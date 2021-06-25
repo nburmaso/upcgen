@@ -1,0 +1,256 @@
+//
+// Created by nburmaso on 6/25/21.
+//
+
+#ifndef LEPGENERATOR__LEPGENERATOR_H_
+#define LEPGENERATOR__LEPGENERATOR_H_
+
+#include "TH1D.h"
+#include "TH2D.h"
+#include "TGraph.h"
+#include "TRandom.h"
+#include "TClonesArray.h"
+#include "Pythia8/Pythia.h"
+#include "TTree.h"
+#include "TLorentzVector.h"
+#include "plog/Log.h"
+#include "plog/Initializers/RollingFileInitializer.h"
+
+using namespace std;
+
+class LepGenerator
+{
+ public:
+  LepGenerator() = default;
+  ~LepGenerator();
+
+  // setters for simulation parameters
+  // ----------------------------------------------------------------------
+
+  // number events to be generated
+  void setNumEvents(int n) { nEvents = n; }
+
+  // minimal pt to generate
+  // caution: user needs to use correspondent pt cut in event selection procedure
+  void setMinPt(double pt) { minPt = pt; }
+
+  // enable pt cuts
+  void setPtCutFlag(bool flag) { doPtCut = flag; }
+
+  // debug level:
+  //  0  -- no debug output
+  //  >0 -- enable debug info
+  void setDebugLevel(int level) { debug = level; }
+
+  // lepton parameters
+  // ----------------------------------------------------------------------
+
+  // mass
+  void setLeptonMass(double mass) { mLep = mass; }
+
+  // anomalous magnetic moment
+  void setLeptonA(double aval) { aLep = aval; }
+
+  // nucleus parameters
+  // ----------------------------------------------------------------------
+  void setNucleusZ(double zval) { Z = zval; }
+  void setNucleusA(double Aval) { A = Aval; }
+
+  // Woods-Saxon
+  void setWSRho0(double rho0Val) { rho0 = rho0Val; }
+  void setWSRadius(double rval) { R = rval; }
+  void setWSA(double aval) { a = aval; }
+
+  // beam parameters
+  // ----------------------------------------------------------------------
+  void setCMSqrtS(double s) { sqrts = s; }
+
+  // cross sections' limits and binnings
+  // ----------------------------------------------------------------------
+
+  void setCSBinningZ(int binsZ) { nz = binsZ; }
+  void setCSBinningW(int binsW) { nw = binsW; }
+  void setCSBinningY(int binsY) { ny = binsY; }
+
+  void setCSLimitsZ(double zlow, double zhi)
+  {
+    zmin = zlow;
+    zmax = zhi;
+  }
+  void setCSLimitsW(double wlow, double whi)
+  {
+    wmin = wlow;
+    wmax = whi;
+  }
+  void setCSLimitsY(double ylow, double yhi)
+  {
+    ymin = ylow;
+    ymax = yhi;
+  }
+
+  // ----------------------------------------------------------------------
+
+  // file parser
+  void initGeneratorFromFile();
+
+  // print parameters
+  void printParameters();
+
+  // the main method
+  void generateEvents();
+
+ private:
+  // internal class methods
+  // ----------------------------------------------------------------------
+
+  // Simpson integrator
+  static double simpson(int n, double* v, double h);
+
+  // photon fluxes
+  double fluxPoint(const double b, const double w, const double g);
+
+  static double fluxFormInt(double* x, double* par);
+
+  double fluxForm(const double b, const double w, const double g);
+
+  // two-photon luminosity
+  double D2LDMDY(double M, double Y);
+
+  // elementary cross section for dilepton production in WZ space
+  double crossSectionWZ(double s, double z);
+
+  // elementary cross section for dilepton production in W space
+  double crossSectionW(double w);
+
+  // histogram filler for WZ-cross section
+  void fillCrossSectionWZ(TH2D* hCrossSectionWZ,
+                          double wmin, double wmax, int nw,
+                          double zmin, double zmax, int nz);
+
+  // histogram filler for W-cross section
+  void fillCrossSectionW(TH1D* hCrossSectionW,
+                         double wmin, double wmax, int nw);
+
+  void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
+
+  // pythia8 helper
+  int importParticles(TClonesArray* particles, Pythia8::Pythia* pythia);
+
+  // simulation & calculation parameters
+  // ----------------------------------------------------------------------
+
+  double mLep{1.77682}; // tau by default
+  double aLep{0};       // lepton anomalous magnetic moment
+
+  // physics constants
+  const double alpha{1.0 / 137.035999074};  // fine structure constant
+  constexpr static double hc{0.1973269718}; // scaling factor
+  const double mProt{0.9382720813};         // proton mass
+
+  // Woods-Saxon parameters
+  static double rho0; // fm-3
+  static double R;    // fm
+  static double a;    // fm
+
+  // parameters of the nucleus
+  double Z{82};
+  double A{208};
+
+  // beam parameters
+  double sqrts{5020};
+  double g1{sqrts / (2. * mProt)};
+  double g2{sqrts / (2. * mProt)};
+
+  // Gaussian integration n = 10
+  // since cos is symmetric around 0 we only need 5
+  // of the points in the gaussian integration.
+  static const int ngi = 5;
+  double weights[ngi]{0.2955242247147529, 0.2692667193099963,
+                      0.2190863625159820, 0.1494513491505806,
+                      0.0666713443086881};
+  double abscissas[ngi]{0.1488743389816312, 0.4333953941292472,
+                        0.6794095682990244, 0.8650633666889845,
+                        0.9739065285171717};
+
+  // flux calculation parameter
+  bool isPoint{true};
+
+  // photon luminosity calculation parameters
+  const int nb1{120};
+  const int nb2{120};
+
+  // cross sections binning
+  double zmin{-1};   // min z
+  double zmax{1};    // max z
+  int nz{100};       // nbins in z = cos(theta)
+  double wmin{3.56}; // min W in GeV
+  double wmax{50.};  // max W in GeV
+  int nw{1001};      // n bins in W
+  double ymin{-6.};  // min pair rapidity
+  double ymax{6.};   // max pair rapidity
+  int ny{121};       // n bins in Y
+
+  // scaling factor
+  double factor{Z * Z * alpha / M_PI / M_PI / hc / hc};
+
+  // helper containers for calculations
+  static const int nb{200};
+  double bmax{20};
+  double db{bmax / (nb - 1)};
+  double vb[nb];
+  double vs[nb];
+  double TA[nb];
+  double rho[nb][nb];
+  double vGAA[nb];
+
+  TGraph* gGAA;
+  TF1* fFluxFormInt;
+
+  // simulation parameters
+  bool doPtCut{false};
+  double minPt{0};
+  int nEvents{1000};
+  int lepPDG{15};
+
+  // helper struct for file output
+  struct Particle {
+    int eventNumber;
+    int pdgCode;
+    int particleID;
+    int motherID;
+    double px;
+    double py;
+    double pz;
+    double e;
+  };
+
+  // parameters dictionary
+  // todo: use <any> from c++17 for a neat parsing???
+  struct InputPars {
+    string inNEvents{"NEVENTS"};
+    string inCMSqrtS{"SQRTS"};
+    string inLepM{"LEP_MASS"};
+    string inLepA{"LEP_A"};
+    string inDoPtCut{"DO_PT_CUT"};
+    string inLowPt{"PT_MIN"};
+    string inLowZ{"ZMIN"};
+    string inHiZ{"ZMAX"};
+    string inLowW{"WMIN"};
+    string inHiW{"WMAX"};
+    string inLowY{"YMIN"};
+    string inHiY{"YMAX"};
+    string inBinsZ{"BINS_Z"};
+    string inBinsW{"BINS_W"};
+    string inBinsY{"BINS_Y"};
+    string inWSRho0{"WS_RHO0"};
+    string inWSRadius{"WS_RAD"};
+    string inWSA{"WS_A"};
+    string inNucZ{"NUCLEUS_Z"};
+    string inNucA{"NUCLUES_A"};
+  };
+
+  // debug level
+  int debug{0};
+};
+
+#endif //LEPGENERATOR__LEPGENERATOR_H_
