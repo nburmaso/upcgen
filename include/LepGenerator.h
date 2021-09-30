@@ -109,7 +109,7 @@ class LepGenerator
   // photon fluxes
   double fluxPoint(const double b, const double w, const double g);
 
-  static double fluxFormInt(double* x, double* par);
+  static double fluxFormInt(double x, void* par);
 
   double fluxForm(const double b, const double w, const double g);
 
@@ -204,7 +204,6 @@ class LepGenerator
   double vGAA[nb];
 
   TGraph* gGAA;
-  TF1* fFluxFormInt;
 
   // simulation parameters
   bool doPtCut{false};
@@ -247,10 +246,11 @@ class LepGenerator
     string inWSA{"WS_A"};
     string inNucZ{"NUCLEUS_Z"};
     string inNucA{"NUCLUES_A"};
+    string inFluxPoint{"FLUX_POINT"};
   };
 
   // debug level
-  int debug{0};
+  static int debug;
 };
 
 #endif //LEPGENERATOR__LEPGENERATOR_H_

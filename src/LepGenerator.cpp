@@ -7,7 +7,6 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TGraph.h"
-#include "TGraph2D.h"
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TMath.h"
@@ -23,17 +22,20 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 
+#include <gsl/gsl_sf.h>
+#include <gsl/gsl_integration.h>
+
 using namespace std;
 
 // out-of-line initialization for static members
 double LepGenerator::rho0 = 0.159538;
 double LepGenerator::R = 6.68;
 double LepGenerator::a = 0.447;
+int LepGenerator::debug = 0;
 
 LepGenerator::~LepGenerator()
 {
   delete gGAA;
-  delete fFluxFormInt;
 }
 
 double LepGenerator::simpson(int n, double* v, double h)
@@ -52,17 +54,26 @@ double LepGenerator::fluxPoint(const double b, const double w, const double g)
 {
   // flux divided by w
   double x = b * w / g / hc;
-  double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
-  double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
-  return factor * w / g / g * (K1 * K1 + K0 * K0 / g / g);
+  double K0 = x > 1e-10 ? gsl_sf_bessel_K0(x) : 0;
+  double K1 = x > 1e-10 ? gsl_sf_bessel_K1(x) : 0;
+  double result = factor * w / g / g * (K1 * K1 + K0 * K0 / g / g);
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result;
+  }
+  return result;
 }
 
-double LepGenerator::fluxFormInt(double* x, double* par)
+double LepGenerator::fluxFormInt(double x, void* params)
 {
-  double k = x[0];
-  double b = par[0];
-  double w = par[1];
-  double g = par[2];
+  double k = x;
+  double b = ((double*)params)[0];
+  double w = ((double*)params)[1];
+  double g = ((double*)params)[2];
+
+  if (debug > 1) {
+    PLOG_DEBUG << "b = " << b << " w = " << w << " g = " << g;
+  }
+
   double t = k * k + w * w / g / g;
   double q = sqrt(t) / hc;
   double sinhVal = sinh(M_PI * q * a);
@@ -72,22 +83,44 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   for (int n = 1; n < 2; n++) {
     ff += 8 * M_PI * rho0 * a * a * a * (n % 2 ? 1 : -1) * n * exp(-n * R / a) / (n * n + q * q * a * a) / (n * n + q * q * a * a);
   }
-  return k * k * ff / t * TMath::BesselJ1(b * k / hc);
+  //  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / hc);
+  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / hc);
+  if (result < 1e-6) {
+    result = 0;
+  }
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result;
+  }
+  return result;
 }
 
+// wrapper for gsl gauss integrator
 double LepGenerator::fluxForm(const double b, const double w, const double g)
 {
   // flux divided by w
   if (isPoint) {
     return fluxPoint(b, w, g);
   }
+
   if (b > 2 * R) {
     return fluxPoint(b, w, g);
   }
-  fFluxFormInt->SetParameter(0, b);
-  fFluxFormInt->SetParameter(1, w);
-  fFluxFormInt->SetParameter(2, g);
-  double Q = fFluxFormInt->Integral(0, 10, 1e-5) / A;
+
+  gsl_integration_workspace* gslWSpace = gsl_integration_workspace_alloc(1000);
+  double result, error;
+  double params[3] = {b, w, g};
+  gsl_function gslFluxForm;
+  gslFluxForm.function = &fluxFormInt;
+  gslFluxForm.params = &params;
+  int quadRule = GSL_INTEG_GAUSS15;
+  gsl_integration_qag(&gslFluxForm, 0, 10, 1e-5, 1e-3, 1000, quadRule, gslWSpace, &result, &error);
+  gsl_integration_workspace_free(gslWSpace);
+
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result << " error = " << error;
+  }
+
+  double Q = result / A;
   return factor * Q * Q / w;
 }
 
@@ -146,7 +179,7 @@ double LepGenerator::D2LDMDY(double M, double Y)
     }
     sum += fluxForm(b1, w1, g1) * sum_b2 * b1 * (b1h - b1l);
   }
-  D2LDMDYx = 2. * M_PI * M / 2. * sum;
+  D2LDMDYx = M_PI * M * sum;
   return D2LDMDYx;
 }
 
@@ -241,7 +274,6 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
 
     double ssm = pow(sqrts, 2) / pow(2 * mProt + 2.1206, 2);
     double csNN = 0.1 * (34.41 + 0.2720 * pow(log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
-    // csNN = 5.467; // SL
 
     // calculate rho and TA
     double b, z, r, s, sum_phi;
@@ -258,7 +290,6 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       TAb[ib] = TA[ib] * b;
       vb[ib] = b;
     }
-    // printf("A = %f\n", 2 * M_PI * simpson(nb, TAb, db));
     auto* gTA = new TGraph(nb, vb, TA);
 
     // calculate GAA
@@ -278,18 +309,19 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
     }
 
-    fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
-
     gGAA = new TGraph(nb, vb, vGAA);
 
     auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
     auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
+    PLOG_INFO << "Calculating 2D luminosity grid..." << 0 << "%";
     for (Int_t iw = 0; iw < nw; iw++) {
       double M = wmin + dw * iw;
       for (Int_t iy = 0; iy < ny; iy++) {
         double y = ymin + dy * iy;
         hD2LDMDY->SetBinContent(iw, iy, D2LDMDY(M, y) * dw * dy);
       }
+      double progressBar = 100. * (double)(iw + 1) / nw;
+      PLOG_INFO << "Calculating 2D luminosity grid..." << fixed << setprecision(2) << progressBar << "%";
     }
     hD2LDMDY->Write();
     f2DLumi->Close();
@@ -456,12 +488,17 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inNucA) {
         A = stod(parValue);
       }
+      if (parameter == parDict.inFluxPoint) {
+        isPoint = stoi(parValue);
+      }
     }
     fInputs.close();
   } else {
     PLOG_WARNING << "Input file not found! Using default parameters...";
     printParameters();
   }
+  // update scaling factor
+  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
 }
 
 void LepGenerator::printParameters()
@@ -470,7 +507,7 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "SQRTS " << sqrts;
   PLOG_WARNING << "LEP_MASS " << mLep;
   PLOG_WARNING << "LEP_A " << aLep;
-  PLOG_WARNING << "DO_PT_CUT " << doPtCut;
+  PLOG_WARNING << "DO_PT_CUT " << (bool)doPtCut;
   PLOG_WARNING << "PT_MIN " << minPt;
   PLOG_WARNING << "ZMIN " << zmin;
   PLOG_WARNING << "ZMAX " << zmax;
@@ -486,10 +523,12 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "WS_A " << a;
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLUES_A " << A;
+  PLOG_WARNING << "FLUX_POINT" << (bool)isPoint;
 }
 
 void LepGenerator::generateEvents()
 {
+  gsl_set_error_handler_off();
   gRandom = new TRandomMT64();
   gRandom->SetSeed(std::time(nullptr));
 
@@ -508,7 +547,9 @@ void LepGenerator::generateEvents()
   auto* hNucCSYM = new TH2D("hNucCSYM", "", ny - 1, ymin, ymax, nw - 1, wmin, wmax);
   nuclearCrossSectionYM(hNucCSYM);
 
-  PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
+  if (debug > 0) {
+    PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
+  }
 
   double mPair = 0.;
   double yPair = 0.;
