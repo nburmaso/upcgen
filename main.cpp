@@ -27,7 +27,6 @@ int main(int argc, char** argv)
   PLOG_INFO << "Initializing the generator...";
   auto* lepGenerator = new LepGenerator();
   lepGenerator->setDebugLevel(debugLevel);
-  lepGenerator->initGeneratorFromFile();
 
   PLOG_INFO << "Starting generation process...";
   lepGenerator->generateEvents();
