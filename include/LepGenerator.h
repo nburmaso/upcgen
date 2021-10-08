@@ -7,6 +7,7 @@
 
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TF1.h"
 #include "TGraph.h"
 #include "TRandom.h"
 #include "TClonesArray.h"
@@ -116,7 +117,7 @@ class LepGenerator
   // photon fluxes
   double fluxPoint(const double b, const double w, const double g);
 
-  static double fluxFormInt(double x, void* par);
+  static double fluxFormInt(double* x, double* par);
 
   double fluxForm(const double b, const double w, const double g);
 
@@ -219,6 +220,7 @@ class LepGenerator
   double vGAA[nb];
 
   TGraph* gGAA;
+  TF1* fFluxFormInt;
 
   // simulation parameters
   bool doPtCut{false};

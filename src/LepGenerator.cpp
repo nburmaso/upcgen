@@ -17,13 +17,11 @@
 #include "TParticle.h"
 #include "TSystem.h"
 #include <fstream>
+#include <omp.h>
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
-
-#include <gsl/gsl_sf.h>
-#include <gsl/gsl_integration.h>
 
 using namespace std;
 
@@ -57,11 +55,7 @@ LepGenerator::LepGenerator()
   decayer->Init();
 }
 
-LepGenerator::~LepGenerator()
-{
-  delete gGAA;
-  delete decayer;
-}
+LepGenerator::~LepGenerator() = default;
 
 double LepGenerator::simpson(int n, double* v, double h)
 {
@@ -79,8 +73,8 @@ double LepGenerator::fluxPoint(const double b, const double w, const double g)
 {
   // flux divided by w
   double x = b * w / g / hc;
-  double K0 = x > 1e-10 ? gsl_sf_bessel_K0(x) : 0;
-  double K1 = x > 1e-10 ? gsl_sf_bessel_K1(x) : 0;
+  double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
+  double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
   double result = factor * w / g / g * (K1 * K1 + K0 * K0 / g / g);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
@@ -88,12 +82,12 @@ double LepGenerator::fluxPoint(const double b, const double w, const double g)
   return result;
 }
 
-double LepGenerator::fluxFormInt(double x, void* params)
+double LepGenerator::fluxFormInt(double* x, double* par)
 {
-  double k = x;
-  double b = ((double*)params)[0];
-  double w = ((double*)params)[1];
-  double g = ((double*)params)[2];
+  double k = x[0];
+  double b = par[0];
+  double w = par[1];
+  double g = par[2];
 
   if (debug > 1) {
     PLOG_DEBUG << "b = " << b << " w = " << w << " g = " << g;
@@ -108,11 +102,7 @@ double LepGenerator::fluxFormInt(double x, void* params)
   for (int n = 1; n < 2; n++) {
     ff += 8 * M_PI * rho0 * a * a * a * (n % 2 ? 1 : -1) * n * exp(-n * R / a) / (n * n + q * q * a * a) / (n * n + q * q * a * a);
   }
-  //  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / hc);
-  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / hc);
-  if (result < 1e-6) {
-    result = 0;
-  }
+  double result = k * k * ff / t * TMath::BesselJ1(b * k / hc);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
   }
@@ -131,22 +121,17 @@ double LepGenerator::fluxForm(const double b, const double w, const double g)
     return fluxPoint(b, w, g);
   }
 
-  gsl_integration_workspace* gslWSpace = gsl_integration_workspace_alloc(1000);
-  double result, error;
-  double params[3] = {b, w, g};
-  gsl_function gslFluxForm;
-  gslFluxForm.function = &fluxFormInt;
-  gslFluxForm.params = &params;
-  int quadRule = GSL_INTEG_GAUSS15;
-  gsl_integration_qag(&gslFluxForm, 0, 10, 1e-5, 1e-3, 1000, quadRule, gslWSpace, &result, &error);
-  gsl_integration_workspace_free(gslWSpace);
+  fFluxFormInt->SetParameter(0, b);
+  fFluxFormInt->SetParameter(1, w);
+  fFluxFormInt->SetParameter(2, g);
+  double Q = fFluxFormInt->Integral(0, 10, 1e-5) / A;
+  double result = factor * Q * Q / w;
 
   if (debug > 1) {
-    PLOG_DEBUG << "result = " << result << " error = " << error;
+    PLOG_DEBUG << "result = " << result;
   }
 
-  double Q = result / A;
-  return factor * Q * Q / w;
+  return result;
 }
 
 double LepGenerator::D2LDMDY(double M, double Y)
@@ -334,6 +319,7 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
     }
 
+    fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
     gGAA = new TGraph(nb, vb, vGAA);
 
     auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
@@ -488,6 +474,8 @@ void LepGenerator::initGeneratorFromFile()
       }
       if (parameter == parDict.inCMSqrtS) {
         sqrts = stod(parValue);
+        g1 = sqrts / (2. * mProt);
+        g2 = sqrts / (2. * mProt);
       }
       if (parameter == parDict.inLepPDG) {
         lepPDG = stoi(parValue);
@@ -595,7 +583,6 @@ void LepGenerator::printParameters()
 
 void LepGenerator::generateEvents()
 {
-  gsl_set_error_handler_off();
   // calculating elementary cross section in WZ space
   // -----------------------------------------------------------------------
   PLOG_INFO << "Calculating elementary cross section...";
