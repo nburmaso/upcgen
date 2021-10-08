@@ -151,8 +151,8 @@ double LepGenerator::D2LDMDY(double M, double Y)
     b2min = 1 * R;
   }
 
-  double b1max = max(5. * g1 * hc / w1, 5 * R);
-  double b2max = max(5. * g2 * hc / w2, 5 * R);
+  double b1max = TMath::Max(5. * g1 * hc / w1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * hc / w2, 5 * R);
   double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
   double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
 
@@ -663,9 +663,9 @@ void LepGenerator::generateEvents()
     }
 
     hNucCSYM->GetRandom2(yPair, mPair);
-    pMag = sqrt(mPair * mPair / 4. - mLep * mLep);
 
     getPairMomentum(mPair, yPair, pPair);
+    pMag = sqrt(pPair.Pz() * pPair.Pz() + pPair.Pt() * pPair.Pt());
 
     binW = hCrossSectionWZ->GetXaxis()->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);
