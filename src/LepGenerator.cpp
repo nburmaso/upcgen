@@ -446,8 +446,8 @@ void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& p
     double angle2 = gRandom->Uniform(0, 2 * M_PI);
     double pt1 = getPhotonPt(w1);
     double pt2 = getPhotonPt(w2);
-    double px = pt1 * cos(2. * M_PI * angle1) + pt2 * cos(2. * M_PI * angle2);
-    double py = pt1 * sin(2. * M_PI * angle1) + pt2 * sin(2. * M_PI * angle2);
+    double px = pt1 * cos(angle1) + pt2 * cos(angle2);
+    double py = pt1 * sin(angle1) + pt2 * sin(angle2);
     double pt = sqrt(px * px + py * py);
     double mtPair = sqrt(mPair * mPair + pt * pt);
     double pz = mtPair * sinh(yPair);
