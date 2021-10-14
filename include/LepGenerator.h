@@ -7,21 +7,29 @@
 
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TF1.h"
 #include "TGraph.h"
 #include "TRandom.h"
 #include "TClonesArray.h"
 #include "Pythia8/Pythia.h"
+#include "TPythia8.h"
+#include "TPythia8Decayer.h"
 #include "TTree.h"
 #include "TLorentzVector.h"
 #include "plog/Log.h"
 #include "plog/Initializers/RollingFileInitializer.h"
+
+#ifdef USE_PYTHIA6
+#include "TPythia6.h"
+#include "TPythia6Decayer.h"
+#endif
 
 using namespace std;
 
 class LepGenerator
 {
  public:
-  LepGenerator() = default;
+  LepGenerator();
   ~LepGenerator();
 
   // setters for simulation parameters
@@ -131,10 +139,21 @@ class LepGenerator
   void fillCrossSectionW(TH1D* hCrossSectionW,
                          double wmin, double wmax, int nw);
 
+  // function to calculate nuclear cross section
+  // using 2D elementary cross section and 2-gamma luminosity
   void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
 
-  // pythia8 helper
-  int importParticles(TClonesArray* particles, Pythia8::Pythia* pythia);
+  // nuclear form factor for momentum transfer q
+  double nucFormFactor(double q);
+
+  // functions for calculating pair momentum
+  // accounting for non-zero photon pt
+  double getPhotonPt(double ePhot);
+  void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
+
+  // pythia helper & decayer parameters
+  int pythiaVersion{8};
+  TVirtualMCDecayer* decayer;
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
@@ -172,9 +191,6 @@ class LepGenerator
                         0.6794095682990244, 0.8650633666889845,
                         0.9739065285171717};
 
-  // flux calculation parameter
-  bool isPoint{true};
-
   // photon luminosity calculation parameters
   const int nb1{120};
   const int nb2{120};
@@ -211,6 +227,8 @@ class LepGenerator
   double minPt{0};
   int nEvents{1000};
   int lepPDG{15};
+  bool isPoint{true}; // flux calculation parameter
+  bool useNonzeroGamPt{true};
 
   // helper struct for file output
   struct Particle {
@@ -229,6 +247,7 @@ class LepGenerator
   struct InputPars {
     string inNEvents{"NEVENTS"};
     string inCMSqrtS{"SQRTS"};
+    string inLepPDG{"LEP_PDG"};
     string inLepM{"LEP_MASS"};
     string inLepA{"LEP_A"};
     string inDoPtCut{"DO_PT_CUT"};
@@ -247,10 +266,13 @@ class LepGenerator
     string inWSA{"WS_A"};
     string inNucZ{"NUCLEUS_Z"};
     string inNucA{"NUCLUES_A"};
+    string inFluxPoint{"FLUX_POINT"};
+    string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
+    string inPythiaVer{"PYTHIA_VERSION"};
   };
 
   // debug level
-  int debug{0};
+  static int debug;
 };
 
 #endif //LEPGENERATOR__LEPGENERATOR_H_

@@ -4,7 +4,8 @@ This is a simple event generator dedicated to dilepton production process in ult
 
 ### Requirements
 
-* Pythia8 event generator (for decays). See [Pythia website](https://pythia.org/) for installation instructions
+* Pythia8 event generator (for decays). See [Pythia website](https://pythia.org/) for installation instructions. It is
+  also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support.
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
 * CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
 
@@ -14,8 +15,12 @@ This generator utilizes simple [plog](https://github.com/SergiusTheBest/plog) li
 
 ### Quick guide
 
-* Clone this repository, then build the project:
-
+* Clone this repository
+* Install ROOT with Pythia8 support (at least Pythia8)
+* Load ROOT environment
+* Setup Pythia8 environment by exporting `PYTHIA8=/path/to/pythia/installation`
+* Optionally: build the generator with Pythia6 using cmake flag `BUILD_WITH_PYTHIA6=ON`
+* Build the project:
 ```shell
 cd path/to/cloned/repo
 mkdir build
@@ -30,9 +35,13 @@ To run the generator use
 ./generate debug_level
 ```
 
-here, `debug_level` is `0` or `1` (for now). In debug mode, the generator will also print number of the event being processed and verbose information about produced particles.
+here, `debug_level` is `0`, `1`, or `2`. In debug mode, the generator will also print number of the event being
+processed and verbose information about produced particles. In the most verbose mode (`2`) the program will also print
+intermediate calculation results, so it is recommended to use it very carefully (and also to look in the code, if
+possible).
 
-Generated events will be stored to `events_{a_lep}_{pt_cut}.root`, where `a_lep` is a value of the anomalous magnetic moment and `pt_cut` is a minimal transverse momentum for a pair of leptons.
+Generated events will be stored to `events_{a_lep}_{pt_cut}.root`, where `a_lep` is a value of the anomalous magnetic
+moment and `pt_cut` is a minimal transverse momentum for a pair of leptons.
 
 ### Input parameters
 
@@ -60,6 +69,8 @@ WS_RAD 6.68       #                         R
 WS_A 0.447        #                         a
 NUCLEUS_Z 82      # atomic number of the incoming nuclei
 NUCLUES_A 208     # atomic mass of the incoming nuclei
+FLUX_POINT 1      # use point flux approximation or not
+PYTHIA_VERSION 8  # Pythia version: either 6 or 8. 8 is used by default
 ```
 
 * Note that the order, and the number of the parameters are not fixed.

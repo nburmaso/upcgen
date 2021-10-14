@@ -8,10 +8,12 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 
-// todo: make a parser for input parameters stored in a file
-
 int main(int argc, char** argv)
 {
+  // logging levels:
+  //  0 -> no debug logs
+  //  1 -> basic debug logs
+  //  2 -> verbose logs with intermediate calculation results
   PLOG_FATAL_IF(argc < 2) << "Wrong number of parameters! Usage: generate debug_level";
 
   // initialize logger
@@ -25,7 +27,6 @@ int main(int argc, char** argv)
   PLOG_INFO << "Initializing the generator...";
   auto* lepGenerator = new LepGenerator();
   lepGenerator->setDebugLevel(debugLevel);
-  lepGenerator->initGeneratorFromFile();
 
   PLOG_INFO << "Starting generation process...";
   lepGenerator->generateEvents();

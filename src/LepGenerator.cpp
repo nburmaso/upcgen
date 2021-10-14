@@ -7,7 +7,6 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TGraph.h"
-#include "TGraph2D.h"
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TMath.h"
@@ -18,6 +17,7 @@
 #include "TParticle.h"
 #include "TSystem.h"
 #include <fstream>
+#include <omp.h>
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Formatters/TxtFormatter.h>
@@ -29,12 +29,33 @@ using namespace std;
 double LepGenerator::rho0 = 0.159538;
 double LepGenerator::R = 6.68;
 double LepGenerator::a = 0.447;
+int LepGenerator::debug = 0;
 
-LepGenerator::~LepGenerator()
+LepGenerator::LepGenerator()
 {
-  delete gGAA;
-  delete fFluxFormInt;
+  // get parameters from file
+  initGeneratorFromFile();
+
+  // initialize the MT64 random number generator
+  gRandom = new TRandomMT64();
+  gRandom->SetSeed(time(nullptr));
+
+  // initialize pythia for decays
+  PLOG_INFO << "Initializing Pythia-based decayer";
+  if (pythiaVersion == 8) {
+    decayer = new TPythia8Decayer();
+  } else if (pythiaVersion == 6) {
+    decayer = new TPythia6Decayer();
+  } else {
+    PLOG_WARNING << "Wrong Pythia version! Please choose either 8 or 6";
+    PLOG_WARNING << "Using Pythia8 by default...";
+    decayer = new TPythia8Decayer();
+  }
+
+  decayer->Init();
 }
+
+LepGenerator::~LepGenerator() = default;
 
 double LepGenerator::simpson(int n, double* v, double h)
 {
@@ -54,7 +75,11 @@ double LepGenerator::fluxPoint(const double b, const double w, const double g)
   double x = b * w / g / hc;
   double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
   double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
-  return factor * w / g / g * (K1 * K1 + K0 * K0 / g / g);
+  double result = factor * w / g / g * (K1 * K1 + K0 * K0 / g / g);
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result;
+  }
+  return result;
 }
 
 double LepGenerator::fluxFormInt(double* x, double* par)
@@ -63,6 +88,11 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   double b = par[0];
   double w = par[1];
   double g = par[2];
+
+  if (debug > 1) {
+    PLOG_DEBUG << "b = " << b << " w = " << w << " g = " << g;
+  }
+
   double t = k * k + w * w / g / g;
   double q = sqrt(t) / hc;
   double sinhVal = sinh(M_PI * q * a);
@@ -72,23 +102,36 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   for (int n = 1; n < 2; n++) {
     ff += 8 * M_PI * rho0 * a * a * a * (n % 2 ? 1 : -1) * n * exp(-n * R / a) / (n * n + q * q * a * a) / (n * n + q * q * a * a);
   }
-  return k * k * ff / t * TMath::BesselJ1(b * k / hc);
+  double result = k * k * ff / t * TMath::BesselJ1(b * k / hc);
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result;
+  }
+  return result;
 }
 
+// wrapper for gsl gauss integrator
 double LepGenerator::fluxForm(const double b, const double w, const double g)
 {
   // flux divided by w
   if (isPoint) {
     return fluxPoint(b, w, g);
   }
+
   if (b > 2 * R) {
     return fluxPoint(b, w, g);
   }
+
   fFluxFormInt->SetParameter(0, b);
   fFluxFormInt->SetParameter(1, w);
   fFluxFormInt->SetParameter(2, g);
   double Q = fFluxFormInt->Integral(0, 10, 1e-5) / A;
-  return factor * Q * Q / w;
+  double result = factor * Q * Q / w;
+
+  if (debug > 1) {
+    PLOG_DEBUG << "result = " << result;
+  }
+
+  return result;
 }
 
 double LepGenerator::D2LDMDY(double M, double Y)
@@ -108,8 +151,8 @@ double LepGenerator::D2LDMDY(double M, double Y)
     b2min = 1 * R;
   }
 
-  double b1max = max(5. * g1 * hc / w1, 5 * R);
-  double b2max = max(5. * g2 * hc / w2, 5 * R);
+  double b1max = TMath::Max(5. * g1 * hc / w1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * hc / w2, 5 * R);
   double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
   double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
 
@@ -146,7 +189,7 @@ double LepGenerator::D2LDMDY(double M, double Y)
     }
     sum += fluxForm(b1, w1, g1) * sum_b2 * b1 * (b1h - b1l);
   }
-  D2LDMDYx = 2. * M_PI * M / 2. * sum;
+  D2LDMDYx = M_PI * M * sum;
   return D2LDMDYx;
 }
 
@@ -241,7 +284,6 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
 
     double ssm = pow(sqrts, 2) / pow(2 * mProt + 2.1206, 2);
     double csNN = 0.1 * (34.41 + 0.2720 * pow(log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
-    // csNN = 5.467; // SL
 
     // calculate rho and TA
     double b, z, r, s, sum_phi;
@@ -258,7 +300,6 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       TAb[ib] = TA[ib] * b;
       vb[ib] = b;
     }
-    // printf("A = %f\n", 2 * M_PI * simpson(nb, TAb, db));
     auto* gTA = new TGraph(nb, vb, TA);
 
     // calculate GAA
@@ -279,17 +320,19 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
     }
 
     fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
-
     gGAA = new TGraph(nb, vb, vGAA);
 
     auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
     auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
+    PLOG_INFO << "Calculating 2D luminosity grid..." << 0 << "%";
     for (Int_t iw = 0; iw < nw; iw++) {
       double M = wmin + dw * iw;
       for (Int_t iy = 0; iy < ny; iy++) {
         double y = ymin + dy * iy;
         hD2LDMDY->SetBinContent(iw, iy, D2LDMDY(M, y) * dw * dy);
       }
+      double progressBar = 100. * (double)(iw + 1) / nw;
+      PLOG_INFO << "Calculating 2D luminosity grid..." << fixed << setprecision(2) << progressBar << "%";
     }
     hD2LDMDY->Write();
     f2DLumi->Close();
@@ -339,48 +382,78 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
   PLOG_INFO << "Total nuclear cross section = " << cssum << " mb";
 }
 
-// from ROOT
-int LepGenerator::importParticles(TClonesArray* particles, Pythia8::Pythia* pythia)
+// Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999
+double LepGenerator::nucFormFactor(double q)
 {
-  if (particles == nullptr) {
-    return 0;
+  double ffactor;
+  if (Z < 7) {
+    ffactor = exp(-R * R * q * q / (6 * hc * hc));
   }
-  TClonesArray& clonesParticles = *particles;
-  clonesParticles.Clear();
-  int nparts = 0;
-  int i;
-  int ioff = 0;
-  int numberOfParticles = pythia->event.size();
-  if (pythia->event[0].id() == 90) {
-    ioff = -1;
+  if (Z >= 7) {
+    double qR = q * R / hc;
+    double invqR = hc / (q * R);
+    ffactor = (sin(qR) - qR * cos(qR)) * 3. * invqR * invqR * invqR;
+    ffactor = ffactor / (1. + (a * a * q * q) / (hc * hc));
   }
+  return ffactor;
+}
 
-  for (i = 0; i < numberOfParticles; i++) {
-    if (pythia->event[i].id() == 90) {
-      continue;
+double LepGenerator::getPhotonPt(double ePhot)
+{
+  double y1 = acosh(g1);
+  double y2 = -acosh(g2);
+  double gtot = cosh((y1 - y2) / 2.);
+
+  double ereds = (ePhot / gtot) * (ePhot / gtot);
+  // sqrt(3) * E / gamma_em is p_t where the distribution is a maximum
+  double Cm = sqrt(3.) * ePhot / gtot;
+  // the amplitude of the p_t spectrum at the maximum
+  double sFFactCM = nucFormFactor(Cm * Cm + ereds);
+  double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (4. * M_PI * (ereds + Cm * Cm) * M_PI * (ereds + Cm * Cm));
+
+  // pick a test value pp, and find the amplitude there
+  double x = gRandom->Uniform(0, 1);
+  double pp = x * 5. * hc / R;
+  double sFFactPt1 = nucFormFactor(pp * pp + ereds);
+  double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (4. * M_PI * (ereds + pp * pp) * M_PI * (ereds + pp * pp));
+
+  bool satisfy = false;
+  while (!satisfy) {
+    double u = gRandom->Uniform(0, 1);
+    if (u * Coef < test) {
+      satisfy = true;
+    } else {
+      x = gRandom->Uniform(0, 1);
+      pp = 5 * hc / R * x;
+      double sFFactPt2 = nucFormFactor(pp * pp + ereds);
+      test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (4. * M_PI * (ereds + pp * pp) * M_PI * (ereds + pp * pp));
     }
-    new (clonesParticles[nparts]) TParticle(
-      pythia->event[i].id(),
-      pythia->event[i].isFinal(),
-      pythia->event[i].mother1() + ioff,
-      pythia->event[i].mother2() + ioff,
-      pythia->event[i].daughter1() + ioff,
-      pythia->event[i].daughter2() + ioff,
-      pythia->event[i].px(),     // [GeV/c]
-      pythia->event[i].py(),     // [GeV/c]
-      pythia->event[i].pz(),     // [GeV/c]
-      pythia->event[i].e(),      // [GeV]
-      pythia->event[i].xProd(),  // [mm]
-      pythia->event[i].yProd(),  // [mm]
-      pythia->event[i].zProd(),  // [mm]
-      pythia->event[i].tProd()); // [mm/c]
-    nparts++;
-  } // particle loop
-
-  if (ioff == -1) {
-    numberOfParticles--;
   }
-  return nparts;
+
+  return pp;
+}
+
+void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
+{
+  if (!useNonzeroGamPt) {
+    double mtPair = sqrt(mPair * mPair); // pairPt = 0
+    pPair.SetPxPyPzE(0., 0., mtPair * sinh(yPair), mtPair * cosh(yPair));
+  }
+  if (useNonzeroGamPt) {
+    double w1 = mPair / 2 * exp(yPair);
+    double w2 = mPair / 2 * exp(-yPair);
+    double angle1 = gRandom->Uniform(0, 2 * M_PI);
+    double angle2 = gRandom->Uniform(0, 2 * M_PI);
+    double pt1 = getPhotonPt(w1);
+    double pt2 = getPhotonPt(w2);
+    double px = pt1 * cos(angle1) + pt2 * cos(angle2);
+    double py = pt1 * sin(angle1) + pt2 * sin(angle2);
+    double pt = sqrt(px * px + py * py);
+    double mtPair = sqrt(mPair * mPair + pt * pt);
+    double pz = mtPair * sinh(yPair);
+    double e = mtPair * cosh(yPair);
+    pPair.SetPxPyPzE(px, py, pz, e);
+  }
 }
 
 void LepGenerator::initGeneratorFromFile()
@@ -393,14 +466,19 @@ void LepGenerator::initGeneratorFromFile()
     string line;
     string parameter;
     string parValue;
-    while (std::getline(fInputs, line)) {
-      std::istringstream iss(line);
+    while (getline(fInputs, line)) {
+      istringstream iss(line);
       iss >> parameter >> parValue;
       if (parameter == parDict.inNEvents) {
         nEvents = stoi(parValue);
       }
       if (parameter == parDict.inCMSqrtS) {
         sqrts = stod(parValue);
+        g1 = sqrts / (2. * mProt);
+        g2 = sqrts / (2. * mProt);
+      }
+      if (parameter == parDict.inLepPDG) {
+        lepPDG = stoi(parValue);
       }
       if (parameter == parDict.inLepM) {
         mLep = stod(parValue);
@@ -456,18 +534,30 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inNucA) {
         A = stod(parValue);
       }
+      if (parameter == parDict.inFluxPoint) {
+        isPoint = stoi(parValue);
+      }
+      if (parameter == parDict.inPythiaVer) {
+        pythiaVersion = stoi(parValue);
+      }
+      if (parameter == parDict.inNonzeroGamPt) {
+        useNonzeroGamPt = stoi(parValue);
+      }
     }
     fInputs.close();
   } else {
     PLOG_WARNING << "Input file not found! Using default parameters...";
     printParameters();
   }
+  // update scaling factor
+  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
 }
 
 void LepGenerator::printParameters()
 {
   PLOG_WARNING << "NEVENTS " << nEvents;
   PLOG_WARNING << "SQRTS " << sqrts;
+  PLOG_WARNING << "LEP_PDG " << lepPDG;
   PLOG_WARNING << "LEP_MASS " << mLep;
   PLOG_WARNING << "LEP_A " << aLep;
   PLOG_WARNING << "DO_PT_CUT " << doPtCut;
@@ -486,13 +576,13 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "WS_A " << a;
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLUES_A " << A;
+  PLOG_WARNING << "FLUX_POINT" << isPoint;
+  PLOG_WARNING << "NON_ZERO_GAM_PT" << useNonzeroGamPt;
+  PLOG_WARNING << "PYTHIA_VERSION" << pythiaVersion;
 }
 
 void LepGenerator::generateEvents()
 {
-  gRandom = new TRandomMT64();
-  gRandom->SetSeed(std::time(nullptr));
-
   // calculating elementary cross section in WZ space
   // -----------------------------------------------------------------------
   PLOG_INFO << "Calculating elementary cross section...";
@@ -508,7 +598,9 @@ void LepGenerator::generateEvents()
   auto* hNucCSYM = new TH2D("hNucCSYM", "", ny - 1, ymin, ymax, nw - 1, wmin, wmax);
   nuclearCrossSectionYM(hNucCSYM);
 
-  PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
+  if (debug > 0) {
+    PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
+  }
 
   double mPair = 0.;
   double yPair = 0.;
@@ -557,30 +649,23 @@ void LepGenerator::generateEvents()
   outTree.Branch("e", &particle.e, "e/D");
   outTree.SetAutoSave(0);
 
-  // initialize pythia8 for decays
-  PLOG_INFO << "Initializing Pythia8-based decayer";
-  auto* pythia = new Pythia8::Pythia();
-  pythia->readString("SoftQCD:elastic = on");
-  pythia->init();
-
   TClonesArray decayParticles("TParticle");
   TLorentzVector tlVector;
-  std::vector<int> pdgLeps(2);
+  vector<int> pdgLeps(2);
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
   for (int evt = 0; evt < nEvents; evt++) {
-    if (debug > 0) {
+    if (debug > 1) {
       PLOG_DEBUG << "Event number: " << evt + 1;
-    } else if ((evt + 1) % 10000 == 0) {
+    } else if ((evt + 1) % 100000 == 0) {
       PLOG_INFO << "Event number: " << evt + 1;
     }
 
     hNucCSYM->GetRandom2(yPair, mPair);
-    pMag = sqrt(mPair * mPair / 4. - mLep * mLep);
 
-    mtPair = sqrt(mPair * mPair + ptPair * ptPair);
-    pPair.SetPxPyPzE(0., 0., mtPair * sinh(yPair), mtPair * cosh(yPair));
+    getPairMomentum(mPair, yPair, pPair);
+    pMag = sqrt(pPair.Pz() * pPair.Pz() + pPair.Pt() * pPair.Pt());
 
     binW = hCrossSectionWZ->GetXaxis()->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);
@@ -614,17 +699,14 @@ void LepGenerator::generateEvents()
     pdgLeps[0] = sign * lepPDG;
     pdgLeps[1] = -sign * lepPDG;
 
-    // lepton decays using Pythia8
+    // lepton decays
     for (int iLep = 0; iLep < 2; iLep++) {
       int partID = 0;
-      pythia->event.clear();
-      int lepID = pythia->event.append(pdgLeps[iLep], 11, 0, 0, pLeps[iLep].Px(), pLeps[iLep].Py(), pLeps[iLep].Pz(), pLeps[iLep].E(), pLeps[iLep].M());
-      pythia->particleData.mayDecay(lepID, true);
-      pythia->moreDecays();
-      importParticles(&decayParticles, pythia);
+      decayer->Decay(pdgLeps[iLep], &pLeps[iLep]);
+      decayer->ImportParticles(&decayParticles);
       for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
         auto* part = (TParticle*)decayParticles.At(ip);
-        if (debug > 0) {
+        if (debug > 1) {
           PLOG_DEBUG << "Particle info:";
           part->Print();
         }
@@ -642,7 +724,6 @@ void LepGenerator::generateEvents()
         outTree.Fill();
         partID++;
       }
-      pythia->event.clear();
     }
     delete hCSSliceAtW;
   }
