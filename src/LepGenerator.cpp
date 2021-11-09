@@ -109,7 +109,6 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   return result;
 }
 
-// wrapper for gsl gauss integrator
 double LepGenerator::fluxForm(const double b, const double w, const double g)
 {
   // flux divided by w

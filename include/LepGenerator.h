@@ -32,69 +32,10 @@ class LepGenerator
   LepGenerator();
   ~LepGenerator();
 
-  // setters for simulation parameters
-  // ----------------------------------------------------------------------
-
-  // number events to be generated
-  void setNumEvents(int n) { nEvents = n; }
-
-  // minimal pt to generate
-  // caution: user needs to use correspondent pt cut in event selection procedure
-  void setMinPt(double pt) { minPt = pt; }
-
-  // enable pt cuts
-  void setPtCutFlag(bool flag) { doPtCut = flag; }
-
   // debug level:
   //  0  -- no debug output
   //  >0 -- enable debug info
   void setDebugLevel(int level) { debug = level; }
-
-  // lepton parameters
-  // ----------------------------------------------------------------------
-
-  // mass
-  void setLeptonMass(double mass) { mLep = mass; }
-
-  // anomalous magnetic moment
-  void setLeptonA(double aval) { aLep = aval; }
-
-  // nucleus parameters
-  // ----------------------------------------------------------------------
-  void setNucleusZ(double zval) { Z = zval; }
-  void setNucleusA(double Aval) { A = Aval; }
-
-  // Woods-Saxon
-  void setWSRho0(double rho0Val) { rho0 = rho0Val; }
-  void setWSRadius(double rval) { R = rval; }
-  void setWSA(double aval) { a = aval; }
-
-  // beam parameters
-  // ----------------------------------------------------------------------
-  void setCMSqrtS(double s) { sqrts = s; }
-
-  // cross sections' limits and binnings
-  // ----------------------------------------------------------------------
-
-  void setCSBinningZ(int binsZ) { nz = binsZ; }
-  void setCSBinningW(int binsW) { nw = binsW; }
-  void setCSBinningY(int binsY) { ny = binsY; }
-
-  void setCSLimitsZ(double zlow, double zhi)
-  {
-    zmin = zlow;
-    zmax = zhi;
-  }
-  void setCSLimitsW(double wlow, double whi)
-  {
-    wmin = wlow;
-    wmax = whi;
-  }
-  void setCSLimitsY(double ylow, double yhi)
-  {
-    ymin = ylow;
-    ymax = yhi;
-  }
 
   // ----------------------------------------------------------------------
 
