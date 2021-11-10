@@ -206,7 +206,7 @@ class LepGenerator
     string inWSRadius{"WS_RAD"};
     string inWSA{"WS_A"};
     string inNucZ{"NUCLEUS_Z"};
-    string inNucA{"NUCLUES_A"};
+    string inNucA{"NUCLEUS_A"};
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
