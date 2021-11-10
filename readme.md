@@ -68,7 +68,7 @@ WS_RHO0 0.159538  # Woods-Saxon parameters: rho0
 WS_RAD 6.68       #                         R
 WS_A 0.447        #                         a
 NUCLEUS_Z 82      # atomic number of the incoming nuclei
-NUCLUES_A 208     # atomic mass of the incoming nuclei
+NUCLEUS_A 208     # atomic mass of the incoming nuclei
 FLUX_POINT 1      # use point flux approximation or not
 PYTHIA_VERSION 8  # Pythia version: either 6 or 8. 8 is used by default
 ```
