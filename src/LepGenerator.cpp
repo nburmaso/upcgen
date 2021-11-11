@@ -575,9 +575,9 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "WS_A " << a;
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLEUS_A " << A;
-  PLOG_WARNING << "FLUX_POINT" << isPoint;
-  PLOG_WARNING << "NON_ZERO_GAM_PT" << useNonzeroGamPt;
-  PLOG_WARNING << "PYTHIA_VERSION" << pythiaVersion;
+  PLOG_WARNING << "FLUX_POINT " << isPoint;
+  PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
+  PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
 }
 
 void LepGenerator::generateEvents()
