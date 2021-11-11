@@ -45,7 +45,9 @@ LepGenerator::LepGenerator()
   if (pythiaVersion == 8) {
     decayer = new TPythia8Decayer();
   } else if (pythiaVersion == 6) {
+#ifdef USE_PYTHIA6
     decayer = new TPythia6Decayer();
+#endif
   } else {
     PLOG_WARNING << "Wrong Pythia version! Please choose either 8 or 6";
     PLOG_WARNING << "Using Pythia8 by default...";
