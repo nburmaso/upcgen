@@ -96,9 +96,9 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   }
 
   double t = k * k + w * w / g / g;
-  double q = sqrt(t) / hc;
-  double sinhVal = sinh(M_PI * q * a);
-  double coshVal = cosh(M_PI * q * a);
+  double q = TMath::Sqrt(t) / hc;
+  double sinhVal = TMath::SinH(M_PI * q * a);
+  double coshVal = TMath::CosH(M_PI * q * a);
   double ff = 4 * M_PI * M_PI * rho0 * a * a * a / (q * a * q * a * sinhVal * sinhVal) *
               (M_PI * q * a * coshVal * sin(q * R) - q * R * cos(q * R) * sinhVal);
   for (int n = 1; n < 2; n++) {
