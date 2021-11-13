@@ -1,5 +1,5 @@
 //
-// Created by nburmaso on 6/25/21.
+// created by Nazar Burmasov on 6/25/21.
 //
 
 #ifndef LEPGENERATOR__LEPGENERATOR_H_
@@ -37,6 +37,9 @@ class LepGenerator
   //  >0 -- enable debug info
   void setDebugLevel(int level) { debug = level; }
 
+  // number of threads for two-photon luminosity calculation
+  void setNumThreads(int n) { numThreads = n; }
+
   // ----------------------------------------------------------------------
 
   // file parser
@@ -49,6 +52,8 @@ class LepGenerator
   void generateEvents();
 
  private:
+  int numThreads{1};
+
   // internal class methods
   // ----------------------------------------------------------------------
 
@@ -60,10 +65,10 @@ class LepGenerator
 
   static double fluxFormInt(double* x, double* par);
 
-  double fluxForm(const double b, const double w, const double g);
+  double fluxForm(const double b, const double w, const double g, TF1* fFluxForm);
 
   // two-photon luminosity
-  double D2LDMDY(double M, double Y);
+  double D2LDMDY(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
   // elementary cross section for dilepton production in WZ space
   double crossSectionWZ(double s, double z);
@@ -160,9 +165,6 @@ class LepGenerator
   double rho[nb][nb];
   double vGAA[nb];
 
-  TGraph* gGAA;
-  TF1* fFluxFormInt;
-
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
@@ -216,4 +218,4 @@ class LepGenerator
   static int debug;
 };
 
-#endif //LEPGENERATOR__LEPGENERATOR_H_
+#endif // LEPGENERATOR__LEPGENERATOR_H_

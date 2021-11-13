@@ -1,5 +1,5 @@
 //
-// Created by nburmaso on 6/25/21.
+// Created by Nazar Burmasov on 6/25/21.
 //
 
 #include "LepGenerator.h"
@@ -15,13 +15,17 @@
 #include "TRandomGen.h"
 #include "TLorentzVector.h"
 #include "TParticle.h"
+#include "TROOT.h"
 #include "TSystem.h"
 #include <fstream>
-#include <omp.h>
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
+
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
 
 using namespace std;
 
@@ -111,7 +115,7 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   return result;
 }
 
-double LepGenerator::fluxForm(const double b, const double w, const double g)
+double LepGenerator::fluxForm(const double b, const double w, const double g, TF1* fFluxFormInt)
 {
   // flux divided by w
   if (isPoint) {
@@ -125,6 +129,7 @@ double LepGenerator::fluxForm(const double b, const double w, const double g)
   fFluxFormInt->SetParameter(0, b);
   fFluxFormInt->SetParameter(1, w);
   fFluxFormInt->SetParameter(2, g);
+  //  PLOG_DEBUG << "Thread " << omp_get_thread_num() << ": " << fFluxFormInt->GetName();
   double Q = fFluxFormInt->Integral(0, 10, 1e-5) / A;
   double result = factor * Q * Q / w;
 
@@ -135,7 +140,7 @@ double LepGenerator::fluxForm(const double b, const double w, const double g)
   return result;
 }
 
-double LepGenerator::D2LDMDY(double M, double Y)
+double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph* gGAA)
 {
   // double differential luminosity
   double D2LDMDYx = 0.;
@@ -162,7 +167,7 @@ double LepGenerator::D2LDMDY(double M, double Y)
     double b2l = b2min * exp(j * log_delta_b2);
     double b2h = b2min * exp((j + 1) * log_delta_b2);
     double b2 = (b2h + b2l) / 2.;
-    flux[j] = fluxForm(b2, w2, g2);
+    flux[j] = fluxForm(b2, w2, g2, fFluxFormInt);
   }
 
   double sum = 0;
@@ -188,7 +193,7 @@ double LepGenerator::D2LDMDY(double M, double Y)
       }
       sum_b2 += flux[j] * M_PI * sum_phi * b2 * (b2h - b2l);
     }
-    sum += fluxForm(b1, w1, g1) * sum_b2 * b1 * (b1h - b1l);
+    sum += fluxForm(b1, w1, g1, fFluxFormInt) * sum_b2 * b1 * (b1h - b1l);
   }
   D2LDMDYx = M_PI * M * sum;
   return D2LDMDYx;
@@ -319,10 +324,39 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       }
       vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
     }
+    auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
+    auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
 
-    fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
-    gGAA = new TGraph(nb, vb, vGAA);
-
+    // using ether parallel or serial implementation
+#ifdef USE_OPENMP
+    ROOT::EnableThreadSafety();
+    int iw, iy;
+    omp_set_num_threads(numThreads);
+#pragma omp parallel default(none) \
+  shared(hD2LDMDY) private(iw, iy) firstprivate(numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights)
+    {
+      auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
+      auto* gGAA = new TGraph(nb, vb, vGAA);
+      auto* hD2LDMDY_private = new TH2D(Form("hD2LDMDY_private_%d", omp_get_thread_num()), ";;", nw, wmin, wmax, ny, ymin, ymax);
+      int threadNum = omp_get_thread_num();
+      int lowW = nw * threadNum / numThreads;
+      int highW = nw * (threadNum + 1) / numThreads;
+      for (iw = lowW; iw < highW; iw++) {
+        double M = wmin + dw * iw;
+        for (iy = 0; iy < ny; iy++) {
+          double y = ymin + dy * iy;
+          double item = D2LDMDY(M, y, fFluxFormInt, gGAA);
+          hD2LDMDY_private->SetBinContent(iw, iy, item * dw * dy);
+        }
+      }
+#pragma omp critical
+      {
+        hD2LDMDY->Add(hD2LDMDY_private);
+      }
+    }
+#else
+    auto* fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
+    auto* gGAA = new TGraph(nb, vb, vGAA);
     auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
     auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
     PLOG_INFO << "Calculating 2D luminosity grid..." << 0 << "%";
@@ -330,11 +364,12 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       double M = wmin + dw * iw;
       for (Int_t iy = 0; iy < ny; iy++) {
         double y = ymin + dy * iy;
-        hD2LDMDY->SetBinContent(iw, iy, D2LDMDY(M, y) * dw * dy);
+        hD2LDMDY->SetBinContent(iw, iy, D2LDMDY(M, y, fFluxFormInt, gGAA) * dw * dy);
       }
       double progressBar = 100. * (double)(iw + 1) / nw;
       PLOG_INFO << "Calculating 2D luminosity grid..." << fixed << setprecision(2) << progressBar << "%";
     }
+#endif
     hD2LDMDY->Write();
     f2DLumi->Close();
 
