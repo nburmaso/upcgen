@@ -331,9 +331,11 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
 #ifdef USE_OPENMP
     ROOT::EnableThreadSafety();
     int iw, iy;
+    int progress = 0;
+    int total = ny * nw;
     omp_set_num_threads(numThreads);
 #pragma omp parallel default(none) \
-  shared(hD2LDMDY) private(iw, iy) firstprivate(numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights)
+  shared(hD2LDMDY, progress) private(iw, iy) firstprivate(total, numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -347,6 +349,11 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
           double y = ymin + dy * iy;
           double item = D2LDMDY(M, y, fFluxFormInt, gGAA);
           hD2LDMDY_private->SetBinContent(iw, iy, item * dw * dy);
+          progress++;
+        }
+        if (threadNum == 0) {
+          double progressBar = 100. * progress / total;
+          PLOG_INFO << "Calculating two-photon luminosity: " << fixed << setprecision(2) << progressBar << "%";
         }
       }
 #pragma omp critical
@@ -429,7 +436,8 @@ double LepGenerator::nucFormFactor(double q)
     double qR = q * R / hc;
     double invqR = hc / (q * R);
     ffactor = (sin(qR) - qR * cos(qR)) * 3. * invqR * invqR * invqR;
-    ffactor = ffactor / (1. + (a * a * q * q) / (hc * hc));
+    const double a0 = 0.7; // [fm]
+    ffactor = ffactor / (1. + (a0 * a0 * q * q) / (hc * hc));
   }
   return ffactor;
 }
@@ -441,13 +449,10 @@ double LepGenerator::getPhotonPt(double ePhot)
   double gtot = cosh((y1 - y2) / 2.);
 
   double ereds = (ePhot / gtot) * (ePhot / gtot);
-  // sqrt(3) * E / gamma_em is p_t where the distribution is a maximum
   double Cm = sqrt(3.) * ePhot / gtot;
-  // the amplitude of the p_t spectrum at the maximum
   double sFFactCM = nucFormFactor(Cm * Cm + ereds);
   double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (4. * M_PI * (ereds + Cm * Cm) * M_PI * (ereds + Cm * Cm));
 
-  // pick a test value pp, and find the amplitude there
   double x = gRandom->Uniform(0, 1);
   double pp = x * 5. * hc / R;
   double sFFactPt1 = nucFormFactor(pp * pp + ereds);
@@ -472,7 +477,7 @@ double LepGenerator::getPhotonPt(double ePhot)
 void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
 {
   if (!useNonzeroGamPt) {
-    double mtPair = sqrt(mPair * mPair); // pairPt = 0
+    double mtPair = mPair; // pairPt = 0
     pPair.SetPxPyPzE(0., 0., mtPair * sinh(yPair), mtPair * cosh(yPair));
   }
   if (useNonzeroGamPt) {
