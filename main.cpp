@@ -19,7 +19,10 @@ int main(int argc, char** argv)
   static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
   plog::init(plog::verbose, &consoleAppender);
 
-  PLOG_FATAL_IF(argc >= 3) << "Wrong number of parameters! Usage: generate debug_level [optional]number_of_threads";
+  PLOG_FATAL_IF(argc > 3) << "Wrong number of parameters! Usage: generate debug_level [optional]number_of_threads";
+  if (argc > 3) {
+    return -1;
+  }
 
   // input
   int debugLevel = std::stoi(argv[1]);
