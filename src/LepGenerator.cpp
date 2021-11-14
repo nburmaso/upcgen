@@ -105,7 +105,7 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   double sinhVal = TMath::SinH(M_PI * q * a);
   double coshVal = TMath::CosH(M_PI * q * a);
   double ff = 4 * M_PI * M_PI * rho0 * a * a * a / (q * a * q * a * sinhVal * sinhVal) *
-              (M_PI * q * a * coshVal * sin(q * R) - q * R * cos(q * R) * sinhVal);
+              (M_PI * q * a * coshVal * TMath::Sin(q * R) - q * R * TMath::Cos(q * R) * sinhVal);
   for (int n = 1; n < 2; n++) {
     ff += 8 * M_PI * rho0 * a * a * a * (n % 2 ? 1 : -1) * n * exp(-n * R / a) / (n * n + q * q * a * a) / (n * n + q * q * a * a);
   }
@@ -189,7 +189,7 @@ double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph
         if (abscissas[k] < 0) {
           continue;
         }
-        b = sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cos(M_PI * abscissas[k]));
+        b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * TMath::Cos(M_PI * abscissas[k]));
         sum_phi += (b < 20.) ? (weights[k] * gGAA->Eval(b) * 2) : (weights[k] * 2.);
       }
       sum_b2 += flux[j] * M_PI * sum_phi * b2 * (b2h - b2l);
@@ -202,8 +202,8 @@ double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph
 
 double LepGenerator::crossSectionWZ(double s, double z)
 {
-  double k = sqrt(s / 2.);              // photon/lepton energy in cm system in GeV
-  double p = sqrt(k * k - mLep * mLep); // outgoing lepton momentum in GeV
+  double k = TMath::Sqrt(s / 2.);              // photon/lepton energy in cm system in GeV
+  double p = TMath::Sqrt(k * k - mLep * mLep); // outgoing lepton momentum in GeV
   double norm = 2 * M_PI * alpha * alpha / s * p / k;
   double kt = -2 * k * (k - z * p) / mLep / mLep;
   double ku = -2 * k * (k + z * p) / mLep / mLep;
@@ -225,7 +225,7 @@ double LepGenerator::crossSectionW(double w)
 {
   double s = w * w;               // cms invariant mass squared
   double x = 4 * mLep * mLep / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
-  double b = sqrt(1 - x);         // lepton relativistic velocity in cms
+  double b = TMath::Sqrt(1 - x);         // lepton relativistic velocity in cms
   double y = atanh(b);            // lepton rapidity in cms
   double cs = 0;
   cs += (2 + 2 * x - x * x) * y - b * (1 + x);
@@ -300,7 +300,7 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       b = ib * db;
       for (iz = 0; iz < nb; iz++) {
         z = iz * db;
-        r = sqrt(b * b + z * z);
+        r = TMath::Sqrt(b * b + z * z);
         rho[ib][iz] = rho0 / (1 + exp((r - R) / a));
       }
       TA[ib] = 2 * simpson(nb, rho[ib], db);
@@ -318,7 +318,7 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
         for (k = 0; k < ngi; k++) {
           if (abscissas[k] < 0)
             continue;
-          r = sqrt(b * b + s * s + 2 * b * s * cos(M_PI * abscissas[k]));
+          r = TMath::Sqrt(b * b + s * s + 2 * b * s * TMath::Cos(M_PI * abscissas[k]));
           sum_phi += 2 * M_PI * weights[k] * gTA->Eval(r);
         }
         vs[is] = 2 * s * gTA->Eval(s) * sum_phi;
@@ -336,7 +336,8 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
     int total = ny * nw;
     omp_set_num_threads(numThreads);
 #pragma omp parallel default(none) \
-  shared(hD2LDMDY, progress) private(iw, iy) firstprivate(total, numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights)
+shared(hD2LDMDY, progress) private(iw, iy) firstprivate(total, numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights, vGAA) \
+firstprivate(nb, vb)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -436,7 +437,7 @@ double LepGenerator::nucFormFactor(double q)
   if (Z >= 7) {
     double qR = q * R / hc;
     double invqR = hc / (q * R);
-    ffactor = (sin(qR) - qR * cos(qR)) * 3. * invqR * invqR * invqR;
+    ffactor = (TMath::Sin(qR) - qR * TMath::Cos(qR)) * 3. * invqR * invqR * invqR;
     const double a0 = 0.7; // [fm]
     ffactor = ffactor / (1. + (a0 * a0 * q * q) / (hc * hc));
   }
@@ -446,12 +447,12 @@ double LepGenerator::nucFormFactor(double q)
 double LepGenerator::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
-  double y1 = acosh(g1);
-  double y2 = -acosh(g2);
-  double gtot = cosh((y1 - y2) / 2.);
+  double y1 = TMath::ACosH(g1);
+  double y2 = -TMath::ACosH(g2);
+  double gtot = TMath::CosH((y1 - y2) / 2.);
 
   double ereds = (ePhot / gtot) * (ePhot / gtot);
-  double Cm = sqrt(3.) * ePhot / gtot;
+  double Cm = TMath::Sqrt(3.) * ePhot / gtot;
   double arg = Cm * Cm + ereds;
   double sFFactCM = nucFormFactor(arg);
   double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
@@ -483,7 +484,7 @@ void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& p
 {
   if (!useNonzeroGamPt) {
     double mtPair = mPair; // pairPt = 0
-    pPair.SetPxPyPzE(0., 0., mtPair * sinh(yPair), mtPair * cosh(yPair));
+    pPair.SetPxPyPzE(0., 0., mtPair * TMath::SinH(yPair), mtPair * TMath::CosH(yPair));
   }
   if (useNonzeroGamPt) {
     double w1 = mPair / 2 * exp(yPair);
@@ -492,12 +493,12 @@ void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& p
     double angle2 = gRandom->Uniform(0, 2 * M_PI);
     double pt1 = getPhotonPt(w1);
     double pt2 = getPhotonPt(w2);
-    double px = pt1 * cos(angle1) + pt2 * cos(angle2);
-    double py = pt1 * sin(angle1) + pt2 * sin(angle2);
-    double pt = sqrt(px * px + py * py);
-    double mtPair = sqrt(mPair * mPair + pt * pt);
-    double pz = mtPair * sinh(yPair);
-    double e = mtPair * cosh(yPair);
+    double px = pt1 * TMath::Cos(angle1) + pt2 * TMath::Cos(angle2);
+    double py = pt1 * TMath::Sin(angle1) + pt2 * TMath::Sin(angle2);
+    double pt = TMath::Sqrt(px * px + py * py);
+    double mtPair = TMath::Sqrt(mPair * mPair + pt * pt);
+    double pz = mtPair * TMath::SinH(yPair);
+    double e = mtPair * TMath::CosH(yPair);
     pPair.SetPxPyPzE(px, py, pz, e);
   }
 }
@@ -648,24 +649,15 @@ void LepGenerator::generateEvents()
     PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
   }
 
-  double mPair = 0.;
-  double yPair = 0.;
-  double ptPair = 0.;
-  double mtPair;
-  double pMag;
-  double cost, theta, phi;
-  int binW;
+  TAxis * elemAxisW = hCrossSectionWZ->GetXaxis();
 
-  TLorentzVector pPair;
   vector<TLorentzVector> pLeps(2);
-  TVector3 vLep;
-  TVector3 boost;
 
   vector<double> cutsZ(hNucCSYM->GetNbinsY());
   if (doPtCut) {
     for (int mBin = 1; mBin <= hNucCSYM->GetNbinsY(); mBin++) {
       double mass = hNucCSYM->GetYaxis()->GetBinLowEdge(mBin);
-      double sqt = sqrt(mass * mass * 0.25 - mLep * mLep);
+      double sqt = TMath::Sqrt(mass * mass * 0.25 - mLep * mLep);
       if (sqt <= minPt) {
         cutsZ[mBin - 1] = 0;
         for (int yBin = 1; yBin <= hNucCSYM->GetNbinsX(); yBin++) {
@@ -673,7 +665,7 @@ void LepGenerator::generateEvents()
         }
         continue;
       }
-      double minZ = sqrt(1 - minPt * minPt / (sqt * sqt));
+      double minZ = TMath::Sqrt(1 - minPt * minPt / (sqt * sqt));
       cutsZ[mBin - 1] = minZ;
     }
   }
@@ -708,12 +700,11 @@ void LepGenerator::generateEvents()
       PLOG_INFO << "Event number: " << evt + 1;
     }
 
+    double yPair;
+    double mPair;
     hNucCSYM->GetRandom2(yPair, mPair);
 
-    getPairMomentum(mPair, yPair, pPair);
-    pMag = pPair.Mag();
-
-    binW = hCrossSectionWZ->GetXaxis()->FindBin(mPair);
+    int binW = elemAxisW->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);
 
     if (doPtCut) {
@@ -729,15 +720,19 @@ void LepGenerator::generateEvents()
       }
     }
 
-    cost = hCSSliceAtW->GetRandom();
-    theta = acos(cost);
-    phi = gRandom->Uniform(0., 2. * M_PI);
+    double cost = hCSSliceAtW->GetRandom();
+    double theta = TMath::ACos(cost);
+    double phi = gRandom->Uniform(0., 2. * M_PI);
 
+    TLorentzVector pPair;
+    getPairMomentum(mPair, yPair, pPair);
+    double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mLep * mLep);
+    TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
     pLeps[0].SetVectM(vLep, mLep);
     pLeps[1].SetVectM(-vLep, mLep);
 
-    boost = pPair.BoostVector();
+    TVector3 boost = pPair.BoostVector();
     pLeps[0].Boost(boost);
     pLeps[1].Boost(boost);
 
