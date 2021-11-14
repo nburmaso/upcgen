@@ -33,6 +33,7 @@ using namespace std;
 double LepGenerator::rho0 = 0.159538;
 double LepGenerator::R = 6.68;
 double LepGenerator::a = 0.447;
+double LepGenerator::Z = 82;
 int LepGenerator::debug = 0;
 
 LepGenerator::LepGenerator()
@@ -444,19 +445,22 @@ double LepGenerator::nucFormFactor(double q)
 
 double LepGenerator::getPhotonPt(double ePhot)
 {
+  constexpr double pi2x4 = 4 * M_PI * M_PI;
   double y1 = acosh(g1);
   double y2 = -acosh(g2);
   double gtot = cosh((y1 - y2) / 2.);
 
   double ereds = (ePhot / gtot) * (ePhot / gtot);
   double Cm = sqrt(3.) * ePhot / gtot;
-  double sFFactCM = nucFormFactor(Cm * Cm + ereds);
-  double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (4. * M_PI * (ereds + Cm * Cm) * M_PI * (ereds + Cm * Cm));
+  double arg = Cm * Cm + ereds;
+  double sFFactCM = nucFormFactor(arg);
+  double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
 
   double x = gRandom->Uniform(0, 1);
   double pp = x * 5. * hc / R;
-  double sFFactPt1 = nucFormFactor(pp * pp + ereds);
-  double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (4. * M_PI * (ereds + pp * pp) * M_PI * (ereds + pp * pp));
+  arg = pp * pp + ereds;
+  double sFFactPt1 = nucFormFactor(arg);
+  double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (pi2x4 * arg * arg);
 
   bool satisfy = false;
   while (!satisfy) {
@@ -466,8 +470,9 @@ double LepGenerator::getPhotonPt(double ePhot)
     } else {
       x = gRandom->Uniform(0, 1);
       pp = 5 * hc / R * x;
-      double sFFactPt2 = nucFormFactor(pp * pp + ereds);
-      test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (4. * M_PI * (ereds + pp * pp) * M_PI * (ereds + pp * pp));
+      arg = pp * pp + ereds;
+      double sFFactPt2 = nucFormFactor(arg);
+      test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);
     }
   }
 
@@ -706,7 +711,7 @@ void LepGenerator::generateEvents()
     hNucCSYM->GetRandom2(yPair, mPair);
 
     getPairMomentum(mPair, yPair, pPair);
-    pMag = sqrt(pPair.Pz() * pPair.Pz() + pPair.Pt() * pPair.Pt());
+    pMag = pPair.Mag();
 
     binW = hCrossSectionWZ->GetXaxis()->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);
@@ -758,10 +763,10 @@ void LepGenerator::generateEvents()
         particle.pdgCode = pdg;
         particle.particleID = partID;
         particle.motherID = part->GetFirstMother();
-        particle.px = tlVector[0];
-        particle.py = tlVector[1];
-        particle.pz = tlVector[2];
-        particle.e = tlVector[3];
+        particle.px = tlVector.Px();
+        particle.py = tlVector.Py();
+        particle.pz = tlVector.Pz();
+        particle.e = tlVector.E();
         outTree.Fill();
         partID++;
       }

@@ -90,7 +90,7 @@ class LepGenerator
   void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
 
   // nuclear form factor for momentum transfer q
-  double nucFormFactor(double q);
+  static double nucFormFactor(double q);
 
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
@@ -118,7 +118,7 @@ class LepGenerator
   static double a;    // fm
 
   // parameters of the nucleus
-  double Z{82};
+  static double Z;
   double A{208};
 
   // beam parameters
