@@ -77,6 +77,7 @@ NUCLEUS_Z 82      # atomic number of the incoming nuclei
 NUCLEUS_A 208     # atomic mass of the incoming nuclei
 FLUX_POINT 1      # use point flux approximation or not
 PYTHIA_VERSION 8  # Pythia version: either 6 or 8. 8 is used by default
+SEED -1           # Seed for random numbers generator. '-1' -> random seed
 ```
 
 * Note that the order, and the number of the parameters are not fixed.

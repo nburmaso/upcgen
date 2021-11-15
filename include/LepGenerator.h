@@ -103,6 +103,7 @@ class LepGenerator
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
+  long seed{-1}; // seed for random numbers generator
 
   double mLep{1.77682}; // tau by default
   double aLep{0};       // lepton anomalous magnetic moment
@@ -212,6 +213,7 @@ class LepGenerator
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
+    string seed{"SEED"};
   };
 
   // debug level

@@ -43,7 +43,7 @@ LepGenerator::LepGenerator()
 
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
-  gRandom->SetSeed(time(nullptr));
+  gRandom->SetSeed(seed == -1 ? time(nullptr) : seed);
 
   // initialize pythia for decays
   PLOG_INFO << "Initializing Pythia-based decayer";
@@ -54,7 +54,7 @@ LepGenerator::LepGenerator()
     decayer = new TPythia6Decayer();
 #endif
   } else {
-    PLOG_WARNING << "Wrong Pythia version! Please choose either 8 or 6";
+    PLOG_WARNING << "Wrong Pythia version! Please choose either 8 or 6 (if built with)";
     PLOG_WARNING << "Using Pythia8 by default...";
     decayer = new TPythia8Decayer();
   }
@@ -590,6 +590,9 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inNonzeroGamPt) {
         useNonzeroGamPt = stoi(parValue);
       }
+      if (parameter == parDict.seed) {
+        seed = stoi(parValue);
+      }
     }
     fInputs.close();
   } else {
@@ -626,6 +629,7 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "FLUX_POINT " << isPoint;
   PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
+  PLOG_WARNING << "SEED " << seed;
 }
 
 void LepGenerator::generateEvents()
