@@ -539,6 +539,12 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inLowPt) {
         minPt = stod(parValue);
       }
+      if (parameter == parDict.inDoDilepMCut) {
+        doDilepMCut = stoi(parValue);
+      }
+      if (parameter == parDict.inLowDilepM) {
+        minDilepM = stod(parValue);
+      }
       if (parameter == parDict.inLowZ) {
         zmin = stod(parValue);
       }
@@ -590,8 +596,8 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inNonzeroGamPt) {
         useNonzeroGamPt = stoi(parValue);
       }
-      if (parameter == parDict.seed) {
-        seed = stoi(parValue);
+      if (parameter == parDict.inSeed) {
+        seed = stol(parValue);
       }
     }
     fInputs.close();
@@ -706,7 +712,18 @@ void LepGenerator::generateEvents()
 
     double yPair;
     double mPair;
-    hNucCSYM->GetRandom2(yPair, mPair);
+
+    if (doDilepMCut) {
+      bool accept = false;
+      while (!accept) {
+        hNucCSYM->GetRandom2(yPair, mPair);
+        if (mPair > minDilepM) {
+          accept = true;
+        }
+      }
+    } else {
+      hNucCSYM->GetRandom2(yPair, mPair);
+    }
 
     int binW = elemAxisW->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);

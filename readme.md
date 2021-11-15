@@ -61,6 +61,8 @@ LEP_MASS 1.77682  # lepton mass
 LEP_A 0           # lepton anomalous magnetic moment
 DO_PT_CUT 0       # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0          # pt cut
+DO_DILEP_M_CUT 0  # enable dilepton mass cut: 0 -- off, 1 -- on
+DILEP_M_MIN 0     # minimal dilepton mass to be produced
 ZMIN -1           # min. z = cos(theta) for the elementary cross section
 ZMAX 1            # max. z = cos(theta) for the elementary cross section
 WMIN 3.56         # min. w for the elementary/nuclear cross section

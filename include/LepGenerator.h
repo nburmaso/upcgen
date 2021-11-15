@@ -169,6 +169,8 @@ class LepGenerator
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
+  bool doDilepMCut{false};
+  double minDilepM{0};
   int nEvents{1000};
   int lepPDG{15};
   bool isPoint{true}; // flux calculation parameter
@@ -196,6 +198,8 @@ class LepGenerator
     string inLepA{"LEP_A"};
     string inDoPtCut{"DO_PT_CUT"};
     string inLowPt{"PT_MIN"};
+    string inDoDilepMCut{"DO_DILEP_M_CUT"};
+    string inLowDilepM{"DILEP_M_MIN"};
     string inLowZ{"ZMIN"};
     string inHiZ{"ZMAX"};
     string inLowW{"WMIN"};
@@ -213,7 +217,7 @@ class LepGenerator
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
-    string seed{"SEED"};
+    string inSeed{"SEED"};
   };
 
   // debug level
