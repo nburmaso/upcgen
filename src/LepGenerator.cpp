@@ -680,6 +680,15 @@ void LepGenerator::generateEvents()
     }
   }
 
+  if (doDilepMCut) {
+    int lBinM = hNucCSYM->GetYaxis()->FindBin(minDilepM);
+    for (int iw = 1; iw < lBinM; iw++) {
+      for (int iy = 1; iy <= ny; iy++) {
+        hNucCSYM->SetBinContent(iy, iw, 0);
+      }
+    }
+  }
+
   // initialize helper structure
   Particle particle{};
 
@@ -713,17 +722,7 @@ void LepGenerator::generateEvents()
     double yPair;
     double mPair;
 
-    if (doDilepMCut) {
-      bool accept = false;
-      while (!accept) {
-        hNucCSYM->GetRandom2(yPair, mPair);
-        if (mPair > minDilepM) {
-          accept = true;
-        }
-      }
-    } else {
-      hNucCSYM->GetRandom2(yPair, mPair);
-    }
+    hNucCSYM->GetRandom2(yPair, mPair);
 
     int binW = elemAxisW->FindBin(mPair);
     TH1D* hCSSliceAtW = hCrossSectionWZ->ProjectionY("sliceW", binW, binW);

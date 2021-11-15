@@ -3,8 +3,8 @@ project(LepGenerator)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
-option(BUILD_WITH_OPENMP "Build with OpenMP support" OFF)
+option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" ON)
+option(BUILD_WITH_OPENMP "Build with OpenMP support" ON)
 
 find_package(OpenMP)
 if (OPENMP_FOUND AND BUILD_WITH_OPENMP)
@@ -23,6 +23,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include
 
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
+#file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/valid/*/*.cpp )
 
 add_executable(generate main.cpp ${sources} ${headers})
 
