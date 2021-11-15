@@ -49,8 +49,8 @@ LepGenerator::LepGenerator()
   PLOG_INFO << "Initializing Pythia-based decayer";
   if (pythiaVersion == 8) {
     decayer = new TPythia8Decayer();
-  } else if (pythiaVersion == 6) {
 #ifdef USE_PYTHIA6
+  } else if (pythiaVersion == 6) {
     decayer = new TPythia6Decayer();
 #endif
   } else {
