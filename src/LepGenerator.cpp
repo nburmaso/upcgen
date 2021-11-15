@@ -325,11 +325,11 @@ void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
       }
       vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
     }
-    auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
-    auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
 
     // using ether parallel or serial implementation
 #ifdef USE_OPENMP
+    auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
+    auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nw, wmin, wmax, ny, ymin, ymax);
     ROOT::EnableThreadSafety();
     int iw, iy;
     int progress = 0;
