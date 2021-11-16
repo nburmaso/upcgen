@@ -682,11 +682,13 @@ void LepGenerator::generateEvents()
 
   if (doDilepMCut) {
     int lBinM = hNucCSYM->GetYaxis()->FindBin(minDilepM);
-    for (int iw = 1; iw < lBinM; iw++) {
+    for (int iw = 1; iw <= lBinM; iw++) {
       for (int iy = 1; iy <= ny; iy++) {
         hNucCSYM->SetBinContent(iy, iw, 0);
       }
     }
+    double csCut = hNucCSYM->Integral();
+    PLOG_INFO << "Nuclear cross section w. dilepton mass cut = " << csCut;
   }
 
   // initialize helper structure
