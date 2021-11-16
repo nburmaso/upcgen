@@ -618,6 +618,8 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "LEP_A " << aLep;
   PLOG_WARNING << "DO_PT_CUT " << doPtCut;
   PLOG_WARNING << "PT_MIN " << minPt;
+  PLOG_WARNING << "DO_DILEP_M_CUT " << doDilepMCut;
+  PLOG_WARNING << "DILEP_M_MIN " << minDilepM;
   PLOG_WARNING << "ZMIN " << zmin;
   PLOG_WARNING << "ZMAX " << zmax;
   PLOG_WARNING << "WMIN " << wmin;
