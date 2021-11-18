@@ -1,5 +1,5 @@
 //
-// Created by nburmaso on 6/25/21.
+// created by Nazar Burmasov on 6/25/21.
 //
 
 #ifndef LEPGENERATOR__LEPGENERATOR_H_
@@ -37,6 +37,9 @@ class LepGenerator
   //  >0 -- enable debug info
   void setDebugLevel(int level) { debug = level; }
 
+  // number of threads for two-photon luminosity calculation
+  void setNumThreads(int n) { numThreads = n; }
+
   // ----------------------------------------------------------------------
 
   // file parser
@@ -49,6 +52,8 @@ class LepGenerator
   void generateEvents();
 
  private:
+  int numThreads{1};
+
   // internal class methods
   // ----------------------------------------------------------------------
 
@@ -60,10 +65,10 @@ class LepGenerator
 
   static double fluxFormInt(double* x, double* par);
 
-  double fluxForm(const double b, const double w, const double g);
+  double fluxForm(const double b, const double w, const double g, TF1* fFluxForm);
 
   // two-photon luminosity
-  double D2LDMDY(double M, double Y);
+  double D2LDMDY(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
   // elementary cross section for dilepton production in WZ space
   double crossSectionWZ(double s, double z);
@@ -85,7 +90,7 @@ class LepGenerator
   void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
 
   // nuclear form factor for momentum transfer q
-  double nucFormFactor(double q);
+  static double nucFormFactor(double q);
 
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
@@ -98,6 +103,7 @@ class LepGenerator
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
+  long seed{-1}; // seed for random numbers generator
 
   double mLep{1.77682}; // tau by default
   double aLep{0};       // lepton anomalous magnetic moment
@@ -113,7 +119,7 @@ class LepGenerator
   static double a;    // fm
 
   // parameters of the nucleus
-  double Z{82};
+  static double Z;
   double A{208};
 
   // beam parameters
@@ -160,12 +166,11 @@ class LepGenerator
   double rho[nb][nb];
   double vGAA[nb];
 
-  TGraph* gGAA;
-  TF1* fFluxFormInt;
-
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
+  bool doDilepMCut{false};
+  double minDilepM{0};
   int nEvents{1000};
   int lepPDG{15};
   bool isPoint{true}; // flux calculation parameter
@@ -193,6 +198,8 @@ class LepGenerator
     string inLepA{"LEP_A"};
     string inDoPtCut{"DO_PT_CUT"};
     string inLowPt{"PT_MIN"};
+    string inDoDilepMCut{"DO_DILEP_M_CUT"};
+    string inLowDilepM{"DILEP_M_MIN"};
     string inLowZ{"ZMIN"};
     string inHiZ{"ZMAX"};
     string inLowW{"WMIN"};
@@ -210,10 +217,11 @@ class LepGenerator
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
+    string inSeed{"SEED"};
   };
 
   // debug level
   static int debug;
 };
 
-#endif //LEPGENERATOR__LEPGENERATOR_H_
+#endif // LEPGENERATOR__LEPGENERATOR_H_
