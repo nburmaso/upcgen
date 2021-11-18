@@ -172,24 +172,21 @@ double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph
   }
 
   double sum = 0;
-  double sum_b2, b1l, b1h, b1, b2l, b2h, b2, sum_phi, b;
-  int i, j, k;
-
-  for (i = 0; i < nb1; ++i) {
-    sum_b2 = 0.;
-    b1l = b1min * exp(i * log_delta_b1);
-    b1h = b1min * exp((i + 1) * log_delta_b1);
-    b1 = (b1h + b1l) / 2.;
-    for (j = 0; j < nb2; ++j) {
-      b2l = b2min * exp(j * log_delta_b2);
-      b2h = b2min * exp((j + 1) * log_delta_b2);
-      b2 = (b2h + b2l) / 2.;
-      sum_phi = 0.;
-      for (k = 0; k < ngi; k++) {
+  for (int i = 0; i < nb1; ++i) {
+    double sum_b2 = 0.;
+    double b1l = b1min * exp(i * log_delta_b1);
+    double b1h = b1min * exp((i + 1) * log_delta_b1);
+    double b1 = (b1h + b1l) / 2.;
+    for (int j = 0; j < nb2; ++j) {
+      double b2l = b2min * exp(j * log_delta_b2);
+      double b2h = b2min * exp((j + 1) * log_delta_b2);
+      double b2 = (b2h + b2l) / 2.;
+      double sum_phi = 0.;
+      for (int k = 0; k < ngi; k++) {
         if (abscissas[k] < 0) {
           continue;
         }
-        b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * TMath::Cos(M_PI * abscissas[k]));
+        double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * TMath::Cos(M_PI * abscissas[k]));
         sum_phi += (b < 20.) ? (weights[k] * gGAA->Eval(b) * 2) : (weights[k] * 2.);
       }
       sum_b2 += flux[j] * M_PI * sum_phi * b2 * (b2h - b2l);
