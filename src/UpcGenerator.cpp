@@ -2,7 +2,7 @@
 // Created by Nazar Burmasov on 6/25/21.
 //
 
-#include "LepGenerator.h"
+#include "UpcGenerator.h"
 #include "TF1.h"
 #include "TFile.h"
 #include "TTree.h"
@@ -30,14 +30,14 @@
 using namespace std;
 
 // out-of-line initialization for static members
-double LepGenerator::rho0 = 0.159538;
-double LepGenerator::R = 6.68;
-double LepGenerator::a = 0.447;
-double LepGenerator::Z = 82;
-int LepGenerator::debug = 0;
-std::map<int, double> LepGenerator::lepMassMap;
+double UpcGenerator::rho0 = 0.159538;
+double UpcGenerator::R = 6.68;
+double UpcGenerator::a = 0.447;
+double UpcGenerator::Z = 82;
+int UpcGenerator::debug = 0;
+std::map<int, double> UpcGenerator::lepMassMap;
 
-LepGenerator::LepGenerator()
+UpcGenerator::UpcGenerator()
 {
   // populating lepton mass map
   // data from PDG
@@ -75,9 +75,9 @@ LepGenerator::LepGenerator()
 #endif
 }
 
-LepGenerator::~LepGenerator() = default;
+UpcGenerator::~UpcGenerator() = default;
 
-double LepGenerator::simpson(int n, double* v, double h)
+double UpcGenerator::simpson(int n, double* v, double h)
 {
   double sum = v[0] + v[n - 1];
   for (int i = 1; i < n - 1; i += 2) {
@@ -89,7 +89,7 @@ double LepGenerator::simpson(int n, double* v, double h)
   return sum * h / 3;
 }
 
-double LepGenerator::fluxPoint(const double b, const double w, const double g)
+double UpcGenerator::fluxPoint(const double b, const double w, const double g)
 {
   // flux divided by w
   double x = b * w / g / hc;
@@ -102,7 +102,7 @@ double LepGenerator::fluxPoint(const double b, const double w, const double g)
   return result;
 }
 
-double LepGenerator::fluxFormInt(double* x, double* par)
+double UpcGenerator::fluxFormInt(double* x, double* par)
 {
   double k = x[0];
   double b = par[0];
@@ -129,7 +129,7 @@ double LepGenerator::fluxFormInt(double* x, double* par)
   return result;
 }
 
-double LepGenerator::fluxForm(const double b, const double w, const double g, TF1* fFluxFormInt)
+double UpcGenerator::fluxForm(const double b, const double w, const double g, TF1* fFluxFormInt)
 {
   // flux divided by w
   if (isPoint) {
@@ -154,7 +154,7 @@ double LepGenerator::fluxForm(const double b, const double w, const double g, TF
   return result;
 }
 
-double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph* gGAA)
+double UpcGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph* gGAA)
 {
   // double differential luminosity
   double D2LDMDYx = 0.;
@@ -210,7 +210,7 @@ double LepGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph
   return D2LDMDYx;
 }
 
-double LepGenerator::crossSectionWZ(double s, double z)
+double UpcGenerator::crossSectionWZ(double s, double z)
 {
   double k = TMath::Sqrt(s / 2.);              // photon/lepton energy in cm system in GeV
   double p = TMath::Sqrt(k * k - mLep * mLep); // outgoing lepton momentum in GeV
@@ -231,7 +231,7 @@ double LepGenerator::crossSectionWZ(double s, double z)
   return cs; // [GeV^-2]
 }
 
-double LepGenerator::crossSectionW(double w)
+double UpcGenerator::crossSectionW(double w)
 {
   double s = w * w;               // cms invariant mass squared
   double x = 4 * mLep * mLep / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
@@ -247,7 +247,7 @@ double LepGenerator::crossSectionW(double w)
   return cs; // [GeV^-2]
 }
 
-void LepGenerator::fillCrossSectionWZ(TH2D* hCrossSectionWZ,
+void UpcGenerator::fillCrossSectionWZ(TH2D* hCrossSectionWZ,
                                       double wmin, double wmax, int nw,
                                       double zmin, double zmax, int nz)
 {
@@ -267,7 +267,7 @@ void LepGenerator::fillCrossSectionWZ(TH2D* hCrossSectionWZ,
   hCrossSectionWZ->Scale(scalingFactor / dw);
 }
 
-void LepGenerator::fillCrossSectionW(TH1D* hCrossSectionW,
+void UpcGenerator::fillCrossSectionW(TH1D* hCrossSectionW,
                                      double wmin, double wmax, int nw)
 {
   double w;
@@ -282,7 +282,7 @@ void LepGenerator::fillCrossSectionW(TH1D* hCrossSectionW,
   hCrossSectionW->Scale(scalingFactor);
 }
 
-void LepGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
+void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
 {
   PLOG_INFO << "Calculating nuclear cross section for a_lep = " << aLep;
 
@@ -438,7 +438,7 @@ firstprivate(nb, vb)
 }
 
 // Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999
-double LepGenerator::nucFormFactor(double q)
+double UpcGenerator::nucFormFactor(double q)
 {
   double ffactor;
   if (Z < 7) {
@@ -454,7 +454,7 @@ double LepGenerator::nucFormFactor(double q)
   return ffactor;
 }
 
-double LepGenerator::getPhotonPt(double ePhot)
+double UpcGenerator::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
   double y1 = TMath::ACosH(g1);
@@ -490,7 +490,7 @@ double LepGenerator::getPhotonPt(double ePhot)
   return pp;
 }
 
-void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
+void UpcGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
 {
   if (!useNonzeroGamPt) {
     double mtPair = mPair; // pairPt = 0
@@ -513,7 +513,7 @@ void LepGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& p
   }
 }
 
-void LepGenerator::initGeneratorFromFile()
+void UpcGenerator::initGeneratorFromFile()
 {
   // todo: use <any> from c++17 for a neat parsing???
   if (!gSystem->AccessPathName("parameters.in")) {
@@ -610,7 +610,7 @@ void LepGenerator::initGeneratorFromFile()
   factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
 }
 
-void LepGenerator::printParameters()
+void UpcGenerator::printParameters()
 {
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLEUS_A " << A;
@@ -638,7 +638,7 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "SEED " << seed;
 }
 
-void LepGenerator::generateEvents()
+void UpcGenerator::generateEvents()
 {
   // calculating elementary cross section in WZ space
   // -----------------------------------------------------------------------

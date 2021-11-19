@@ -2,7 +2,7 @@
 // created by Nazar Burmasov on 6/25/21.
 //
 
-#include "LepGenerator.h"
+#include "UpcGenerator.h"
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Formatters/TxtFormatter.h>
@@ -33,15 +33,15 @@ int main(int argc, char** argv)
   }
 
   PLOG_INFO << "Initializing the generator...";
-  auto* lepGenerator = new LepGenerator();
-  lepGenerator->setDebugLevel(debugLevel);
-  lepGenerator->setNumThreads(numThreads);
+  auto* upcGenerator = new UpcGenerator();
+  upcGenerator->setDebugLevel(debugLevel);
+  upcGenerator->setNumThreads(numThreads);
 
   PLOG_WARNING << "Check inputs:";
-  lepGenerator->printParameters();
+  upcGenerator->printParameters();
 
   PLOG_INFO << "Starting generation process...";
-  lepGenerator->generateEvents();
+  upcGenerator->generateEvents();
 
   PLOG_INFO << "Event generation is finished!";
 

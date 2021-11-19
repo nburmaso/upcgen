@@ -2,8 +2,8 @@
 // created by Nazar Burmasov on 6/25/21.
 //
 
-#ifndef LEPGENERATOR__LEPGENERATOR_H_
-#define LEPGENERATOR__LEPGENERATOR_H_
+#ifndef UPCGENERATOR__UPCGENERATOR_H_
+#define UPCGENERATOR__UPCGENERATOR_H_
 
 #include "TH1D.h"
 #include "TH2D.h"
@@ -29,11 +29,11 @@
 
 using namespace std;
 
-class LepGenerator
+class UpcGenerator
 {
  public:
-  LepGenerator();
-  ~LepGenerator();
+  UpcGenerator();
+  ~UpcGenerator();
 
   // debug level:
   //  0  -- no debug output
@@ -226,4 +226,4 @@ class LepGenerator
   static int debug;
 };
 
-#endif // LEPGENERATOR__LEPGENERATOR_H_
+#endif // UPCGENERATOR__UPCGENERATOR_H_
