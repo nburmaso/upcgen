@@ -620,7 +620,7 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLEUS_A " << A;
   PLOG_WARNING << "WS_RHO0 " << rho0;
-  PLOG_WARNING << "WS_RAD " << R;
+  PLOG_WARNING << "WS_R " << R;
   PLOG_WARNING << "WS_A " << a;
   PLOG_WARNING << "SQRTS " << sqrts;
   PLOG_WARNING << "LEP_PDG " << lepPDG;

@@ -199,7 +199,7 @@ class UpcGenerator
     string inNucZ{"NUCLEUS_Z"};
     string inNucA{"NUCLEUS_A"};
     string inWSRho0{"WS_RHO0"};
-    string inWSRadius{"WS_RAD"};
+    string inWSRadius{"WS_R"};
     string inWSA{"WS_A"};
     string inCMSqrtS{"SQRTS"};
     string inLepPDG{"LEP_PDG"};
