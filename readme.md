@@ -5,7 +5,8 @@ This is a simple event generator dedicated to dilepton production process in ult
 ### Requirements
 
 * Pythia8 event generator (for decays). See [Pythia website](https://pythia.org/) for installation instructions. It is
-  also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support.
+also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support. Note that Pythia is
+only used for tau decays and completely optional
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
 * CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
 * Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
@@ -86,4 +87,7 @@ SEED -1           # Seed for random numbers generator. '-1' -> random seed
 
 ### Tips
 
-* The generator calculates two-photon luminosity and caches it into `hD2LDMDY.root`. This file will be picked automatically if found. The calculation process may take a lot of time, so you may want to keep pre-calculated grid for further usage. Note that you need to recalculate it in case if you have changed grid input parameters (e.g., binning and/or range in z/w/Y).
+* The generator calculates two-photon luminosity and caches it into `hD2LDMDY.root`. 
+This file will be picked automatically if found. The calculation process may take a lot of time,
+so you may want to keep pre-calculated grid for further usage. Note that you need to recalculate
+it in case if you have changed grid input parameters (e.g., binning and/or range in W/Y).
