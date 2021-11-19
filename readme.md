@@ -21,6 +21,7 @@ This generator utilizes simple [plog](https://github.com/SergiusTheBest/plog) li
 * Load ROOT environment
 * Setup Pythia8 environment by exporting `PYTHIA8=/path/to/pythia/installation`
 * Optionally: build the generator with Pythia6 using cmake flag `BUILD_WITH_PYTHIA6=ON`
+* Optionally: build the generator with Pythia8 using cmake flag `BUILD_WITH_PYTHIA8=ON`
 * Optionally: build the generator with OpenMP support for parallel computation of two-photon luminosity
   (the most CPU-consuming operation) using cmake flag `BUILD_WITH_OPENMP=ON`
 * For details, see `CMakeLists.txt`
@@ -76,7 +77,7 @@ BINS_Z 100        # cross section binnings: bins for z
 BINS_W 1001       #                         bins for w
 BINS_Y 121        #                         bins for y
 FLUX_POINT 1      # use point flux approximation or not
-PYTHIA_VERSION 8  # Pythia version: either 6 or 8. 8 is used by default
+PYTHIA_VERSION 8  # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
 SEED -1           # Seed for random numbers generator. '-1' -> random seed
 ```
 
