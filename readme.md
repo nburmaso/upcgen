@@ -55,14 +55,17 @@ Input parameters can be specified in the `parameters.in` file. The example can b
 repository. Available parameters are the following:
 
 ```
-NEVENTS 1000      # number of events to be generated
+NUCLEUS_Z 82      # atomic number of the incoming nuclei
+NUCLEUS_A 208     # atomic mass of the incoming nuclei
+WS_RHO0 0.159538  # Woods-Saxon parameters: rho0
+WS_RAD 6.68       #                         R
+WS_A 0.447        #                         a
 SQRTS 5020        # sqrt(s) in the CM frame
-LEP_MASS 1.77682  # lepton mass
+LEP_PDG 15        # lepton code according to Monte Carlo numbering scheme from PDG
 LEP_A 0           # lepton anomalous magnetic moment
+NEVENTS 1000      # number of events to be generated
 DO_PT_CUT 0       # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0          # pt cut
-DO_DILEP_M_CUT 0  # enable dilepton mass cut: 0 -- off, 1 -- on
-DILEP_M_MIN 0     # minimal dilepton mass to be produced
 ZMIN -1           # min. z = cos(theta) for the elementary cross section
 ZMAX 1            # max. z = cos(theta) for the elementary cross section
 WMIN 3.56         # min. w for the elementary/nuclear cross section
@@ -72,11 +75,6 @@ YMAX 6            # max. y for the nuclear cross section
 BINS_Z 100        # cross section binnings: bins for z
 BINS_W 1001       #                         bins for w
 BINS_Y 121        #                         bins for y
-WS_RHO0 0.159538  # Woods-Saxon parameters: rho0
-WS_RAD 6.68       #                         R
-WS_A 0.447        #                         a
-NUCLEUS_Z 82      # atomic number of the incoming nuclei
-NUCLEUS_A 208     # atomic mass of the incoming nuclei
 FLUX_POINT 1      # use point flux approximation or not
 PYTHIA_VERSION 8  # Pythia version: either 6 or 8. 8 is used by default
 SEED -1           # Seed for random numbers generator. '-1' -> random seed

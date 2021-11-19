@@ -35,31 +35,44 @@ double LepGenerator::R = 6.68;
 double LepGenerator::a = 0.447;
 double LepGenerator::Z = 82;
 int LepGenerator::debug = 0;
+std::map<int, double> LepGenerator::lepMassMap;
 
 LepGenerator::LepGenerator()
 {
+  // populating lepton mass map
+  // data from PDG
+  lepMassMap[11] = 0.000510998946;
+  lepMassMap[13] = 0.1056583745;
+  lepMassMap[15] = 1.77686;
+
   // get parameters from file
   initGeneratorFromFile();
+
+  mLep = lepMassMap[lepPDG];
 
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
   gRandom->SetSeed(seed == -1 ? time(nullptr) : seed);
 
   // initialize pythia for decays
+#ifdef USE_PYTHIA8
   PLOG_INFO << "Initializing Pythia-based decayer";
   if (pythiaVersion == 8) {
     decayer = new TPythia8Decayer();
+  }
+#endif
 #ifdef USE_PYTHIA6
-  } else if (pythiaVersion == 6) {
+  if (pythiaVersion == 6) {
     decayer = new TPythia6Decayer();
 #endif
-  } else {
-    PLOG_WARNING << "Wrong Pythia version! Please choose either 8 or 6 (if built with)";
-    PLOG_WARNING << "Using Pythia8 by default...";
-    decayer = new TPythia8Decayer();
+  if (pythiaVersion == -1) {
+    PLOG_WARNING << "Decays with Pythia are not used!";
   }
 
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+  isPythiaUsed = true;
   decayer->Init();
+#endif
 }
 
 LepGenerator::~LepGenerator() = default;
@@ -524,9 +537,6 @@ void LepGenerator::initGeneratorFromFile()
       if (parameter == parDict.inLepPDG) {
         lepPDG = stoi(parValue);
       }
-      if (parameter == parDict.inLepM) {
-        mLep = stod(parValue);
-      }
       if (parameter == parDict.inLepA) {
         aLep = stod(parValue);
       }
@@ -535,12 +545,6 @@ void LepGenerator::initGeneratorFromFile()
       }
       if (parameter == parDict.inLowPt) {
         minPt = stod(parValue);
-      }
-      if (parameter == parDict.inDoDilepMCut) {
-        doDilepMCut = stoi(parValue);
-      }
-      if (parameter == parDict.inLowDilepM) {
-        minDilepM = stod(parValue);
       }
       if (parameter == parDict.inLowZ) {
         zmin = stod(parValue);
@@ -608,15 +612,17 @@ void LepGenerator::initGeneratorFromFile()
 
 void LepGenerator::printParameters()
 {
-  PLOG_WARNING << "NEVENTS " << nEvents;
+  PLOG_WARNING << "NUCLEUS_Z " << Z;
+  PLOG_WARNING << "NUCLEUS_A " << A;
+  PLOG_WARNING << "WS_RHO0 " << rho0;
+  PLOG_WARNING << "WS_RAD " << R;
+  PLOG_WARNING << "WS_A " << a;
   PLOG_WARNING << "SQRTS " << sqrts;
   PLOG_WARNING << "LEP_PDG " << lepPDG;
-  PLOG_WARNING << "LEP_MASS " << mLep;
   PLOG_WARNING << "LEP_A " << aLep;
+  PLOG_WARNING << "NEVENTS " << nEvents;
   PLOG_WARNING << "DO_PT_CUT " << doPtCut;
   PLOG_WARNING << "PT_MIN " << minPt;
-  PLOG_WARNING << "DO_DILEP_M_CUT " << doDilepMCut;
-  PLOG_WARNING << "DILEP_M_MIN " << minDilepM;
   PLOG_WARNING << "ZMIN " << zmin;
   PLOG_WARNING << "ZMAX " << zmax;
   PLOG_WARNING << "WMIN " << wmin;
@@ -626,11 +632,6 @@ void LepGenerator::printParameters()
   PLOG_WARNING << "BINS_Z " << nz;
   PLOG_WARNING << "BINS_W " << nw;
   PLOG_WARNING << "BINS_Y " << ny;
-  PLOG_WARNING << "WS_RHO0 " << rho0;
-  PLOG_WARNING << "WS_RAD " << R;
-  PLOG_WARNING << "WS_A " << a;
-  PLOG_WARNING << "NUCLEUS_Z " << Z;
-  PLOG_WARNING << "NUCLEUS_A " << A;
   PLOG_WARNING << "FLUX_POINT " << isPoint;
   PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
@@ -677,17 +678,6 @@ void LepGenerator::generateEvents()
       double minZ = TMath::Sqrt(1 - minPt * minPt / (sqt * sqt));
       cutsZ[mBin - 1] = minZ;
     }
-  }
-
-  if (doDilepMCut) {
-    int lBinM = hNucCSYM->GetYaxis()->FindBin(minDilepM);
-    for (int iw = 1; iw <= lBinM; iw++) {
-      for (int iy = 1; iy <= ny; iy++) {
-        hNucCSYM->SetBinContent(iy, iw, 0);
-      }
-    }
-    double csCut = hNucCSYM->Integral();
-    PLOG_INFO << "Nuclear cross section w. dilepton mass cut = " << csCut;
   }
 
   // initialize helper structure
@@ -761,28 +751,48 @@ void LepGenerator::generateEvents()
     pdgLeps[0] = sign * lepPDG;
     pdgLeps[1] = -sign * lepPDG;
 
-    // lepton decays
-    for (int iLep = 0; iLep < 2; iLep++) {
-      int partID = 0;
-      decayer->Decay(pdgLeps[iLep], &pLeps[iLep]);
-      decayer->ImportParticles(&decayParticles);
-      for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
-        auto* part = (TParticle*)decayParticles.At(ip);
-        if (debug > 1) {
-          PLOG_DEBUG << "Particle info:";
-          part->Print();
+    // lepton decays for tau or straight writing
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+    if (lepPDG == 15 && isPythiaUsed) {
+      for (int iLep = 0; iLep < 2; iLep++) {
+        int partID = 0;
+        decayer->Decay(pdgLeps[iLep], &pLeps[iLep]);
+        decayer->ImportParticles(&decayParticles);
+        for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
+          auto* part = (TParticle*)decayParticles.At(ip);
+          if (debug > 1) {
+            PLOG_DEBUG << "Particle info:";
+            part->Print();
+          }
+          int pdg = part->GetPdgCode();
+          part->Momentum(tlVector);
+          // filling output tree
+          particle.eventNumber = evt;
+          particle.pdgCode = pdg;
+          particle.particleID = partID;
+          particle.motherID = abs(pdg) == 15 ? -1 : 0;
+          particle.px = tlVector.Px();
+          particle.py = tlVector.Py();
+          particle.pz = tlVector.Pz();
+          particle.e = tlVector.E();
+          outTree.Fill();
+          partID++;
         }
-        int pdg = part->GetPdgCode();
-        part->Momentum(tlVector);
-        // filling output tree
+      }
+    }
+#endif
+    if (lepPDG != 15 || !isPythiaUsed) {
+      for (int iLep = 0; iLep < 2; iLep++) {
+        int partID = 0;
+        int pdg = pdgLeps[iLep];
         particle.eventNumber = evt;
         particle.pdgCode = pdg;
         particle.particleID = partID;
-        particle.motherID = part->GetFirstMother();
-        particle.px = tlVector.Px();
-        particle.py = tlVector.Py();
-        particle.pz = tlVector.Pz();
-        particle.e = tlVector.E();
+        particle.motherID = -1;
+        particle.px = pLeps[iLep].Px();
+        particle.py = pLeps[iLep].Py();
+        particle.pz = pLeps[iLep].Pz();
+        particle.e = pLeps[iLep].E();
         outTree.Fill();
         partID++;
       }

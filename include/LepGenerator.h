@@ -11,9 +11,6 @@
 #include "TGraph.h"
 #include "TRandom.h"
 #include "TClonesArray.h"
-#include "Pythia8/Pythia.h"
-#include "TPythia8.h"
-#include "TPythia8Decayer.h"
 #include "TTree.h"
 #include "TLorentzVector.h"
 #include "plog/Log.h"
@@ -22,6 +19,12 @@
 #ifdef USE_PYTHIA6
 #include "TPythia6.h"
 #include "TPythia6Decayer.h"
+#endif
+
+#ifdef USE_PYTHIA8
+#include "Pythia8/Pythia.h"
+#include "TPythia8.h"
+#include "TPythia8Decayer.h"
 #endif
 
 using namespace std;
@@ -98,13 +101,17 @@ class LepGenerator
   void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
 
   // pythia helper & decayer parameters
-  int pythiaVersion{8};
+  int pythiaVersion{-1}; // not using Pythia at all by default
+  bool isPythiaUsed{false};
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
   TVirtualMCDecayer* decayer;
+#endif
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
   long seed{-1}; // seed for random numbers generator
 
+  int lepPDG{15};       // tau by default
   double mLep{1.77682}; // tau by default
   double aLep{0};       // lepton anomalous magnetic moment
 
@@ -169,12 +176,10 @@ class LepGenerator
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
-  bool doDilepMCut{false};
-  double minDilepM{0};
   int nEvents{1000};
-  int lepPDG{15};
   bool isPoint{true}; // flux calculation parameter
   bool useNonzeroGamPt{true};
+  static std::map<int, double> lepMassMap;
 
   // helper struct for file output
   struct Particle {
@@ -191,15 +196,17 @@ class LepGenerator
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???
   struct InputPars {
-    string inNEvents{"NEVENTS"};
+    string inNucZ{"NUCLEUS_Z"};
+    string inNucA{"NUCLEUS_A"};
+    string inWSRho0{"WS_RHO0"};
+    string inWSRadius{"WS_RAD"};
+    string inWSA{"WS_A"};
     string inCMSqrtS{"SQRTS"};
     string inLepPDG{"LEP_PDG"};
-    string inLepM{"LEP_MASS"};
     string inLepA{"LEP_A"};
     string inDoPtCut{"DO_PT_CUT"};
+    string inNEvents{"NEVENTS"};
     string inLowPt{"PT_MIN"};
-    string inDoDilepMCut{"DO_DILEP_M_CUT"};
-    string inLowDilepM{"DILEP_M_MIN"};
     string inLowZ{"ZMIN"};
     string inHiZ{"ZMAX"};
     string inLowW{"WMIN"};
@@ -209,11 +216,6 @@ class LepGenerator
     string inBinsZ{"BINS_Z"};
     string inBinsW{"BINS_W"};
     string inBinsY{"BINS_Y"};
-    string inWSRho0{"WS_RHO0"};
-    string inWSRadius{"WS_RAD"};
-    string inWSA{"WS_A"};
-    string inNucZ{"NUCLEUS_Z"};
-    string inNucA{"NUCLEUS_A"};
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
