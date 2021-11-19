@@ -64,9 +64,14 @@ UpcGenerator::UpcGenerator()
 #ifdef USE_PYTHIA6
   if (pythiaVersion == 6) {
     decayer = new TPythia6Decayer();
+  }
 #endif
   if (pythiaVersion == -1) {
     PLOG_WARNING << "Decays with Pythia are not used!";
+  }
+
+  if (pythiaVersion != -1 && pythiaVersion != 6 && pythiaVersion != 8) {
+    PLOG_WARNING << "Wrong PYTHIA_VERSION parameter! Decays with Pythia are not used!";
   }
 
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
