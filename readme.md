@@ -9,8 +9,8 @@ also possible to use Pythia6. Note that in both cases one needs to build ROOT wi
 only used for tau decays and completely optional
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
 * CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
-* It is possible to use HepMC output format. Source code can be obtained 
-from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
+* HepMC: It is possible to use HepMC output format. Source code and installation instructions 
+can be obtained from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
 * Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
 
 ### Other 3rd party libraries
