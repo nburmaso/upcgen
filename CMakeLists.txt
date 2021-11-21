@@ -27,9 +27,11 @@ set(CMAKE_CXX_STANDARD 11)
 option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" OFF)
 option(BUILD_WITH_OPENMP "Build with OpenMP support" OFF)
+option(BUILD_WITH_HEPMC "Build with HepMC output support" OFF)
 
 find_package(OpenMP)
 if (OPENMP_FOUND AND BUILD_WITH_OPENMP)
+    add_definitions(-DUSE_OPENMP)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
@@ -62,4 +64,11 @@ if (BUILD_WITH_PYTHIA8)
     target_link_libraries(generate
             $ENV{PYTHIA8}/lib/libpythia8.so
             $ENV{ROOTSYS}/lib/libEGPythia8.so)
+endif()
+
+if (BUILD_WITH_HEPMC)
+    add_definitions(-DUSE_HEPMC)
+    find_package(HepMC3 PATHS $ENV{HEPMC_ROOT}/share/* REQUIRED)
+    include_directories(${HEPMC3_INCLUDE_DIR})
+    target_link_libraries(generate ${HEPMC3_LIBRARIES})
 endif()

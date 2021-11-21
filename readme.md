@@ -9,6 +9,8 @@ also possible to use Pythia6. Note that in both cases one needs to build ROOT wi
 only used for tau decays and completely optional
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
 * CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
+* It is possible to use HepMC output format. Source code can be obtained 
+from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
 * Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
 
 ### Other 3rd party libraries
@@ -18,13 +20,16 @@ This generator utilizes simple [plog](https://github.com/SergiusTheBest/plog) li
 ### Quick guide
 
 * Clone this repository
-* Install ROOT with Pythia8 support (at least Pythia8)
+* Install ROOT with Pythia8 support (recommended for decays) or Pythia6 support
 * Load ROOT environment
-* Setup Pythia8 environment by exporting `PYTHIA8=/path/to/pythia/installation`
+* Setup Pythia8 environment by exporting `PYTHIA8=/path/to/pythia/install/dir`
 * Optionally: build the generator with Pythia6 using cmake flag `BUILD_WITH_PYTHIA6=ON`
 * Optionally: build the generator with Pythia8 using cmake flag `BUILD_WITH_PYTHIA8=ON`
 * Optionally: build the generator with OpenMP support for parallel computation of two-photon luminosity
   (the most CPU-consuming operation) using cmake flag `BUILD_WITH_OPENMP=ON`
+* Optionally: install HepMC library following instructions from the GitLab repository,
+setup environment with `export HEPMC_ROOT=/path/to/hepmc/install/dir` and build the generator 
+with HepMC support using `BUILD_WITH_HEPMC=ON`
 * For details, see `CMakeLists.txt`
 * Build the project:
 ```shell
@@ -49,7 +54,8 @@ possible).
 The default number of threads is 1.
 
 Generated events will be stored to `events_{a_lep}_{pt_cut}.root`, where `a_lep` is a value of the anomalous magnetic
-moment and `pt_cut` is a minimal transverse momentum for a pair of leptons.
+moment and `pt_cut` is a minimal transverse momentum for a pair of leptons. If the generator is built with HepMC flag,
+events will be written to `events_{a_lep}_{pt_cut}.hepmc2`
 
 ### Input parameters
 
@@ -84,6 +90,8 @@ SEED -1           # Seed for random numbers generator. '-1' -> random seed
 
 * Note that the order, and the number of the parameters are not fixed.
 * If a parameter is not specified by user, the default value will be used.
+* IMPORTANT: make sure that you have built the generator with support of a desired Pythia version,
+that you are going to pass via `PYTHIA_VERSION`
 
 ### Tips
 

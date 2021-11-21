@@ -75,29 +75,246 @@ UpcGenerator::UpcGenerator()
 #ifdef USE_PYTHIA8
   PLOG_INFO << "Initializing Pythia-based decayer";
   if (pythiaVersion == 8) {
+    isPythiaUsed = true;
     decayer = new TPythia8Decayer();
   }
 #endif
 #ifdef USE_PYTHIA6
   if (pythiaVersion == 6) {
+    isPythiaUsed = true;
     decayer = new TPythia6Decayer();
   }
 #endif
-  if (pythiaVersion == -1) {
+
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+  if (pythiaVersion == 6 || pythiaVersion == 8 && isPythiaUsed) {
+    decayer->Init();
+  }
+#endif
+  if (!isPythiaUsed) {
     PLOG_WARNING << "Decays with Pythia are not used!";
   }
 
-  if (pythiaVersion != -1 && pythiaVersion != 6 && pythiaVersion != 8) {
-    PLOG_WARNING << "Wrong PYTHIA_VERSION parameter! Decays with Pythia are not used!";
-  }
-
-#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  isPythiaUsed = true;
-  decayer->Init();
+#ifndef USE_HEPMC
+  // initialize file output
+  PLOG_WARNING << "Using ROOT tree for output!";
+  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
+  outFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
+  outTree = new TTree("particles", "Generated particles");
+  outTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
+  outTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
+  outTree->Branch("particleID", &particle.particleID, "particleID/I");
+  outTree->Branch("motherID", &particle.motherID, "motherID/I");
+  outTree->Branch("px", &particle.px, "px/D");
+  outTree->Branch("py", &particle.py, "py/D");
+  outTree->Branch("pz", &particle.pz, "pz/D");
+  outTree->Branch("e", &particle.e, "e/D");
+  outTree->SetAutoSave(0);
+#else
+  PLOG_WARNING << "Using HepMC2 format for output!";
+  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc2", aLep, minPt);
+  writerHepMC = new HepMC3::WriterAsciiHepMC2(Form("events_%.3f_%.0f.hepmc2", aLep, minPt));
 #endif
 }
 
 UpcGenerator::~UpcGenerator() = default;
+
+void UpcGenerator::initGeneratorFromFile()
+{
+  // todo: use <any> from c++17 for a neat parsing???
+  if (!gSystem->AccessPathName("parameters.in")) {
+    PLOG_INFO << "Reading parameters from parameters.in ...";
+    InputPars parDict;
+    ifstream fInputs("parameters.in");
+    string line;
+    string parameter;
+    string parValue;
+    while (getline(fInputs, line)) {
+      istringstream iss(line);
+      iss >> parameter >> parValue;
+      if (parameter == parDict.inNEvents) {
+        nEvents = stoi(parValue);
+      }
+      if (parameter == parDict.inCMSqrtS) {
+        sqrts = stod(parValue);
+        g1 = sqrts / (2. * mProt);
+        g2 = sqrts / (2. * mProt);
+      }
+      if (parameter == parDict.inLepPDG) {
+        lepPDG = stoi(parValue);
+      }
+      if (parameter == parDict.inLepA) {
+        aLep = stod(parValue);
+      }
+      if (parameter == parDict.inDoPtCut) {
+        doPtCut = stoi(parValue);
+      }
+      if (parameter == parDict.inLowPt) {
+        minPt = stod(parValue);
+      }
+      if (parameter == parDict.inLowZ) {
+        zmin = stod(parValue);
+      }
+      if (parameter == parDict.inHiZ) {
+        zmax = stod(parValue);
+      }
+      if (parameter == parDict.inLowW) {
+        wmin = stod(parValue);
+      }
+      if (parameter == parDict.inHiW) {
+        wmax = stod(parValue);
+      }
+      if (parameter == parDict.inLowY) {
+        ymin = stod(parValue);
+      }
+      if (parameter == parDict.inHiY) {
+        ymax = stod(parValue);
+      }
+      if (parameter == parDict.inBinsZ) {
+        nz = stoi(parValue);
+      }
+      if (parameter == parDict.inBinsW) {
+        nw = stoi(parValue);
+      }
+      if (parameter == parDict.inBinsY) {
+        ny = stoi(parValue);
+      }
+      if (parameter == parDict.inWSRho0) {
+        rho0 = stod(parValue);
+      }
+      if (parameter == parDict.inWSRadius) {
+        R = stod(parValue);
+      }
+      if (parameter == parDict.inWSA) {
+        a = stod(parValue);
+      }
+      if (parameter == parDict.inNucZ) {
+        Z = stod(parValue);
+      }
+      if (parameter == parDict.inNucA) {
+        A = stod(parValue);
+      }
+      if (parameter == parDict.inFluxPoint) {
+        isPoint = stoi(parValue);
+      }
+      if (parameter == parDict.inPythiaVer) {
+        pythiaVersion = stoi(parValue);
+      }
+      if (parameter == parDict.inNonzeroGamPt) {
+        useNonzeroGamPt = stoi(parValue);
+      }
+      if (parameter == parDict.inSeed) {
+        seed = stol(parValue);
+      }
+    }
+    fInputs.close();
+  } else {
+    PLOG_WARNING << "Input file not found! Using default parameters...";
+    printParameters();
+  }
+  // update scaling factor
+  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
+}
+
+void UpcGenerator::printParameters()
+{
+  PLOG_WARNING << "OMP_NTHREADS " << numThreads;
+  PLOG_WARNING << "NUCLEUS_Z " << Z;
+  PLOG_WARNING << "NUCLEUS_A " << A;
+  PLOG_WARNING << "WS_RHO0 " << rho0;
+  PLOG_WARNING << "WS_R " << R;
+  PLOG_WARNING << "WS_A " << a;
+  PLOG_WARNING << "SQRTS " << sqrts;
+  PLOG_WARNING << "LEP_PDG " << lepPDG;
+  PLOG_WARNING << "LEP_A " << aLep;
+  PLOG_WARNING << "NEVENTS " << nEvents;
+  PLOG_WARNING << "DO_PT_CUT " << doPtCut;
+  PLOG_WARNING << "PT_MIN " << minPt;
+  PLOG_WARNING << "ZMIN " << zmin;
+  PLOG_WARNING << "ZMAX " << zmax;
+  PLOG_WARNING << "WMIN " << wmin;
+  PLOG_WARNING << "WMAX " << wmax;
+  PLOG_WARNING << "YMIN " << ymin;
+  PLOG_WARNING << "YMAX " << ymax;
+  PLOG_WARNING << "BINS_Z " << nz;
+  PLOG_WARNING << "BINS_W " << nw;
+  PLOG_WARNING << "BINS_Y " << ny;
+  PLOG_WARNING << "FLUX_POINT " << isPoint;
+  PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
+  PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
+  PLOG_WARNING << "SEED " << seed;
+}
+
+void UpcGenerator::simDecays(int inNumber,
+                             vector<int>& pdgs,
+                             vector<int>& mothers,
+                             vector<TLorentzVector>& particles)
+{
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+  TClonesArray decayParticles("TParticle");
+  TLorentzVector tlVector;
+  for (int i = 0; i < inNumber; i++) {
+    decayer->Decay(pdgs[i], &particles[i]);
+    decayer->ImportParticles(&decayParticles);
+    // skipping first particle, which is lepton
+    for (int ip = 1; ip < decayParticles.GetEntriesFast(); ip++) {
+      auto* part = (TParticle*)decayParticles.At(ip);
+      if (debug > 1) {
+        PLOG_DEBUG << "Particle info:";
+        part->Print();
+      }
+      int pdg = part->GetPdgCode();
+      part->Momentum(tlVector);
+      pdgs.emplace_back(part->GetPdgCode());
+      mothers.emplace_back(i);
+      particles.emplace_back(tlVector);
+    }
+  }
+#endif
+}
+
+void UpcGenerator::writeEvent(int evt,
+                              int inNumber,
+                              vector<int>& pdgs,
+                              vector<int>& mothers,
+                              vector<TLorentzVector>& particles)
+{
+#ifndef USE_HEPMC
+  for (int i = 0; i < inNumber; i++) {
+    int pdg = pdgs[i];
+    particle.eventNumber = evt;
+    particle.pdgCode = pdg;
+    particle.particleID = i;
+    particle.motherID = abs(pdgs[i]) == lepPDG ? -1 : mothers[i];
+    particle.px = particles[i].Px();
+    particle.py = particles[i].Py();
+    particle.pz = particles[i].Pz();
+    particle.e = particles[i].E();
+    outTree->Fill();
+  }
+#endif
+
+#ifdef USE_HEPMC
+  HepMC3::GenVertexPtr vertex = std::make_shared<HepMC3::GenVertex>();
+  for (int i = 0; i < inNumber; i++) {
+    HepMC3::FourVector p;
+    p.setPx(particles[i].Px());
+    p.setPy(particles[i].Py());
+    p.setPz(particles[i].Pz());
+    p.setE(particles[i].E());
+    int status = abs(pdgs[i]) == lepPDG ? 1 : 2;
+    HepMC3::GenParticlePtr part = std::make_shared<HepMC3::GenParticle>(p, pdgs[i], status);
+    if (abs(pdgs[i]) == lepPDG) {
+      vertex->add_particle_in(part);
+    } else {
+      vertex->add_particle_out(part);
+    }
+    HepMC3::GenEvent eventHepMC;
+    eventHepMC.add_vertex(vertex);
+    writerHepMC->write_event(eventHepMC);
+  }
+#endif
+}
 
 double UpcGenerator::simpson(int n, double* v, double h)
 {
@@ -257,7 +474,7 @@ double UpcGenerator::crossSectionW(double w)
 {
   double s = w * w;               // cms invariant mass squared
   double x = 4 * mLep * mLep / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
-  double b = TMath::Sqrt(1 - x);         // lepton relativistic velocity in cms
+  double b = TMath::Sqrt(1 - x);  // lepton relativistic velocity in cms
   double y = atanh(b);            // lepton rapidity in cms
   double cs = 0;
   cs += (2 + 2 * x - x * x) * y - b * (1 + x);
@@ -367,9 +584,9 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
     int progress = 0;
     int total = ny * nw;
     omp_set_num_threads(numThreads);
-#pragma omp parallel default(none) \
-shared(hD2LDMDY, progress) private(iw, iy) firstprivate(total, numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights, vGAA) \
-firstprivate(nb, vb)
+#pragma omp parallel default(none)                                                                                                             \
+  shared(hD2LDMDY, progress) private(iw, iy) firstprivate(total, numThreads, dw, dy, ymin, ymax, wmin, wmax, nw, ny, abscissas, weights, vGAA) \
+    firstprivate(nb, vb)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -395,6 +612,7 @@ firstprivate(nb, vb)
         hD2LDMDY->Add(hD2LDMDY_private);
       }
     }
+    omp_set_num_threads(1);
 #else
     auto* fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
     auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -535,131 +753,6 @@ void UpcGenerator::getPairMomentum(double mPair, double yPair, TLorentzVector& p
   }
 }
 
-void UpcGenerator::initGeneratorFromFile()
-{
-  // todo: use <any> from c++17 for a neat parsing???
-  if (!gSystem->AccessPathName("parameters.in")) {
-    PLOG_INFO << "Reading parameters from parameters.in ...";
-    InputPars parDict;
-    ifstream fInputs("parameters.in");
-    string line;
-    string parameter;
-    string parValue;
-    while (getline(fInputs, line)) {
-      istringstream iss(line);
-      iss >> parameter >> parValue;
-      if (parameter == parDict.inNEvents) {
-        nEvents = stoi(parValue);
-      }
-      if (parameter == parDict.inCMSqrtS) {
-        sqrts = stod(parValue);
-        g1 = sqrts / (2. * mProt);
-        g2 = sqrts / (2. * mProt);
-      }
-      if (parameter == parDict.inLepPDG) {
-        lepPDG = stoi(parValue);
-      }
-      if (parameter == parDict.inLepA) {
-        aLep = stod(parValue);
-      }
-      if (parameter == parDict.inDoPtCut) {
-        doPtCut = stoi(parValue);
-      }
-      if (parameter == parDict.inLowPt) {
-        minPt = stod(parValue);
-      }
-      if (parameter == parDict.inLowZ) {
-        zmin = stod(parValue);
-      }
-      if (parameter == parDict.inHiZ) {
-        zmax = stod(parValue);
-      }
-      if (parameter == parDict.inLowW) {
-        wmin = stod(parValue);
-      }
-      if (parameter == parDict.inHiW) {
-        wmax = stod(parValue);
-      }
-      if (parameter == parDict.inLowY) {
-        ymin = stod(parValue);
-      }
-      if (parameter == parDict.inHiY) {
-        ymax = stod(parValue);
-      }
-      if (parameter == parDict.inBinsZ) {
-        nz = stoi(parValue);
-      }
-      if (parameter == parDict.inBinsW) {
-        nw = stoi(parValue);
-      }
-      if (parameter == parDict.inBinsY) {
-        ny = stoi(parValue);
-      }
-      if (parameter == parDict.inWSRho0) {
-        rho0 = stod(parValue);
-      }
-      if (parameter == parDict.inWSRadius) {
-        R = stod(parValue);
-      }
-      if (parameter == parDict.inWSA) {
-        a = stod(parValue);
-      }
-      if (parameter == parDict.inNucZ) {
-        Z = stod(parValue);
-      }
-      if (parameter == parDict.inNucA) {
-        A = stod(parValue);
-      }
-      if (parameter == parDict.inFluxPoint) {
-        isPoint = stoi(parValue);
-      }
-      if (parameter == parDict.inPythiaVer) {
-        pythiaVersion = stoi(parValue);
-      }
-      if (parameter == parDict.inNonzeroGamPt) {
-        useNonzeroGamPt = stoi(parValue);
-      }
-      if (parameter == parDict.inSeed) {
-        seed = stol(parValue);
-      }
-    }
-    fInputs.close();
-  } else {
-    PLOG_WARNING << "Input file not found! Using default parameters...";
-    printParameters();
-  }
-  // update scaling factor
-  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
-}
-
-void UpcGenerator::printParameters()
-{
-  PLOG_WARNING << "NUCLEUS_Z " << Z;
-  PLOG_WARNING << "NUCLEUS_A " << A;
-  PLOG_WARNING << "WS_RHO0 " << rho0;
-  PLOG_WARNING << "WS_R " << R;
-  PLOG_WARNING << "WS_A " << a;
-  PLOG_WARNING << "SQRTS " << sqrts;
-  PLOG_WARNING << "LEP_PDG " << lepPDG;
-  PLOG_WARNING << "LEP_A " << aLep;
-  PLOG_WARNING << "NEVENTS " << nEvents;
-  PLOG_WARNING << "DO_PT_CUT " << doPtCut;
-  PLOG_WARNING << "PT_MIN " << minPt;
-  PLOG_WARNING << "ZMIN " << zmin;
-  PLOG_WARNING << "ZMAX " << zmax;
-  PLOG_WARNING << "WMIN " << wmin;
-  PLOG_WARNING << "WMAX " << wmax;
-  PLOG_WARNING << "YMIN " << ymin;
-  PLOG_WARNING << "YMAX " << ymax;
-  PLOG_WARNING << "BINS_Z " << nz;
-  PLOG_WARNING << "BINS_W " << nw;
-  PLOG_WARNING << "BINS_Y " << ny;
-  PLOG_WARNING << "FLUX_POINT " << isPoint;
-  PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
-  PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
-  PLOG_WARNING << "SEED " << seed;
-}
-
 void UpcGenerator::generateEvents()
 {
   // calculating elementary cross section in WZ space
@@ -681,9 +774,7 @@ void UpcGenerator::generateEvents()
     PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
   }
 
-  TAxis * elemAxisW = hCrossSectionWZ->GetXaxis();
-
-  vector<TLorentzVector> pLeps(2);
+  TAxis* elemAxisW = hCrossSectionWZ->GetXaxis();
 
   vector<double> cutsZ(hNucCSYM->GetNbinsY());
   if (doPtCut) {
@@ -702,26 +793,9 @@ void UpcGenerator::generateEvents()
     }
   }
 
-  // initialize helper structure
-  Particle particle{};
-
-  // initialize file output
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
-  TFile outFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
-  TTree outTree("particles", "Generated particles");
-  outTree.Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
-  outTree.Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
-  outTree.Branch("particleID", &particle.particleID, "particleID/I");
-  outTree.Branch("motherID", &particle.motherID, "motherID/I");
-  outTree.Branch("px", &particle.px, "px/D");
-  outTree.Branch("py", &particle.py, "py/D");
-  outTree.Branch("pz", &particle.pz, "pz/D");
-  outTree.Branch("e", &particle.e, "e/D");
-  outTree.SetAutoSave(0);
-
-  TClonesArray decayParticles("TParticle");
-  TLorentzVector tlVector;
-  vector<int> pdgLeps(2);
+  vector<int> pdgs;
+  vector<int> mothers;
+  vector<TLorentzVector> particles;
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
@@ -762,66 +836,43 @@ void UpcGenerator::generateEvents()
     double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mLep * mLep);
     TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
-    pLeps[0].SetVectM(vLep, mLep);
-    pLeps[1].SetVectM(-vLep, mLep);
+    TLorentzVector tlLep1;
+    TLorentzVector tlLep2;
+    tlLep1.SetVectM(vLep, mLep);
+    tlLep2.SetVectM(-vLep, mLep);
+    particles.emplace_back(tlLep1);
+    particles.emplace_back(tlLep2);
 
     TVector3 boost = pPair.BoostVector();
-    pLeps[0].Boost(boost);
-    pLeps[1].Boost(boost);
+    particles[0].Boost(boost);
+    particles[1].Boost(boost);
 
     int sign = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
-    pdgLeps[0] = sign * lepPDG;
-    pdgLeps[1] = -sign * lepPDG;
+    pdgs.emplace_back(sign * lepPDG);
+    pdgs.emplace_back(-sign * lepPDG);
 
-    // lepton decays for tau or straight writing
-#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+    mothers.emplace_back(-1);
+    mothers.emplace_back(-1);
+
+    // lepton decays for taus
     if (lepPDG == 15 && isPythiaUsed) {
-      for (int iLep = 0; iLep < 2; iLep++) {
-        int partID = 0;
-        decayer->Decay(pdgLeps[iLep], &pLeps[iLep]);
-        decayer->ImportParticles(&decayParticles);
-        for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
-          auto* part = (TParticle*)decayParticles.At(ip);
-          if (debug > 1) {
-            PLOG_DEBUG << "Particle info:";
-            part->Print();
-          }
-          int pdg = part->GetPdgCode();
-          part->Momentum(tlVector);
-          // filling output tree
-          particle.eventNumber = evt;
-          particle.pdgCode = pdg;
-          particle.particleID = partID;
-          particle.motherID = abs(pdg) == 15 ? -1 : 0;
-          particle.px = tlVector.Px();
-          particle.py = tlVector.Py();
-          particle.pz = tlVector.Pz();
-          particle.e = tlVector.E();
-          outTree.Fill();
-          partID++;
-        }
-      }
+      simDecays(2, pdgs, mothers, particles);
     }
-#endif
-    if (lepPDG != 15 || !isPythiaUsed) {
-      for (int iLep = 0; iLep < 2; iLep++) {
-        int partID = 0;
-        int pdg = pdgLeps[iLep];
-        particle.eventNumber = evt;
-        particle.pdgCode = pdg;
-        particle.particleID = partID;
-        particle.motherID = -1;
-        particle.px = pLeps[iLep].Px();
-        particle.py = pLeps[iLep].Py();
-        particle.pz = pLeps[iLep].Pz();
-        particle.e = pLeps[iLep].E();
-        outTree.Fill();
-        partID++;
-      }
-    }
+
+    writeEvent(evt, particles.size(), pdgs, mothers, particles);
+
+    pdgs.clear();
+    mothers.clear();
+    particles.clear();
     delete hCSSliceAtW;
   }
 
-  outFile.Write();
-  outFile.Close();
+#ifndef USE_HEPMC
+  outFile->Write();
+  outFile->Close();
+#endif
+
+#ifdef USE_HEPMC
+  writerHepMC->close();
+#endif
 }

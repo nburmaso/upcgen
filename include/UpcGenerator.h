@@ -46,6 +46,14 @@
 #include "TPythia8Decayer.h"
 #endif
 
+#ifdef USE_HEPMC
+#include "HepMC3/GenEvent.h"
+#include "HepMC3/GenVertex.h"
+#include "HepMC3/GenParticle.h"
+#include "HepMC3/FourVector.h"
+#include "HepMC3/WriterAsciiHepMC2.h"
+#endif
+
 using namespace std;
 
 class UpcGenerator
@@ -74,9 +82,50 @@ class UpcGenerator
   void generateEvents();
 
  private:
+  // internal methods for event treating
+  // ----------------------------------------------------------------------
+  void simDecays(int inNumber,
+                 vector<int>& pdgs,
+                 vector<int>& mothers,
+                 vector<TLorentzVector>& particles);
+
+  // helper struct for file output
+  struct {
+    int eventNumber;
+    int pdgCode;
+    int particleID;
+    int motherID;
+    double px;
+    double py;
+    double pz;
+    double e;
+  } particle;
+
+  TFile* outFile;
+  TTree* outTree;
+
+  void writeEvent(int evt,
+                  int inNumber,
+                  vector<int>& pdgs,
+                  vector<int>& mothers,
+                  vector<TLorentzVector>& particles);
+
+  // pythia helper & decayer parameters
+  int pythiaVersion{-1}; // not using Pythia at all by default
+  bool isPythiaUsed{false};
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+  TVirtualMCDecayer* decayer;
+#endif
+
+#ifdef USE_HEPMC
+  // helper for HepMC output format
+  HepMC3::WriterAsciiHepMC2* writerHepMC;
+#endif
+
+  // number of worker threads for OpenMP
   int numThreads{1};
 
-  // internal class methods
+  // internal methods for calculations
   // ----------------------------------------------------------------------
 
   // Simpson integrator
@@ -118,13 +167,6 @@ class UpcGenerator
   // accounting for non-zero photon pt
   double getPhotonPt(double ePhot);
   void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
-
-  // pythia helper & decayer parameters
-  int pythiaVersion{-1}; // not using Pythia at all by default
-  bool isPythiaUsed{false};
-#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  TVirtualMCDecayer* decayer;
-#endif
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
@@ -199,18 +241,6 @@ class UpcGenerator
   bool isPoint{true}; // flux calculation parameter
   bool useNonzeroGamPt{true};
   static std::map<int, double> lepMassMap;
-
-  // helper struct for file output
-  struct Particle {
-    int eventNumber;
-    int pdgCode;
-    int particleID;
-    int motherID;
-    double px;
-    double py;
-    double pz;
-    double e;
-  };
 
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???
