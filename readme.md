@@ -98,4 +98,4 @@ that you are going to pass via `PYTHIA_VERSION`
 * The generator calculates two-photon luminosity and caches it into `hD2LDMDY.root`. 
 This file will be picked automatically if found. The calculation process may take a lot of time,
 so you may want to keep pre-calculated grid for further usage. Note that you need to recalculate
-it in case if you have changed grid input parameters (e.g., binning and/or range in W/Y).
+it in case if you have changed grid input parameters (e.g., binning and/or range in M/Y).
