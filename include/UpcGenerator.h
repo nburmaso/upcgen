@@ -133,29 +133,29 @@ class UpcGenerator
   static double simpson(int n, double* v, double h);
 
   // photon fluxes
-  double fluxPoint(const double b, const double w, const double g);
+  double fluxPoint(const double b, const double k, const double g);
 
   static double fluxFormInt(double* x, double* par);
 
-  double fluxForm(const double b, const double w, const double g, TF1* fFluxForm);
+  double fluxForm(const double b, const double k, const double g, TF1* fFluxForm);
 
   // two-photon luminosity
   double D2LDMDY(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
-  // elementary cross section for dilepton production in WZ space
-  double crossSectionWZ(double s, double z);
+  // elementary cross section for dilepton production in MZ space
+  double crossSectionMZ(double s, double z);
 
-  // elementary cross section for dilepton production in W space
-  double crossSectionW(double w);
+  // elementary cross section for dilepton production in M space
+  double crossSectionM(double m);
 
-  // histogram filler for WZ-cross section
-  void fillCrossSectionWZ(TH2D* hCrossSectionWZ,
-                          double wmin, double wmax, int nw,
+  // histogram filler for MZ-cross section
+  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
+                          double mmin, double mmax, int nm,
                           double zmin, double zmax, int nz);
 
-  // histogram filler for W-cross section
-  void fillCrossSectionW(TH1D* hCrossSectionW,
-                         double wmin, double wmax, int nw);
+  // histogram filler for M-cross section
+  void fillCrossSectionM(TH1D* hCrossSectionM,
+                         double mmin, double mmax, int nm);
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and 2-gamma luminosity
@@ -215,9 +215,9 @@ class UpcGenerator
   double zmin{-1};   // min z
   double zmax{1};    // max z
   int nz{100};       // nbins in z = cos(theta)
-  double wmin{3.56}; // min W in GeV
-  double wmax{50.};  // max W in GeV
-  int nw{1001};      // n bins in W
+  double mmin{3.56}; // min M in GeV
+  double mmax{50.};  // max M in GeV
+  int nm{1001};      // n bins in M
   double ymin{-6.};  // min pair rapidity
   double ymax{6.};   // max pair rapidity
   int ny{121};       // n bins in Y
@@ -259,12 +259,12 @@ class UpcGenerator
     string inLowPt{"PT_MIN"};
     string inLowZ{"ZMIN"};
     string inHiZ{"ZMAX"};
-    string inLowW{"WMIN"};
-    string inHiW{"WMAX"};
+    string inLowM{"MMIN"};
+    string inHiM{"MMAX"};
     string inLowY{"YMIN"};
     string inHiY{"YMAX"};
     string inBinsZ{"BINS_Z"};
-    string inBinsW{"BINS_W"};
+    string inBinsM{"BINS_M"};
     string inBinsY{"BINS_Y"};
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};

@@ -26,7 +26,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" OFF)
-option(BUILD_WITH_OPENMP "Build with OpenMP support" OFF)
+option(BUILD_WITH_OPENMP "Build with OpenMP support" ON)
 option(BUILD_WITH_HEPMC "Build with HepMC output support" OFF)
 
 find_package(OpenMP)

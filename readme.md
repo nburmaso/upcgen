@@ -76,12 +76,12 @@ DO_PT_CUT 0       # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0          # pt cut
 ZMIN -1           # min. z = cos(theta) for the elementary cross section
 ZMAX 1            # max. z = cos(theta) for the elementary cross section
-WMIN 3.56         # min. w for the elementary/nuclear cross section
-WMAX 50           # max. w for the elementary/nuclear cross section
+MMIN 3.56         # min. m for the elementary/nuclear cross section
+MMAX 50           # max. m for the elementary/nuclear cross section
 YMIN -6           # min. y for the nuclear cross section
 YMAX 6            # max. y for the nuclear cross section
 BINS_Z 100        # cross section binnings: bins for z
-BINS_W 1001       #                         bins for w
+BINS_M 1001       #                         bins for m
 BINS_Y 121        #                         bins for y
 FLUX_POINT 1      # use point flux approximation or not
 PYTHIA_VERSION 8  # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
