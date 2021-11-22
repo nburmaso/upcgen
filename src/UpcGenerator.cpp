@@ -295,6 +295,7 @@ void UpcGenerator::writeEvent(int evt,
 #endif
 
 #ifdef USE_HEPMC
+  HepMC3::GenEvent eventHepMC;
   HepMC3::GenVertexPtr vertex = std::make_shared<HepMC3::GenVertex>();
   for (int i = 0; i < inNumber; i++) {
     HepMC3::FourVector p;
@@ -309,10 +310,9 @@ void UpcGenerator::writeEvent(int evt,
     } else {
       vertex->add_particle_out(part);
     }
-    HepMC3::GenEvent eventHepMC;
-    eventHepMC.add_vertex(vertex);
-    writerHepMC->write_event(eventHepMC);
   }
+  eventHepMC.add_vertex(vertex);
+  writerHepMC->write_event(eventHepMC);
 #endif
 }
 
