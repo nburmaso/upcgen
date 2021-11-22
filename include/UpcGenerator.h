@@ -51,6 +51,7 @@
 #include "HepMC3/GenVertex.h"
 #include "HepMC3/GenParticle.h"
 #include "HepMC3/FourVector.h"
+#include "HepMC3/WriterAscii.h"
 #include "HepMC3/WriterAsciiHepMC2.h"
 #endif
 
@@ -119,7 +120,7 @@ class UpcGenerator
 
 #ifdef USE_HEPMC
   // helper for HepMC output format
-  HepMC3::WriterAsciiHepMC2* writerHepMC;
+  HepMC3::WriterAscii* writerHepMC;
 #endif
 
   // number of worker threads for OpenMP

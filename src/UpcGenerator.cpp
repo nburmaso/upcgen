@@ -111,9 +111,9 @@ UpcGenerator::UpcGenerator()
   outTree->Branch("e", &particle.e, "e/D");
   outTree->SetAutoSave(0);
 #else
-  PLOG_WARNING << "Using HepMC2 format for output!";
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc2", aLep, minPt);
-  writerHepMC = new HepMC3::WriterAsciiHepMC2(Form("events_%.3f_%.0f.hepmc2", aLep, minPt));
+  PLOG_WARNING << "Using HepMC format for output!";
+  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc", aLep, minPt);
+  writerHepMC = new HepMC3::WriterAscii(Form("events_%.3f_%.0f.hepmc", aLep, minPt));
 #endif
 }
 
@@ -295,6 +295,7 @@ void UpcGenerator::writeEvent(int evt,
 #endif
 
 #ifdef USE_HEPMC
+  // todo: add incoming photons to vertices
   HepMC3::GenEvent eventHepMC;
   eventHepMC.set_event_number(evt);
   HepMC3::GenVertexPtr vertex = std::make_shared<HepMC3::GenVertex>();
@@ -306,12 +307,10 @@ void UpcGenerator::writeEvent(int evt,
     p.setE(particles[i].E());
     int status = abs(pdgs[i]) == lepPDG ? 1 : 2;
     HepMC3::GenParticlePtr part = std::make_shared<HepMC3::GenParticle>(p, pdgs[i], status);
-    if (abs(pdgs[i]) == lepPDG) {
-      vertex->add_particle_in(part);
-    } else {
-      vertex->add_particle_out(part);
-    }
+    vertex->add_particle_out(part);
   }
+  // dummy in-particle for correct output
+  vertex->add_particle_in(std::make_shared<HepMC3::GenParticle>());
   eventHepMC.add_vertex(vertex);
   writerHepMC->write_event(eventHepMC);
 #endif
@@ -803,7 +802,7 @@ void UpcGenerator::generateEvents()
   for (int evt = 0; evt < nEvents; evt++) {
     if (debug > 1) {
       PLOG_DEBUG << "Event number: " << evt + 1;
-    } else if ((evt + 1) % 100000 == 0) {
+    } else if ((evt + 1) % 10000 == 0) {
       PLOG_INFO << "Event number: " << evt + 1;
     }
 
