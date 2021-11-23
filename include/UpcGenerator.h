@@ -132,6 +132,9 @@ class UpcGenerator
   // Simpson integrator
   static double simpson(int n, double* v, double h);
 
+  // Woods-Saxon rho0 from normalization
+  double calcWSRho();
+
   // photon fluxes
   double fluxPoint(const double b, const double k, const double g);
 
@@ -234,6 +237,7 @@ class UpcGenerator
   double TA[nb];
   double rho[nb][nb];
   double vGAA[nb];
+  double vRho[nb];
 
   // simulation parameters
   bool doPtCut{false};
@@ -248,7 +252,6 @@ class UpcGenerator
   struct InputPars {
     string inNucZ{"NUCLEUS_Z"};
     string inNucA{"NUCLEUS_A"};
-    string inWSRho0{"WS_RHO0"};
     string inWSRadius{"WS_R"};
     string inWSA{"WS_A"};
     string inCMSqrtS{"SQRTS"};

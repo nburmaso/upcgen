@@ -65,8 +65,7 @@ repository. Available parameters are the following:
 ```
 NUCLEUS_Z 82      # atomic number of the incoming nuclei
 NUCLEUS_A 208     # atomic mass of the incoming nuclei
-WS_RHO0 0.159538  # Woods-Saxon parameters: rho0
-WS_R 6.68         #                         R
+WS_R 6.68         # Woods-Saxon parameters: R
 WS_A 0.447        #                         a
 SQRTS 5020        # sqrt(s) in the CM frame
 LEP_PDG 15        # lepton code according to Monte Carlo numbering scheme from PDG

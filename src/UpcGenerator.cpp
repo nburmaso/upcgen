@@ -67,6 +67,12 @@ UpcGenerator::UpcGenerator()
 
   mLep = lepMassMap[lepPDG];
 
+  // update scaling factor
+  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
+
+  // calculate Woods-Saxon rho0 from R and a
+  rho0 = calcWSRho();
+
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
   gRandom->SetSeed(seed == -1 ? time(nullptr) : seed);
@@ -179,9 +185,6 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inBinsY) {
         ny = stoi(parValue);
       }
-      if (parameter == parDict.inWSRho0) {
-        rho0 = stod(parValue);
-      }
       if (parameter == parDict.inWSRadius) {
         R = stod(parValue);
       }
@@ -212,8 +215,6 @@ void UpcGenerator::initGeneratorFromFile()
     PLOG_WARNING << "Input file not found! Using default parameters...";
     printParameters();
   }
-  // update scaling factor
-  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
 }
 
 void UpcGenerator::printParameters()
@@ -221,9 +222,9 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "OMP_NTHREADS " << numThreads;
   PLOG_WARNING << "NUCLEUS_Z " << Z;
   PLOG_WARNING << "NUCLEUS_A " << A;
-  PLOG_WARNING << "WS_RHO0 " << rho0;
   PLOG_WARNING << "WS_R " << R;
   PLOG_WARNING << "WS_A " << a;
+  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << calcWSRho();
   PLOG_WARNING << "SQRTS " << sqrts;
   PLOG_WARNING << "LEP_PDG " << lepPDG;
   PLOG_WARNING << "LEP_A " << aLep;
@@ -326,6 +327,16 @@ double UpcGenerator::simpson(int n, double* v, double h)
     sum += 2 * v[i];
   }
   return sum * h / 3;
+}
+
+double UpcGenerator::calcWSRho()
+{
+  for (int ib = 0; ib < nb; ib++) {
+    double r = ib * db;
+    vRho[ib] = r * r / (1 + exp((r - R) / a));
+  }
+  double wsRho0 = A / simpson(nb, vRho, db) / 4 / M_PI;
+  return wsRho0;
 }
 
 double UpcGenerator::fluxPoint(const double b, const double k, const double g)
