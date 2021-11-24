@@ -47,7 +47,7 @@
 using namespace std;
 
 // out-of-line initialization for static members
-double UpcGenerator::rho0 = 0.159538;
+double UpcGenerator::rho0 = 0;
 double UpcGenerator::R = 6.68;
 double UpcGenerator::a = 0.447;
 double UpcGenerator::Z = 82;
@@ -224,7 +224,7 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "NUCLEUS_A " << A;
   PLOG_WARNING << "WS_R " << R;
   PLOG_WARNING << "WS_A " << a;
-  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << calcWSRho();
+  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << rho0;
   PLOG_WARNING << "SQRTS " << sqrts;
   PLOG_WARNING << "LEP_PDG " << lepPDG;
   PLOG_WARNING << "LEP_A " << aLep;
