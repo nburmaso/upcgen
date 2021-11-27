@@ -100,27 +100,6 @@ UpcGenerator::UpcGenerator()
   if (!isPythiaUsed) {
     PLOG_WARNING << "Decays with Pythia are not used!";
   }
-
-#ifndef USE_HEPMC
-  // initialize file output
-  PLOG_WARNING << "Using ROOT tree for output!";
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
-  outFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
-  outTree = new TTree("particles", "Generated particles");
-  outTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
-  outTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
-  outTree->Branch("particleID", &particle.particleID, "particleID/I");
-  outTree->Branch("motherID", &particle.motherID, "motherID/I");
-  outTree->Branch("px", &particle.px, "px/D");
-  outTree->Branch("py", &particle.py, "py/D");
-  outTree->Branch("pz", &particle.pz, "pz/D");
-  outTree->Branch("e", &particle.e, "e/D");
-  outTree->SetAutoSave(0);
-#else
-  PLOG_WARNING << "Using HepMC format for output!";
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc", aLep, minPt);
-  writerHepMC = new HepMC3::WriterAscii(Form("events_%.3f_%.0f.hepmc", aLep, minPt));
-#endif
 }
 
 UpcGenerator::~UpcGenerator() = default;
@@ -807,6 +786,27 @@ void UpcGenerator::generateEvents()
   vector<int> pdgs;
   vector<int> mothers;
   vector<TLorentzVector> particles;
+
+#ifndef USE_HEPMC
+  // initialize file output
+  PLOG_WARNING << "Using ROOT tree for output!";
+  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
+  outFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
+  outTree = new TTree("particles", "Generated particles");
+  outTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
+  outTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
+  outTree->Branch("particleID", &particle.particleID, "particleID/I");
+  outTree->Branch("motherID", &particle.motherID, "motherID/I");
+  outTree->Branch("px", &particle.px, "px/D");
+  outTree->Branch("py", &particle.py, "py/D");
+  outTree->Branch("pz", &particle.pz, "pz/D");
+  outTree->Branch("e", &particle.e, "e/D");
+  outTree->SetAutoSave(0);
+#else
+  PLOG_WARNING << "Using HepMC format for output!";
+  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc", aLep, minPt);
+  writerHepMC = new HepMC3::WriterAscii(Form("events_%.3f_%.0f.hepmc", aLep, minPt));
+#endif
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
