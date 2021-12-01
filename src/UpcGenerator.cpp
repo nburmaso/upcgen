@@ -710,7 +710,7 @@ double UpcGenerator::getPhotonPt(double ePhot)
       satisfy = true;
     } else {
       x = gRandom->Uniform(0, 1);
-      pp = 5 * hc / R * x;
+      pp = x * 5 * hc / R;
       arg = pp * pp + ereds;
       double sFFactPt2 = nucFormFactor(arg);
       test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);
