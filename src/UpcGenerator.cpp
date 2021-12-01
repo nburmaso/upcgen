@@ -93,7 +93,7 @@ UpcGenerator::UpcGenerator()
 #endif
 
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  if (pythiaVersion == 6 || pythiaVersion == 8 && isPythiaUsed) {
+  if ((pythiaVersion == 6 || pythiaVersion == 8) && isPythiaUsed) {
     decayer->Init();
   }
 #endif
