@@ -685,6 +685,8 @@ double UpcGenerator::nucFormFactor(double t)
   return ffactor;
 }
 
+// Function from Starlight
+// (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
 double UpcGenerator::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
