@@ -670,17 +670,17 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
 // Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999
 double UpcGenerator::nucFormFactor(double t)
 {
-  double q = TMath::Sqrt(t);
   double ffactor;
   if (Z < 7) {
-    ffactor = exp(-R * R * q * q / (6 * hc * hc));
+    ffactor = exp(-R * R * t * t / (6 * hc * hc));
   }
   if (Z >= 7) {
+    double q = TMath::Sqrt(t);
     double qR = q * R / hc;
     double invqR = hc / (q * R);
     ffactor = (TMath::Sin(qR) - qR * TMath::Cos(qR)) * 3. * invqR * invqR * invqR;
     const double a0 = 0.7; // [fm]
-    ffactor = ffactor / (1. + (a0 * a0 * q * q) / (hc * hc));
+    ffactor = ffactor / (1. + (a0 * a0 * t) / (hc * hc));
   }
   return ffactor;
 }
