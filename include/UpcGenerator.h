@@ -165,7 +165,7 @@ class UpcGenerator
   void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
 
   // nuclear form factor for momentum transfer q
-  static double nucFormFactor(double q);
+  static double nucFormFactor(double t);
 
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
