@@ -36,11 +36,19 @@ class UpcPythiaBase
 
   virtual void init() = 0;
 
-  virtual void decay(std::vector<int>& pdgs, std::vector<TLorentzVector>& particles) = 0;
+  virtual void process(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<TLorentzVector>& particles) = 0;
 
   virtual int import(TClonesArray* particles) = 0;
 
-  virtual void setFSR(bool doFSR) = 0;
+  // auxiliary methods
+  void setFSR(bool doFSR) { mDoFSR = doFSR; }
+  void setSeed(long seed) { mSeed = seed; }
+  void setDecays(bool doDecays) { mDoDecays = doDecays; }
+
+ protected:
+  long mSeed{0};
+  bool mDoFSR{false};
+  bool mDoDecays{false};
 };
 
 #endif // UPCGENERATOR_INCLUDE_UPCPYTHIABASE_H_

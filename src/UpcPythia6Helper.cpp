@@ -33,7 +33,7 @@ void UpcPythia6Helper::init()
 {
 }
 
-void UpcPythia6Helper::decay(std::vector<int>& pdgs, std::vector<TLorentzVector>& particles)
+void UpcPythia6Helper::process(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<TLorentzVector>& particles)
 {
   for (int i = 0; i < particles.size(); i++) {
     TPythia6::Instance()->Py1ent(0, pdgs[i], particles[i].Energy(), particles[i].Theta(), particles[i].Phi());

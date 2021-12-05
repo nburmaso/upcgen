@@ -29,9 +29,11 @@
 // can be used only if built with Pythia8
 #ifdef USE_PYTHIA8
 
-class TClonesArrray;
-class TLorentzVector;
-class TPythia8;
+#include "TClonesArray.h"
+#include "TLorentzVector.h"
+#include "TParticle.h"
+
+#include "Pythia8/Pythia.h"
 
 class UpcPythia8Helper : public UpcPythiaBase
 {
@@ -41,24 +43,20 @@ class UpcPythia8Helper : public UpcPythiaBase
 
   void init() override;
 
-  void decay(std::vector<int>& pdgs, std::vector<TLorentzVector>& particles) override;
+  void process(std::vector<int>& pdgs,
+               std::vector<int>& statuses,
+               std::vector<TLorentzVector>& particles) override;
 
   int import(TClonesArray* particles) override;
 
-  virtual void setDebugLevel(int debug) { fDebug = debug; }
-
-  void setFSR(bool doFSR) override { fDoFSR = doFSR; }
-
-  const TPythia8* getPythia() { return fPythia8; }
+  const Pythia8::Pythia* getPythia() { return mPythia8; }
 
  protected:
-  void appendParticle(int pdg, TLorentzVector* p);
+  void appendParticle(int pdg, int status, TLorentzVector* p);
   void clearEvent();
 
  private:
-  bool fDoFSR{false};
-  TPythia8* fPythia8;
-  int fDebug;
+  Pythia8::Pythia* mPythia8;
 };
 
 #endif

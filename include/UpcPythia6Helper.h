@@ -39,14 +39,9 @@ class UpcPythia6Helper : public UpcPythiaBase
 
   void init() override;
 
-  void decay(std::vector<int>& pdgs, std::vector<TLorentzVector>& particles) override;
+  void process(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<TLorentzVector>& particles) override;
 
   int import(TClonesArray* particles) override;
-
-  void setFSR(bool doFSR) override {}
-
- protected:
-  static UpcPythia6Helper* fgInstance;
 };
 
 #endif

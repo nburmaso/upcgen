@@ -34,53 +34,86 @@
 #include "TLorentzVector.h"
 #include "TPythia8.h"
 
-UpcPythia8Helper::UpcPythia8Helper() : fPythia8(new TPythia8()),
-                                       fDebug(0)
+UpcPythia8Helper::UpcPythia8Helper() : mPythia8(new Pythia8::Pythia())
 {
 }
 
 void UpcPythia8Helper::init()
 {
-  if (fDoFSR) {
-    fPythia8->Pythia8()->readString("ProcessLevel:all = off");
-    fPythia8->Pythia8()->readString("SpaceShower:QEDshowerByL = on");
-    fPythia8->Pythia8()->readString("TimeShower:QEDshowerByL = on");
+  if (mDoFSR) {
+    mPythia8->readString("ProcessLevel:all = off");
+    mPythia8->readString("PartonShowers:Model = 1");
   }
-  fPythia8->Pythia8()->readString("PartonLevel:FSR = on");
-  fPythia8->Pythia8()->readString("SoftQCD:elastic = on");
-  fPythia8->Pythia8()->init();
+  mPythia8->readString("SoftQCD:elastic = on");
+  mPythia8->init();
 }
 
-void UpcPythia8Helper::decay(std::vector<int>& pdgs,
-                             std::vector<TLorentzVector>& particles)
+void UpcPythia8Helper::process(std::vector<int>& pdgs,
+                               std::vector<int>& statuses,
+                               std::vector<TLorentzVector>& particles)
 {
   clearEvent();
   for (int i = 0; i < particles.size(); i++) {
-    appendParticle(pdgs[i], &particles[i]);
-    int idPart = fPythia8->Pythia8()->event[i].id();
-    // fPythia8->Pythia8()->particleData.mayDecay(idPart, true);
+    appendParticle(pdgs[i], statuses[i], &particles[i]);
+    int idPart = mPythia8->event[i].id();
+    if (statuses[i] == 23) {
+      mPythia8->particleData.mayDecay(idPart, true);
+    }
   }
-  if (fDoFSR) {
-    fPythia8->Pythia8()->forceTimeShower(0, 0, particles[0].Pt(), 1);
+  if (mDoFSR) {
+    mPythia8->getShowerModelPtr()->getTimeShower()->showerQED(0, 1, mPythia8->event, particles[0].Pt());
   }
-  // fPythia8->Pythia8()->moreDecays();
-  if (fDebug > 0)
-    fPythia8->EventListing();
+  if (mDoDecays) {
+    mPythia8->moreDecays();
+  }
+  // mPythia8->event.list();
 }
 
 int UpcPythia8Helper::import(TClonesArray* particles)
 {
-  return (fPythia8->ImportParticles(particles, "All"));
+  if (particles == nullptr) {
+    return 0;
+  }
+  TClonesArray& clonesParticles = *particles;
+  clonesParticles.Clear();
+  int nparts = 0;
+  int ioff = 0;
+  if (mPythia8->event[0].id() == 90) {
+    ioff = -1;
+  }
+
+  for (const auto& part : mPythia8->event) {
+    if (part.id() == 90) {
+      continue;
+    }
+    new (clonesParticles[nparts]) TParticle(
+      part.id(),
+      part.status(),
+      part.mother1() + ioff,
+      part.mother2() + ioff,
+      part.daughter1() + ioff,
+      part.daughter2() + ioff,
+      part.px(),
+      part.py(),
+      part.pz(),
+      part.e(),
+      part.xProd(),
+      part.yProd(),
+      part.zProd(),
+      part.tProd());
+    nparts++;
+  }
+  return nparts;
 }
 
-void UpcPythia8Helper::appendParticle(int pdg, TLorentzVector* p)
+void UpcPythia8Helper::appendParticle(int pdg, int status, TLorentzVector* p)
 {
-  fPythia8->Pythia8()->event.append(pdg, 11, 0, 0, p->Px(), p->Py(), p->Pz(), p->E(), p->M(), p->Pt());
+  mPythia8->event.append(pdg, status, 0, 0, p->Px(), p->Py(), p->Pz(), p->E(), p->M(), p->Pt());
 }
 
 void UpcPythia8Helper::clearEvent()
 {
-  fPythia8->Pythia8()->event.clear();
+  mPythia8->event.clear();
 }
 
 #endif

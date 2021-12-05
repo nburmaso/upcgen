@@ -65,6 +65,7 @@ UpcGenerator::UpcGenerator()
     isPythiaUsed = true;
     decayer = new UpcPythia8Helper();
     decayer->setFSR(doFSR);
+    decayer->setDecays(doDecays);
     decayer->init();
   }
 #endif
@@ -163,6 +164,9 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inPythia8FSR) {
         doFSR = stoi(parValue);
       }
+      if (parameter == parDict.inPythia8Decays) {
+        doDecays = stoi(parValue);
+      }
       if (parameter == parDict.inNonzeroGamPt) {
         useNonzeroGamPt = stoi(parValue);
       }
@@ -204,30 +208,37 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
   PLOG_WARNING << "PYTHIA8_FSR " << doFSR;
+  PLOG_WARNING << "PYTHIA8_DECAYS " << doDecays;
   PLOG_WARNING << "SEED " << seed;
 }
 
-void UpcGenerator::simDecays(vector<int>& pdgs, vector<int>& mothers, vector<TLorentzVector>& particles)
+void UpcGenerator::processInPythia(vector<int>& pdgs,
+                                   vector<int>& statuses,
+                                   vector<int>& mothers,
+                                   vector<TLorentzVector>& particles)
 {
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  TClonesArray decayParticles("TParticle");
+  TClonesArray processedParts("TParticle");
   TLorentzVector tlVector;
-  decayer->decay(pdgs, particles);
-  decayer->import(&decayParticles);
+  decayer->process(pdgs, statuses, particles);
+  decayer->import(&processedParts);
   // todo: not very optimal, to be cleaned up
   pdgs.clear();
+  statuses.clear();
   mothers.clear();
   particles.clear();
-  for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
-    auto* part = (TParticle*)decayParticles.At(ip);
+  for (int ip = 0; ip < processedParts.GetEntriesFast(); ip++) {
+    auto* part = (TParticle*)processedParts.At(ip);
     if (debug > 1) {
       PLOG_DEBUG << "Particle info:";
       part->Print();
     }
     int pdg = part->GetPdgCode();
+    int status = part->GetStatusCode();
     int mother = part->GetFirstMother();
     part->Momentum(tlVector);
     pdgs.emplace_back(pdg);
+    statuses.emplace_back(status);
     mothers.emplace_back(mother);
     particles.emplace_back(tlVector);
   }
@@ -235,22 +246,23 @@ void UpcGenerator::simDecays(vector<int>& pdgs, vector<int>& mothers, vector<TLo
 }
 
 void UpcGenerator::writeEvent(int evt,
-                              int inNumber,
                               const vector<int>& pdgs,
+                              const vector<int>& statuses,
                               const vector<int>& mothers,
                               const vector<TLorentzVector>& particles)
 {
 #ifndef USE_HEPMC
-  for (int i = 0; i < inNumber; i++) {
+  for (int i = 0; i < particles.size(); i++) {
     particle.eventNumber = evt;
     particle.pdgCode = pdgs[i];
     particle.particleID = i;
-    particle.motherID = pdgs[i] == lepPDG ? -1 : mothers[i];
+    particle.statusID = statuses[i];
+    particle.motherID = i <= 1 ? -1 : mothers[i]; // first two particles = primary leptons
     particle.px = particles[i].Px();
     particle.py = particles[i].Py();
     particle.pz = particles[i].Pz();
     particle.e = particles[i].E();
-    outTree->Fill();
+    mOutTree->Fill();
   }
 #endif
 
@@ -259,13 +271,13 @@ void UpcGenerator::writeEvent(int evt,
   HepMC3::GenEvent eventHepMC;
   eventHepMC.set_event_number(evt);
   HepMC3::GenVertexPtr vertex = std::make_shared<HepMC3::GenVertex>();
-  for (int i = 0; i < inNumber; i++) {
+  for (int i = 0; i < particles.size(); i++) {
     HepMC3::FourVector p;
     p.setPx(particles[i].Px());
     p.setPy(particles[i].Py());
     p.setPz(particles[i].Pz());
     p.setE(particles[i].E());
-    int status = abs(pdgs[i]) == lepPDG ? 1 : 2;
+    int status = i <= 1 ? 1 : 2;
     HepMC3::GenParticlePtr part = std::make_shared<HepMC3::GenParticle>(p, pdgs[i], status);
     vertex->add_particle_out(part);
   }
@@ -767,6 +779,7 @@ void UpcGenerator::generateEvents()
   }
 
   vector<int> pdgs;
+  vector<int> statuses;
   vector<int> mothers;
   vector<TLorentzVector> particles;
 
@@ -774,17 +787,18 @@ void UpcGenerator::generateEvents()
   // initialize file output
   PLOG_WARNING << "Using ROOT tree for output!";
   PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
-  outFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
-  outTree = new TTree("particles", "Generated particles");
-  outTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
-  outTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
-  outTree->Branch("particleID", &particle.particleID, "particleID/I");
-  outTree->Branch("motherID", &particle.motherID, "motherID/I");
-  outTree->Branch("px", &particle.px, "px/D");
-  outTree->Branch("py", &particle.py, "py/D");
-  outTree->Branch("pz", &particle.pz, "pz/D");
-  outTree->Branch("e", &particle.e, "e/D");
-  outTree->SetAutoSave(0);
+  mOutFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
+  mOutTree = new TTree("particles", "Generated particles");
+  mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
+  mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
+  mOutTree->Branch("particleID", &particle.particleID, "particleID/I");
+  mOutTree->Branch("statusID", &particle.statusID, "statusID/I");
+  mOutTree->Branch("motherID", &particle.motherID, "motherID/I");
+  mOutTree->Branch("px", &particle.px, "px/D");
+  mOutTree->Branch("py", &particle.py, "py/D");
+  mOutTree->Branch("pz", &particle.pz, "pz/D");
+  mOutTree->Branch("e", &particle.e, "e/D");
+  mOutTree->SetAutoSave(0);
 #else
   PLOG_WARNING << "Using HepMC format for output!";
   PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc", aLep, minPt);
@@ -830,8 +844,7 @@ void UpcGenerator::generateEvents()
     double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mLep * mLep);
     TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
-    TLorentzVector tlLep1;
-    TLorentzVector tlLep2;
+    TLorentzVector tlLep1, tlLep2;
     tlLep1.SetVectM(vLep, mLep);
     tlLep2.SetVectM(-vLep, mLep);
     particles.emplace_back(tlLep1);
@@ -844,26 +857,30 @@ void UpcGenerator::generateEvents()
     int sign = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
     pdgs.emplace_back(sign * lepPDG);
     pdgs.emplace_back(-sign * lepPDG);
-
     mothers.emplace_back(-1);
     mothers.emplace_back(-1);
+    statuses.emplace_back(23);
+    statuses.emplace_back(23);
 
     // lepton decays for taus
-    if ((lepPDG == 15 || doFSR) && isPythiaUsed) {
-      simDecays(pdgs, mothers, particles);
+    // todo: at the moment "fsr" and "decays" flags
+    //       are only really meaningful for pythia8
+    if ((doFSR || doDecays) && isPythiaUsed) {
+      processInPythia(pdgs, statuses, mothers, particles);
     }
 
-    writeEvent(evt, particles.size(), pdgs, mothers, particles);
+    writeEvent(evt, pdgs, statuses, mothers, particles);
 
     pdgs.clear();
+    statuses.clear();
     mothers.clear();
     particles.clear();
     delete hCSSliceAtM;
   }
 
 #ifndef USE_HEPMC
-  outFile->Write();
-  outFile->Close();
+  mOutFile->Write();
+  mOutFile->Close();
 #endif
 
 #ifdef USE_HEPMC

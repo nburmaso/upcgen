@@ -91,13 +91,17 @@ class UpcGenerator
  private:
   // internal methods for event treating
   // ----------------------------------------------------------------------
-  void simDecays(vector<int>& pdgs, vector<int>& mothers, vector<TLorentzVector>& particles);
+  void processInPythia(vector<int>& pdgs,
+                       vector<int>& statuses,
+                       vector<int>& mothers,
+                       vector<TLorentzVector>& particles);
 
   // helper struct for file output
   struct {
     int eventNumber;
     int pdgCode;
     int particleID;
+    int statusID;
     int motherID;
     double px;
     double py;
@@ -105,12 +109,12 @@ class UpcGenerator
     double e;
   } particle;
 
-  TFile* outFile;
-  TTree* outTree;
+  TFile* mOutFile;
+  TTree* mOutTree;
 
   void writeEvent(int evt,
-                  int inNumber,
                   const vector<int>& pdgs,
+                  const vector<int>& statuses,
                   const vector<int>& mothers,
                   const vector<TLorentzVector>& particles);
 
@@ -121,6 +125,7 @@ class UpcGenerator
   UpcPythiaBase* decayer;
 #endif
   bool doFSR{false};
+  bool doDecays{false};
 
 #ifdef USE_HEPMC
   // helper for HepMC output format
@@ -277,6 +282,7 @@ class UpcGenerator
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
     string inPythia8FSR{"PYTHIA8_FSR"};
+    string inPythia8Decays{"PYTHIA8_DECAYS"};
     string inSeed{"SEED"};
   };
 
