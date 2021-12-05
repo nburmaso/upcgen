@@ -20,25 +20,6 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "UpcGenerator.h"
-#include "TF1.h"
-#include "TFile.h"
-#include "TTree.h"
-#include "TGraph.h"
-#include "TH1D.h"
-#include "TH2D.h"
-#include "TMath.h"
-#include "TRandom.h"
-#include "TString.h"
-#include "TRandomGen.h"
-#include "TLorentzVector.h"
-#include "TParticle.h"
-#include "TROOT.h"
-#include "TSystem.h"
-#include <fstream>
-#include <plog/Log.h>
-#include <plog/Init.h>
-#include <plog/Formatters/TxtFormatter.h>
-#include <plog/Appenders/ColorConsoleAppender.h>
 
 #ifdef USE_OPENMP
 #include <omp.h>
@@ -82,21 +63,18 @@ UpcGenerator::UpcGenerator()
   PLOG_INFO << "Initializing Pythia-based decayer";
   if (pythiaVersion == 8) {
     isPythiaUsed = true;
-    decayer = new TPythia8Decayer();
+    decayer = new UpcPythia8Helper();
+    decayer->setFSR(doFSR);
+    decayer->init();
   }
 #endif
 #ifdef USE_PYTHIA6
   if (pythiaVersion == 6) {
     isPythiaUsed = true;
-    decayer = new TPythia6Decayer();
+    decayer = new UpcPythia6Helper();
   }
 #endif
 
-#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  if ((pythiaVersion == 6 || pythiaVersion == 8) && isPythiaUsed) {
-    decayer->Init();
-  }
-#endif
   if (!isPythiaUsed) {
     PLOG_WARNING << "Decays with Pythia are not used!";
   }
@@ -182,6 +160,9 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inPythiaVer) {
         pythiaVersion = stoi(parValue);
       }
+      if (parameter == parDict.inPythia8FSR) {
+        doFSR = stoi(parValue);
+      }
       if (parameter == parDict.inNonzeroGamPt) {
         useNonzeroGamPt = stoi(parValue);
       }
@@ -222,50 +203,49 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "FLUX_POINT " << isPoint;
   PLOG_WARNING << "NON_ZERO_GAM_PT " << useNonzeroGamPt;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
+  PLOG_WARNING << "PYTHIA8_FSR " << doFSR;
   PLOG_WARNING << "SEED " << seed;
 }
 
-void UpcGenerator::simDecays(int inNumber,
-                             vector<int>& pdgs,
-                             vector<int>& mothers,
-                             vector<TLorentzVector>& particles)
+void UpcGenerator::simDecays(vector<int>& pdgs, vector<int>& mothers, vector<TLorentzVector>& particles)
 {
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
   TClonesArray decayParticles("TParticle");
   TLorentzVector tlVector;
-  for (int i = 0; i < inNumber; i++) {
-    decayer->Decay(pdgs[i], &particles[i]);
-    decayer->ImportParticles(&decayParticles);
-    // skipping first particle, which is lepton
-    for (int ip = 1; ip < decayParticles.GetEntriesFast(); ip++) {
-      auto* part = (TParticle*)decayParticles.At(ip);
-      if (debug > 1) {
-        PLOG_DEBUG << "Particle info:";
-        part->Print();
-      }
-      int pdg = part->GetPdgCode();
-      part->Momentum(tlVector);
-      pdgs.emplace_back(part->GetPdgCode());
-      mothers.emplace_back(i);
-      particles.emplace_back(tlVector);
+  decayer->decay(pdgs, particles);
+  decayer->import(&decayParticles);
+  // todo: not very optimal, to be cleaned up
+  pdgs.clear();
+  mothers.clear();
+  particles.clear();
+  for (int ip = 0; ip < decayParticles.GetEntriesFast(); ip++) {
+    auto* part = (TParticle*)decayParticles.At(ip);
+    if (debug > 1) {
+      PLOG_DEBUG << "Particle info:";
+      part->Print();
     }
+    int pdg = part->GetPdgCode();
+    int mother = part->GetFirstMother();
+    part->Momentum(tlVector);
+    pdgs.emplace_back(pdg);
+    mothers.emplace_back(mother);
+    particles.emplace_back(tlVector);
   }
 #endif
 }
 
 void UpcGenerator::writeEvent(int evt,
                               int inNumber,
-                              vector<int>& pdgs,
-                              vector<int>& mothers,
-                              vector<TLorentzVector>& particles)
+                              const vector<int>& pdgs,
+                              const vector<int>& mothers,
+                              const vector<TLorentzVector>& particles)
 {
 #ifndef USE_HEPMC
   for (int i = 0; i < inNumber; i++) {
-    int pdg = pdgs[i];
     particle.eventNumber = evt;
-    particle.pdgCode = pdg;
+    particle.pdgCode = pdgs[i];
     particle.particleID = i;
-    particle.motherID = abs(pdgs[i]) == lepPDG ? -1 : mothers[i];
+    particle.motherID = pdgs[i] == lepPDG ? -1 : mothers[i];
     particle.px = particles[i].Px();
     particle.py = particles[i].Py();
     particle.pz = particles[i].Pz();
@@ -574,9 +554,9 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM)
     int progress = 0;
     int total = ny * nm;
     omp_set_num_threads(numThreads);
-#pragma omp parallel default(none) \
+#pragma omp parallel default(none)           \
   shared(hD2LDMDY, progress) private(im, iy) \
-  firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas, weights, vGAA)
+    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas, weights, vGAA)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -869,8 +849,8 @@ void UpcGenerator::generateEvents()
     mothers.emplace_back(-1);
 
     // lepton decays for taus
-    if (lepPDG == 15 && isPythiaUsed) {
-      simDecays(2, pdgs, mothers, particles);
+    if ((lepPDG == 15 || doFSR) && isPythiaUsed) {
+      simDecays(pdgs, mothers, particles);
     }
 
     writeEvent(evt, particles.size(), pdgs, mothers, particles);
