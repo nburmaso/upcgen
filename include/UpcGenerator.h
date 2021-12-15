@@ -42,7 +42,6 @@
 #include "TString.h"
 #include "TSystem.h"
 #include "TTree.h"
-#include "TTree.h"
 
 #include "plog/Appenders/ColorConsoleAppender.h"
 #include "plog/Formatters/TxtFormatter.h"
