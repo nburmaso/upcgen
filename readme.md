@@ -84,6 +84,8 @@ BINS_M 1001       #                         bins for m
 BINS_Y 121        #                         bins for y
 FLUX_POINT 1      # use point flux approximation or not
 PYTHIA_VERSION 8  # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
+PYTHIA8_FSR 0     # For Pythia8 only: simulate final state radiation (EM showers)
+PYTHIA8_DECAYS 0  # For Pythia8 only: switch to turn on/off lepton decays
 SEED -1           # Seed for random numbers generator. '-1' -> random seed
 ```
 
@@ -91,6 +93,8 @@ SEED -1           # Seed for random numbers generator. '-1' -> random seed
 * If a parameter is not specified by user, the default value will be used.
 * IMPORTANT: make sure that you have built the generator with support of a desired Pythia version,
 that you are going to pass via `PYTHIA_VERSION`
+* Note that `PYTHIA8_FSR` and `PYTHIA8_DECAYS` only work for Pythia8. Decays are always enabled if
+the generator runs with Pythia6.
 
 ### Tips
 
