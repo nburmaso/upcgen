@@ -24,27 +24,32 @@
 #ifndef UPCGENERATOR__UPCGENERATOR_H_
 #define UPCGENERATOR__UPCGENERATOR_H_
 
+#include "UpcPythia8Helper.h"
+#include "UpcPythia6Helper.h"
+
+#include "TClonesArray.h"
+#include "TF1.h"
+#include "TFile.h"
+#include "TGraph.h"
 #include "TH1D.h"
 #include "TH2D.h"
-#include "TF1.h"
-#include "TGraph.h"
-#include "TRandom.h"
-#include "TClonesArray.h"
-#include "TTree.h"
 #include "TLorentzVector.h"
-#include "plog/Log.h"
+#include "TMath.h"
+#include "TParticle.h"
+#include "TROOT.h"
+#include "TRandom.h"
+#include "TRandomGen.h"
+#include "TString.h"
+#include "TSystem.h"
+#include "TTree.h"
+
+#include "plog/Appenders/ColorConsoleAppender.h"
+#include "plog/Formatters/TxtFormatter.h"
+#include "plog/Init.h"
 #include "plog/Initializers/RollingFileInitializer.h"
+#include "plog/Log.h"
 
-#ifdef USE_PYTHIA6
-#include "TPythia6.h"
-#include "TPythia6Decayer.h"
-#endif
-
-#ifdef USE_PYTHIA8
-#include "Pythia8/Pythia.h"
-#include "TPythia8.h"
-#include "TPythia8Decayer.h"
-#endif
+#include <fstream>
 
 #ifdef USE_HEPMC
 #include "HepMC3/GenEvent.h"
@@ -85,16 +90,17 @@ class UpcGenerator
  private:
   // internal methods for event treating
   // ----------------------------------------------------------------------
-  void simDecays(int inNumber,
-                 vector<int>& pdgs,
-                 vector<int>& mothers,
-                 vector<TLorentzVector>& particles);
+  void processInPythia(vector<int>& pdgs,
+                       vector<int>& statuses,
+                       vector<int>& mothers,
+                       vector<TLorentzVector>& particles);
 
   // helper struct for file output
   struct {
     int eventNumber;
     int pdgCode;
     int particleID;
+    int statusID;
     int motherID;
     double px;
     double py;
@@ -102,21 +108,23 @@ class UpcGenerator
     double e;
   } particle;
 
-  TFile* outFile;
-  TTree* outTree;
+  TFile* mOutFile;
+  TTree* mOutTree;
 
   void writeEvent(int evt,
-                  int inNumber,
-                  vector<int>& pdgs,
-                  vector<int>& mothers,
-                  vector<TLorentzVector>& particles);
+                  const vector<int>& pdgs,
+                  const vector<int>& statuses,
+                  const vector<int>& mothers,
+                  const vector<TLorentzVector>& particles);
 
   // pythia helper & decayer parameters
   int pythiaVersion{-1}; // not using Pythia at all by default
   bool isPythiaUsed{false};
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  TVirtualMCDecayer* decayer;
+  UpcPythiaBase* decayer;
 #endif
+  bool doFSR{false};
+  bool doDecays{false};
 
 #ifdef USE_HEPMC
   // helper for HepMC output format
@@ -272,6 +280,8 @@ class UpcGenerator
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPythiaVer{"PYTHIA_VERSION"};
+    string inPythia8FSR{"PYTHIA8_FSR"};
+    string inPythia8Decays{"PYTHIA8_DECAYS"};
     string inSeed{"SEED"};
   };
 
