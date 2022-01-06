@@ -49,6 +49,8 @@
 #include "plog/Initializers/RollingFileInitializer.h"
 #include "plog/Log.h"
 
+#include "gsl/gsl_sf_bessel.h"
+
 #include <fstream>
 
 #ifdef USE_HEPMC
@@ -67,6 +69,9 @@ class UpcGenerator
  public:
   UpcGenerator();
   ~UpcGenerator();
+
+  // parse inputs, set flags, prepare caches...
+  void init();
 
   // debug level:
   //  0  -- no debug output
@@ -144,17 +149,31 @@ class UpcGenerator
   double calcWSRho();
 
   // photon fluxes
-  double fluxPoint(const double b, const double k, const double g);
+  double fluxPoint(const double b, const double k);
 
   static double fluxFormInt(double* x, double* par);
 
-  double fluxForm(const double b, const double k, const double g, TF1* fFluxForm);
+  double calcFormFac(double Q2);
+
+  double fluxForm(const double b, const double k, TF1* fFluxForm);
 
   // two-photon luminosity
-  double D2LDMDY(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+  double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+
+  // polarized elementary cross sections
+  double crossSectionMZPolS(double m, double z);
+
+  double crossSectionMPolS(double m);
+
+  double crossSectionMZPolPS(double m, double z);
+
+  double crossSectionMPolPS(double m);
+
+  // two-photon luminosity for scalar part
+  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, double b, TF1* fFluxForm);
 
   // elementary cross section for dilepton production in MZ space
-  double crossSectionMZ(double s, double z);
+  double crossSectionMZ(double m, double z);
 
   // elementary cross section for dilepton production in M space
   double crossSectionM(double m);
@@ -162,15 +181,16 @@ class UpcGenerator
   // histogram filler for MZ-cross section
   void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
                           double mmin, double mmax, int nm,
-                          double zmin, double zmax, int nz);
+                          double zmin, double zmax, int nz,
+                          int flag);
 
   // histogram filler for M-cross section
   void fillCrossSectionM(TH1D* hCrossSectionM,
                          double mmin, double mmax, int nm);
 
   // function to calculate nuclear cross section
-  // using 2D elementary cross section and 2-gamma luminosity
-  void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
+  // using 2D elementary cross section and two-photon luminosity
+  void nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
 
   // nuclear form factor for momentum transfer q
   static double nucFormFactor(double t);
@@ -179,6 +199,19 @@ class UpcGenerator
   // accounting for non-zero photon pt
   double getPhotonPt(double ePhot);
   void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
+
+  // various cachers-getters for lookup tables
+  // ----------------------------------------------------------------------
+
+  // prepare G_AA
+  void prepareGAA();
+
+  // prepare form factor
+  void prepareFormFac();
+  static double getCachedFormFac(double Q2);
+
+  // prepare two photon luminosity, cache to file
+  void prepareTwoPhotonLumi();
 
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
@@ -189,9 +222,9 @@ class UpcGenerator
   double aLep{0};       // lepton anomalous magnetic moment
 
   // physics constants
-  const double alpha{1.0 / 137.035999074};  // fine structure constant
-  constexpr static double hc{0.1973269718}; // scaling factor
-  const double mProt{0.9382720813};         // proton mass
+  constexpr static double alpha{1.0 / 137.035999074};     // fine structure constant
+  constexpr static double hc{0.1973269718};    // scaling factor
+  constexpr static double mProt{0.9382720813}; // proton mass
 
   // Woods-Saxon parameters
   static double rho0; // fm-3
@@ -203,20 +236,20 @@ class UpcGenerator
   double A{208};
 
   // beam parameters
-  double sqrts{5020};
-  double g1{sqrts / (2. * mProt)};
-  double g2{sqrts / (2. * mProt)};
+  static double sqrts;
+  static double g1;
+  static double g2;
 
   // Gaussian integration n = 10
   // since cos is symmetric around 0 we only need 5
   // of the points in the gaussian integration.
   static const int ngi = 5;
-  double weights[ngi]{0.2955242247147529, 0.2692667193099963,
-                      0.2190863625159820, 0.1494513491505806,
-                      0.0666713443086881};
-  double abscissas[ngi]{0.1488743389816312, 0.4333953941292472,
-                        0.6794095682990244, 0.8650633666889845,
-                        0.9739065285171717};
+  double weights10[ngi]{0.2955242247147529, 0.2692667193099963,
+                        0.2190863625159820, 0.1494513491505806,
+                        0.0666713443086881};
+  double abscissas10[ngi]{0.1488743389816312, 0.4333953941292472,
+                          0.6794095682990244, 0.8650633666889845,
+                          0.9739065285171717};
 
   // photon luminosity calculation parameters
   const int nb1{120};
@@ -247,12 +280,17 @@ class UpcGenerator
   double vGAA[nb];
   double vRho[nb];
 
+  // lookup tables
+  static const int nQ2{1000000};
+  static double* vCachedFormFac; // Q^2-grid for possible form factor values
+
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
   int nEvents{1000};
   bool isPoint{true}; // flux calculation parameter
   bool useNonzeroGamPt{true};
+  bool usePolarizedCS{false};
   static std::map<int, double> lepMassMap;
 
   // parameters dictionary
@@ -279,6 +317,7 @@ class UpcGenerator
     string inBinsY{"BINS_Y"};
     string inFluxPoint{"FLUX_POINT"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
+    string inPolarized{"USE_POLARIZED_CS"};
     string inPythiaVer{"PYTHIA_VERSION"};
     string inPythia8FSR{"PYTHIA8_FSR"};
     string inPythia8Decays{"PYTHIA8_DECAYS"};
