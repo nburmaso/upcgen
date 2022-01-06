@@ -444,8 +444,9 @@ double UpcGenerator::crossSectionMPolS(double m)
   if (r > 1) {
     return 0;
   }
-  double cs_s = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep * (1 + 1.5 * r2) *
-                ((1 - 0.5 * r2) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2));
+//  double cs_s = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep * (1 + 1.5 * r2) *
+//                ((1 - 0.5 * r2) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2));
+  double cs_s = 4*M_PI*alpha*alpha*hc*hc/m/m*((1+r*r-3./4.*r*r*r*r)*2*log(1/r+sqrt(1/r/r-1))-(1+3./2.*r*r)*sqrt(1-r*r));
   return cs_s;
   // fm^2 //
 }
@@ -472,9 +473,10 @@ double UpcGenerator::crossSectionMPolPS(double m)
   if (r > 1) {
     return 0;
   }
-  double cs_ps = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep *
-                 ((1 + r2 - 0.25 * r4) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2) * (1 + 0.5 * r2));
-  return cs_ps;
+//  double cs_ps = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep *
+//                 ((1 + r2 - 0.25 * r4) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2) * (1 + 0.5 * r2));
+//  return cs_ps;
+  return 4*M_PI*alpha*alpha*hc*hc/m/m*((1+r*r-1./4.*r*r*r*r)*2*log(1/r+sqrt(1/r/r-1))-(1+1./2.*r*r)*sqrt(1-r*r));
   // fm^2 //
 }
 
@@ -512,19 +514,19 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
     double sum_phi_p = 0.;
     double ff_x = fluxForm(x, k2, fFluxForm);
     for (int k = 0; k < ngi; k++) {
-      double phi = M_PI * abscissas10[k];
+      double phi = M_PI * (1 + abscissas10[k]);
       double xmb = TMath::Sqrt(x * x + b * b - 2. * x * b * TMath::Cos(phi));
       double ff_xmb = fluxForm(xmb, k1, fFluxForm);
       double xs = (x - b * TMath::Cos(phi)) / xmb;
       double xp = b * TMath::Sin(phi) / xmb;
-      sum_phi_s += 2 * weights10[k] * ff_xmb * ff_x * xs * xs;
-      sum_phi_p += 2 * weights10[k] * ff_xmb * ff_x * xp * xp;
+      sum_phi_s += weights10[k] * ff_xmb * ff_x * xs * xs;
+      sum_phi_p += weights10[k] * ff_xmb * ff_x * xp * xp;
     }
-    sum_x_s += M_PI * sum_phi_s * x * (xh - xl);
-    sum_x_p += M_PI * sum_phi_p * x * (xh - xl);
+    sum_x_s += sum_phi_s * x * (xh - xl);
+    sum_x_p += sum_phi_p * x * (xh - xl);
   }
-  ns = sum_x_s;
-  np = sum_x_p;
+  ns = M_PI * M_PI * M * sum_x_s;
+  np = M_PI * M_PI * M * sum_x_p;
 }
 
 double UpcGenerator::crossSectionMZ(double m, double z)
@@ -785,8 +787,8 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   double cs[nm][ny];
   double cs_rat[nm][ny];
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)       \
-  shared(cs, cs_rat, hD2LDMDY, progress) private(im, iy, ib)\
+#pragma omp parallel default(none) \
+  shared(cs, cs_rat, hD2LDMDY, progress) private(im, iy, ib) \
     firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
     vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
@@ -801,7 +803,7 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
       hD2LDMDY_private = (TH2D*)hD2LDMDY->Clone(Form("hD2LDMDY_private_%d", omp_get_thread_num()));
     }
     int threadNum = omp_get_thread_num();
-    int lowM = nm * threadNum / numThreads;
+    int lowM = nm * threadNum / numThreads; // fixme: kal
     int highM = nm * (threadNum + 1) / numThreads;
     for (im = lowM; im < highM; im++) {
       double m = mmin + dm * im;
@@ -830,14 +832,15 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
             sum_p += np * cs_p * gaa * b * (bh - bl);
           }
           double sum = sum_s + sum_p;
+          sum *= dm * dy;
           cs_private[im][iy] = sum * 1e7; // fm^2 -> nb
           rat_private[im][iy] = sum_s / sum_p;
         }
         progress++;
-        if (threadNum == 0) {
-          double progressBar = 100. * progress / total;
-          PLOG_INFO << "Calculating nuclear cross section... " << fixed << setprecision(2) << progressBar << "%";
-        }
+      }
+      if (threadNum == 0) {
+        double progressBar = 100. * progress / total;
+        PLOG_INFO << "Calculating nuclear cross section... " << fixed << setprecision(2) << progressBar << "%";
       }
     }
 #pragma omp critical
