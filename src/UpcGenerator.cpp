@@ -357,7 +357,7 @@ double UpcGenerator::fluxFormInt(double* x, double* par)
 
   double t = k * k + w * w / g / g;
   double ff = getCachedFormFac(t);
-  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / hc);
+  double result = k * k * ff / t * TMath::BesselJ1(b * k / hc);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
   }

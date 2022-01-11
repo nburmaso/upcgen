@@ -77,7 +77,3 @@ if (BUILD_WITH_HEPMC)
     include_directories(${HEPMC3_INCLUDE_DIR})
     target_link_libraries(generate ${HEPMC3_LIBRARIES})
 endif()
-
-find_package(GSL)
-include_directories(${GSL_INCLUDE_DIR})
-target_link_libraries(generate GSL::gsl)

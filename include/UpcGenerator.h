@@ -49,8 +49,6 @@
 #include "plog/Initializers/RollingFileInitializer.h"
 #include "plog/Log.h"
 
-#include "gsl/gsl_sf_bessel.h"
-
 #include <fstream>
 
 #ifdef USE_HEPMC
