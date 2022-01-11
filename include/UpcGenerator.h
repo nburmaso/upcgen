@@ -168,7 +168,7 @@ class UpcGenerator
   double crossSectionMPolPS(double m);
 
   // two-photon luminosity for scalar part
-  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, double b, TF1* fFluxForm);
+  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
   // elementary cross section for dilepton production in MZ space
   double crossSectionMZ(double m, double z);

@@ -493,40 +493,60 @@ double UpcGenerator::crossSectionMZPolPS(double m, double z)
   // GeV^-2 //
 }
 
-void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, double b, TF1* fFluxForm)
+void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
 {
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
 
-  constexpr int nx = 120;
-  double xmin = isPoint ? 1 * R : 0.05 * R;
-  double xmax = max(5 * R, max(5. * g1 * hc / k1, 5. * g2 * hc / k2));
-  double log_delta_x = (log(xmax) - log(xmin)) / nx;
+  double b1min = isPoint ? 1 * R : 0.05 * R;
+  double b2min = isPoint ? 1 * R : 0.05 * R;
+  double b1max = TMath::Max(5. * g1 * hc / k1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * hc / k2, 5 * R);
+  double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
+  double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
+
+  double flux[nb2];
+  for (int j = 0; j < nb2; ++j) {
+    double b2l = b2min * exp(j * log_delta_b2);
+    double b2h = b2min * exp((j + 1) * log_delta_b2);
+    double b2 = (b2h + b2l) / 2.;
+    flux[j] = fluxForm(b2, k2, fFluxForm);
+  }
 
   // calculating two integrals simultaneously
-  double sum_x_s = 0; // scalar part
-  double sum_x_p = 0; // pseudoscalar part
-  for (int ix = 0; ix < nx; ix++) {
-    double xl = xmin * exp(ix * log_delta_x);
-    double xh = xmin * exp((ix + 1) * log_delta_x);
-    double x = (xh + xl) / 2.;
-    double sum_phi_s = 0.;
-    double sum_phi_p = 0.;
-    double ff_x = fluxForm(x, k2, fFluxForm);
-    for (int k = 0; k < ngi; k++) {
-      double phi = M_PI * (1 + abscissas10[k]);
-      double xmb = TMath::Sqrt(x * x + b * b - 2. * x * b * TMath::Cos(phi));
-      double ff_xmb = fluxForm(xmb, k1, fFluxForm);
-      double xs = (x - b * TMath::Cos(phi)) / xmb;
-      double xp = b * TMath::Sin(phi) / xmb;
-      sum_phi_s += weights10[k] * ff_xmb * ff_x * xs * xs;
-      sum_phi_p += weights10[k] * ff_xmb * ff_x * xp * xp;
+  double sum_b1_s = 0; // scalar part
+  double sum_b1_p = 0; // pseudoscalar part
+  for (int i = 0; i < nb1; i++) {
+    double b1l = b1min * exp(i * log_delta_b1);
+    double b1h = b1min * exp((i + 1) * log_delta_b1);
+    double b1 = (b1h + b1l) / 2.;
+    double ff_b1 = fluxForm(b1, k1, fFluxForm);
+    double sum_b2_s = 0;
+    double sum_b2_p = 0;
+    for (int j = 0; j < nb2; ++j) {
+      double b2l = b2min * exp(j * log_delta_b2);
+      double b2h = b2min * exp((j + 1) * log_delta_b2);
+      double b2 = (b2h + b2l) / 2.;
+      double sum_phi_s = 0.;
+      double sum_phi_p = 0.;
+      for (int k = 0; k < ngi; k++) {
+        double phi = M_PI * (1 + abscissas10[k]);
+        double cphi = TMath::Cos(phi);
+        double sphi = TMath::Sin(phi);
+        double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cphi);
+        double gaa = b < 20 ? gGAA->Eval(b) : 1;
+        sum_phi_s += gaa * weights10[k] * cphi * cphi;
+        sum_phi_p += gaa * weights10[k] * sphi * sphi;
+      }
+      double ff_b2 = flux[j];
+      sum_b2_s += sum_phi_s * ff_b2 * b2 * (b2h - b2l);
+      sum_b2_p += sum_phi_p * ff_b2 * b2 * (b2h - b2l);
     }
-    sum_x_s += sum_phi_s * x * (xh - xl);
-    sum_x_p += sum_phi_p * x * (xh - xl);
+    sum_b1_s += sum_b2_s * ff_b1 * b1 * (b1h - b1l);
+    sum_b1_p += sum_b2_p * ff_b1 * b1 * (b1h - b1l);
   }
-  ns = M_PI * M_PI * M * sum_x_s;
-  np = M_PI * M_PI * M * sum_x_p;
+  ns = M_PI * M_PI * M * sum_b1_s;
+  np = M_PI * M_PI * M * sum_b1_p;
 }
 
 double UpcGenerator::crossSectionMZ(double m, double z)
@@ -814,23 +834,10 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
           double y = ymin + dy * iy;
           double cs_s = crossSectionMPolS(m);
           double cs_p = crossSectionMPolPS(m);
-          double bmin = isPoint ? 1 * R : 0.05 * R;
-          double k1 = m / 2. * exp(y);
-          double k2 = m / 2. * exp(-y);
-          double bmax = max(5 * R, max(5. * g1 * hc / k1, 5. * g2 * hc / k2));
-          double log_delta_b = (log(bmax) - log(bmin)) / nb1;
-          double sum_s = 0;
-          double sum_p = 0;
-          for (ib = 0; ib < nb1; ib++) { // integrating over impact parameter b
-            double bl = bmin * exp(ib * log_delta_b);
-            double bh = bmin * exp((ib + 1) * log_delta_b);
-            double b = (bh + bl) / 2.;
-            double ns, np;
-            calcTwoPhotonLumiPol(ns, np, m, y, b, fFluxFormInt_private);
-            double gaa = b > 20 ? 1 : gGAA_private->Eval(b);
-            sum_s += ns * cs_s * gaa * b * (bh - bl);
-            sum_p += np * cs_p * gaa * b * (bh - bl);
-          }
+          double ns, np;
+          calcTwoPhotonLumiPol(ns, np, m, y, fFluxFormInt_private, gGAA_private);
+          double sum_s = ns * cs_s; // scalar part
+          double sum_p = np * cs_p; // psudoscalar part
           double sum = sum_s + sum_p;
           sum *= dm * dy;
           cs_private[im][iy] = sum * 1e7; // fm^2 -> nb
@@ -861,10 +868,10 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   for (int i = 0; i < nm - 1; i++) {
     for (int j = 0; j < ny - 1; j++) {
       double cs_ij = (cs[i][j] + cs[i + 1][j] + cs[i][j + 1] + cs[i + 1][j + 1]) / 4.;
-      double rat_ij = (cs_rat[i][j] + cs_rat[i + 1][j] + cs_rat[i][j + 1] + cs_rat[i + 1][j + 1]) / 4.;
       cssum += cs_ij;
       hCrossSectionYM->SetBinContent(j + 1, i + 1, cs_ij);
       if (usePolarizedCS) {
+        double rat_ij = (cs_rat[i][j] + cs_rat[i + 1][j] + cs_rat[i][j + 1] + cs_rat[i + 1][j + 1]) / 4.;
         hPolCSRatio->SetBinContent(j + 1, i + 1, rat_ij);
       }
     }
