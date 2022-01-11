@@ -433,7 +433,7 @@ double UpcGenerator::D2LDMDY(double M, double Y, TF1* fFluxFormInt, const TGraph
 
 double UpcGenerator::crossSectionMZ(double s, double z)
 {
-  double k = TMath::Sqrt(s / 2.);              // photon/lepton energy in cm system in GeV
+  double k = TMath::Sqrt(s) / 2.;              // photon/lepton energy in cm system in GeV
   double p = TMath::Sqrt(k * k - mLep * mLep); // outgoing lepton momentum in GeV
   double norm = 2 * M_PI * alpha * alpha / s * p / k;
   double kt = -2 * k * (k - z * p) / mLep / mLep;
