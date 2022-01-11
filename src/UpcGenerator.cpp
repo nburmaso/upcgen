@@ -444,9 +444,9 @@ double UpcGenerator::crossSectionMPolS(double m)
   if (r > 1) {
     return 0;
   }
-//  double cs_s = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep * (1 + 1.5 * r2) *
-//                ((1 - 0.5 * r2) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2));
-  double cs_s = 4*M_PI*alpha*alpha*hc*hc/m/m*((1+r*r-3./4.*r*r*r*r)*2*log(1/r+sqrt(1/r/r-1))-(1+3./2.*r*r)*sqrt(1-r*r));
+  //  double cs_s = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep * (1 + 1.5 * r2) *
+  //                ((1 - 0.5 * r2) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2));
+  double cs_s = 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 3. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 3. / 2. * r * r) * sqrt(1 - r * r));
   return cs_s;
   // fm^2 //
 }
@@ -473,10 +473,10 @@ double UpcGenerator::crossSectionMPolPS(double m)
   if (r > 1) {
     return 0;
   }
-//  double cs_ps = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep *
-//                 ((1 + r2 - 0.25 * r4) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2) * (1 + 0.5 * r2));
-//  return cs_ps;
-  return 4*M_PI*alpha*alpha*hc*hc/m/m*((1+r*r-1./4.*r*r*r*r)*2*log(1/r+sqrt(1/r/r-1))-(1+1./2.*r*r)*sqrt(1-r*r));
+  //  double cs_ps = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep *
+  //                 ((1 + r2 - 0.25 * r4) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2) * (1 + 0.5 * r2));
+  //  return cs_ps;
+  return 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 1. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 1. / 2. * r * r) * sqrt(1 - r * r));
   // fm^2 //
 }
 
@@ -807,7 +807,7 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   double cs[nm][ny];
   double cs_rat[nm][ny];
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none) \
+#pragma omp parallel default(none)                           \
   shared(cs, cs_rat, hD2LDMDY, progress) private(im, iy, ib) \
     firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
