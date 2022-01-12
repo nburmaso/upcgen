@@ -151,7 +151,7 @@ class UpcGenerator
 
   static double fluxFormInt(double* x, double* par);
 
-  double calcFormFac(double Q2);
+  static double calcFormFac(double Q2);
 
   double fluxForm(const double b, const double k, TF1* fFluxForm);
 
@@ -220,9 +220,9 @@ class UpcGenerator
   double aLep{0};       // lepton anomalous magnetic moment
 
   // physics constants
-  constexpr static double alpha{1.0 / 137.035999074};     // fine structure constant
-  constexpr static double hc{0.1973269718};    // scaling factor
-  constexpr static double mProt{0.9382720813}; // proton mass
+  constexpr static double alpha{1.0 / 137.035999074}; // fine structure constant
+  constexpr static double hc{0.1973269718};           // scaling factor
+  constexpr static double mProt{0.9382720813};        // proton mass
 
   // Woods-Saxon parameters
   static double rho0; // fm-3
@@ -241,27 +241,64 @@ class UpcGenerator
   // Gaussian integration n = 10
   // since cos is symmetric around 0 we only need 5
   // of the points in the gaussian integration.
-  static const int ngi = 10;
-  double weights10[ngi]{0.0666713443086881,
-                        0.1494513491505806,
-                        0.2190863625159820,
-                        0.2692667193099963,
-                        0.2955242247147529,
-                        0.2955242247147529,
-                        0.2692667193099963,
-                        0.2190863625159820,
-                        0.1494513491505806,
-                        0.0666713443086881};
-  double abscissas10[ngi]{-0.9739065285171717,
-                          -0.8650633666889845,
-                          -0.6794095682990244,
-                          -0.4333953941292472,
-                          -0.1488743389816312,
-                           0.1488743389816312,
-                           0.4333953941292472,
-                           0.6794095682990244,
-                           0.8650633666889845,
-                           0.9739065285171717};
+  static const int ngi10 = 10;
+  double weights10[ngi10]{0.0666713443086881,
+                          0.1494513491505806,
+                          0.2190863625159820,
+                          0.2692667193099963,
+                          0.2955242247147529,
+                          0.2955242247147529,
+                          0.2692667193099963,
+                          0.2190863625159820,
+                          0.1494513491505806,
+                          0.0666713443086881};
+
+  double abscissas10[ngi10]{-0.9739065285171717,
+                            -0.8650633666889845,
+                            -0.6794095682990244,
+                            -0.4333953941292472,
+                            -0.1488743389816312,
+                            0.1488743389816312,
+                            0.4333953941292472,
+                            0.6794095682990244,
+                            0.8650633666889845,
+                            0.9739065285171717};
+
+  // Gaussian integration n = 16
+  static const int ngi16 = 16;
+  double abscissas16[ngi16]{-0.9894009349916499,
+                            -0.9445750230732326,
+                            -0.8656312023878318,
+                            -0.7554044083550030,
+                            -0.6178762444026438,
+                            -0.4580167776572274,
+                            -0.2816035507792589,
+                            -0.0950125098376374,
+                            0.0950125098376374,
+                            0.2816035507792589,
+                            0.4580167776572274,
+                            0.6178762444026438,
+                            0.7554044083550030,
+                            0.8656312023878318,
+                            0.9445750230732326,
+                            0.9894009349916499};
+
+  double weights16[ngi16]{0.0271524594117541,
+                          0.0622535239386479,
+                          0.0951585116824928,
+                          0.1246289712555339,
+                          0.1495959888165767,
+                          0.1691565193950025,
+                          0.1826034150449236,
+                          0.1894506104550685,
+                          0.1894506104550685,
+                          0.1826034150449236,
+                          0.1691565193950025,
+                          0.1495959888165767,
+                          0.1246289712555339,
+                          0.0951585116824928,
+                          0.0622535239386479,
+                          0.0271524594117541};
 
   // photon luminosity calculation parameters
   const int nb1{120};
@@ -293,7 +330,10 @@ class UpcGenerator
   double vRho[nb];
 
   // lookup tables
-  static const int nQ2{1000000};
+  static constexpr double Q2min{1e-9};
+  static constexpr double Q2max{100};
+  static const int nQ2{10000000};
+  static constexpr double dQ2{(Q2max - Q2min) / nQ2};
   static double* vCachedFormFac; // Q^2-grid for possible form factor values
 
   // simulation parameters
