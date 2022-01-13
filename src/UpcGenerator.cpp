@@ -507,6 +507,7 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
   double b1max = max(5. * g1 * hc / k2, 5 * R);
   double log_delta_b = (log(b1max) - log(b1min)) / nb1;
 
+  // array of pre-calculated flux values
   constexpr int ncached = 1000;
   vector<double> flux(ncached, 0);
   vector<double> crdGrid(ncached, 0);
@@ -552,15 +553,15 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
         double cphi = cos(phi);
         double sphi = sin(phi);
         double xmb = sqrt(x * x + b * b - 2. * x * b * cphi);
-        double ff_xmb = approxFF(xmb);
+        double ff_xmb = approxFF(xmb); // using approximation for speed-up
         double xs = (x - b * cphi) / xmb;
         double xp = b * sphi / xmb;
-        double item = weights10[k] * ff_xmb * ff_x;
+        double item = weights10[k] * ff_xmb;
         sum_phi_s += item * xs * xs;
         sum_phi_p += item * xp * xp;
       }
-      sum_x_s += sum_phi_s * x * (xh - xl);
-      sum_x_p += sum_phi_p * x * (xh - xl);
+      sum_x_s += sum_phi_s * ff_x * x * (xh - xl);
+      sum_x_p += sum_phi_p * ff_x * x * (xh - xl);
     }
     double gaa = b < 20 ? gGAA->Eval(b) : 1; // |\vec{x_t - b} - \vec{x_t}| - |b|
     sum_b_s += sum_x_s * b * (bh - bl);
