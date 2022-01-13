@@ -500,11 +500,11 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
   double k2 = M / 2. * exp(-Y);
 
   double xmin = isPoint ? 1 * R : 0.05 * R;
-  double xmax = max(5. * g1 * hc / k1, 5 * R);
+  double xmax = max(5. * g1 * hc / k2, 5 * R);
   double log_delta_x = (log(xmax) - log(xmin)) / nb1;
 
   double b1min = isPoint ? 1 * R : 0.05 * R;
-  double b1max = max(5. * g1 * hc / k2, 5 * R);
+  double b1max = max(5. * g1 * hc / k1, 5 * R);
   double log_delta_b = (log(b1max) - log(b1min)) / nb1;
 
   // array of pre-calculated flux values
