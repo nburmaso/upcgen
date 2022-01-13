@@ -141,7 +141,8 @@ class UpcGenerator
   // ----------------------------------------------------------------------
 
   // Simpson integrator
-  static double simpson(int n, double* v, double h);
+  template <typename ArrayType>
+  static double simpson(int n, ArrayType* v, double h);
 
   // Woods-Saxon rho0 from normalization
   double calcWSRho();
