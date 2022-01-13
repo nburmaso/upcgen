@@ -423,11 +423,11 @@ double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const
       double b2 = (b2h + b2l) / 2.;
       double sum_phi = 0.;
       for (int k = 0; k < ngi16; k++) {
-        if (abscissas16[k] < 0) {
+        if (abscissas10[k] < 0) {
           continue;
         }
         double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * TMath::Cos(M_PI * abscissas10[k]));
-        sum_phi += (b < 20.) ? (weights16[k] * gGAA->Eval(b) * 2) : (weights16[k] * 2.);
+        sum_phi += (b < 20.) ? (weights10[k] * gGAA->Eval(b) * 2) : (weights10[k] * 2.);
       }
       sum_b2 += flux[j] * M_PI * sum_phi * b2 * (b2h - b2l);
     }
@@ -548,14 +548,14 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
       double sum_phi_p = 0.;
       double ff_x = fluxForm(x, k2, fFluxForm);
       for (int k = 0; k < ngi16; k++) {
-        double phi = M_PI * (1 + abscissas16[k]);
+        double phi = M_PI * (1 + abscissas10[k]);
         double cphi = cos(phi);
         double sphi = sin(phi);
         double xmb = sqrt(x * x + b * b - 2. * x * b * cphi);
         double ff_xmb = approxFF(xmb);
         double xs = (x - b * cphi) / xmb;
         double xp = b * sphi / xmb;
-        double item = weights16[k] * ff_xmb * ff_x;
+        double item = weights10[k] * ff_xmb * ff_x;
         sum_phi_s += item * xs * xs;
         sum_phi_p += item * xp * xp;
       }
@@ -682,10 +682,10 @@ void UpcGenerator::prepareGAA()
       double s = is * db;
       double sum_phi = 0;
       for (int k = 0; k < ngi10; k++) {
-        if (abscissas16[k] < 0)
+        if (abscissas10[k] < 0)
           continue;
         double r = TMath::Sqrt(b * b + s * s + 2 * b * s * TMath::Cos(M_PI * abscissas10[k]));
-        sum_phi += 2 * M_PI * weights16[k] * gTA->Eval(r);
+        sum_phi += 2 * M_PI * weights10[k] * gTA->Eval(r);
       }
       vs[is] = 2 * s * gTA->Eval(s) * sum_phi;
     }
@@ -747,7 +747,7 @@ void UpcGenerator::prepareTwoPhotonLumi()
     omp_set_num_threads(numThreads);
 #pragma omp parallel default(none)           \
   shared(hD2LDMDY, progress) private(im, iy) \
-    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas16, weights16, vGAA)
+    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
@@ -827,7 +827,7 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   omp_set_num_threads(numThreads);
 #pragma omp parallel default(none)                           \
   shared(cs, cs_rat, hD2LDMDY, progress) private(im, iy, ib) \
-    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas16, weights16, vGAA)
+    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
     vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
     vector<vector<double>> rat_private(nm, vector<double>(ny, 0));
