@@ -396,8 +396,8 @@ double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
 
-  double b1min = isPoint ? 1 * R : 1e-7;
-  double b2min = isPoint ? 1 * R : 1e-7;
+  double b1min = isPoint ? 1 * R : 0.05 * R;
+  double b2min = isPoint ? 1 * R : 0.05 * R;
   double b1max = TMath::Max(5. * g1 * hc / k1, 5 * R);
   double b2max = TMath::Max(5. * g2 * hc / k2, 5 * R);
   double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
@@ -499,11 +499,11 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
 
-  double xmin = isPoint ? 1 * R : 1e-3;
+  double xmin = isPoint ? 1 * R : 0.05 * R;
   double xmax = max(5. * g1 * hc / k1, 5 * R);
   double log_delta_x = (log(xmax) - log(xmin)) / nb1;
 
-  double b1min = isPoint ? 1 * R : 1e-3;
+  double b1min = isPoint ? 1 * R : 0.05 * R;
   double b1max = max(5. * g1 * hc / k2, 5 * R);
   double log_delta_b = (log(b1max) - log(b1min)) / nb1;
 
@@ -552,18 +552,17 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
         double cphi = cos(phi);
         double sphi = sin(phi);
         double xmb = sqrt(x * x + b * b - 2. * x * b * cphi);
-        double ff_xmb = fluxForm(xmb, k1, fFluxForm);
+        double ff_xmb = approxFF(xmb);
         double xs = (x - b * cphi) / xmb;
         double xp = b * sphi / xmb;
-        double xpb = sqrt(x * x + b * b + 2 * x * b * cphi); // |\vec{x_t - b} - \vec{x_t}|
-        double gaa = xpb < 20 ? gGAA->Eval(xpb) : 1;
-        double item = gaa * weights16[k] * ff_xmb * ff_x;
+        double item = weights16[k] * ff_xmb * ff_x;
         sum_phi_s += item * xs * xs;
         sum_phi_p += item * xp * xp;
       }
       sum_x_s += sum_phi_s * x * (xh - xl);
       sum_x_p += sum_phi_p * x * (xh - xl);
     }
+    double gaa = b < 20 ? gGAA->Eval(b) : 1; // |\vec{x_t - b} - \vec{x_t}| - |b|
     sum_b_s += sum_x_s * b * (bh - bl);
     sum_b_p += sum_x_p * b * (bh - bl);
   }
