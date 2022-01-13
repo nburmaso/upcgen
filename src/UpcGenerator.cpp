@@ -422,7 +422,7 @@ double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const
       double b2h = b2min * exp((j + 1) * log_delta_b2);
       double b2 = (b2h + b2l) / 2.;
       double sum_phi = 0.;
-      for (int k = 0; k < ngi16; k++) {
+      for (int k = 0; k < ngi10; k++) {
         if (abscissas10[k] < 0) {
           continue;
         }
@@ -547,7 +547,7 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
       double sum_phi_s = 0.;
       double sum_phi_p = 0.;
       double ff_x = fluxForm(x, k2, fFluxForm);
-      for (int k = 0; k < ngi16; k++) {
+      for (int k = 0; k < ngi10; k++) {
         double phi = M_PI * (1 + abscissas10[k]);
         double cphi = cos(phi);
         double sphi = sin(phi);
