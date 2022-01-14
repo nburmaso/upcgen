@@ -499,79 +499,58 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
 
-  double xmin = isPoint ? 1 * R : 0.05 * R;
-  double xmax = max(5. * g1 * hc / k2, 5 * R);
-  double log_delta_x = (log(xmax) - log(xmin)) / nb1;
-
   double b1min = isPoint ? 1 * R : 0.05 * R;
-  double b1max = max(5. * g1 * hc / k1, 5 * R);
-  double log_delta_b = (log(b1max) - log(b1min)) / nb1;
+  double b2min = isPoint ? 1 * R : 0.05 * R;
+  double b1max = TMath::Max(5. * g1 * hc / k1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * hc / k2, 5 * R);
+  double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
+  double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
 
-  // array of pre-calculated flux values
-  constexpr int ncached = 1000;
-  vector<double> flux(ncached, 0);
-  vector<double> crdGrid(ncached, 0);
-  double bcmin = isPoint ? 1 * R : 1e-7;
-  double bcmax = max(xmax, b1max);
-  double log_delta_bc = (log(bcmax) - log(bcmin)) / ncached;
-  for (int j = 0; j < ncached; j++) {
-    double bl = bcmin * exp(j * log_delta_bc);
-    double bh = bcmin * exp((j + 1) * log_delta_bc);
-    double b = (bh + bl) / 2.;
-    flux[j] = fluxForm(b, k1, fFluxForm);
-    crdGrid[j] = b;
+  double flux[nb2];
+  for (int j = 0; j < nb2; ++j) {
+    double b2l = b2min * exp(j * log_delta_b2);
+    double b2h = b2min * exp((j + 1) * log_delta_b2);
+    double b2 = (b2h + b2l) / 2.;
+    flux[j] = fluxForm(b2, k2, fFluxForm);
   }
 
-  // simple linear fit for flux
-  auto approxFF = [&](double x) {
-    auto it_upp = lower_bound(crdGrid.begin(), crdGrid.end(), x);
-    int upp = it_upp - crdGrid.begin();
-    int low = upp - 1;
-    double c = (flux[low] - flux[upp]) / (crdGrid[low] - crdGrid[upp]);
-    double d = flux[low] - c * crdGrid[low];
-    double fit = c * x + d;
-    return fit;
-  };
-
-  double sum_b_s = 0; // scalar part
-  double sum_b_p = 0; // pseudoscalar part
-  for (int ib = 0; ib < nb1; ib++) {
-    double bl = b1min * exp(ib * log_delta_b);
-    double bh = b1min * exp((ib + 1) * log_delta_b);
-    double b = (bh + bl) / 2.;
-    double sum_x_s = 0;
-    double sum_x_p = 0;
-    for (int ix = 0; ix < nb1; ix++) {
-      double xl = xmin * exp(ix * log_delta_x);
-      double xh = xmin * exp((ix + 1) * log_delta_x);
-      double x = (xh + xl) / 2.;
+  // calculating two integrals simultaneously
+  double sum_b1_s = 0; // scalar part
+  double sum_b1_p = 0; // pseudoscalar part
+  for (int i = 0; i < nb1; i++) {
+    double b1l = b1min * exp(i * log_delta_b1);
+    double b1h = b1min * exp((i + 1) * log_delta_b1);
+    double b1 = (b1h + b1l) / 2.;
+    double ff_b1 = fluxForm(b1, k1, fFluxForm);
+    double sum_b2_s = 0;
+    double sum_b2_p = 0;
+    for (int j = 0; j < nb2; ++j) {
+      double b2l = b2min * exp(j * log_delta_b2);
+      double b2h = b2min * exp((j + 1) * log_delta_b2);
+      double b2 = (b2h + b2l) / 2.;
       double sum_phi_s = 0.;
       double sum_phi_p = 0.;
-      double ff_x = fluxForm(x, k2, fFluxForm);
       for (int k = 0; k < ngi10; k++) {
-        double phi = M_PI * (1 + abscissas10[k]);
-        double cphi = cos(phi);
-        double sphi = sin(phi);
-        double xmb = sqrt(x * x + b * b - 2. * x * b * cphi);
-        double ff_xmb = approxFF(xmb); // using approximation for speed-up
-        double xs = (x - b * cphi) / xmb;
-        double xp = b * sphi / xmb;
-        double item = weights10[k] * ff_xmb;
-        sum_phi_s += item * xs * xs;
-        sum_phi_p += item * xp * xp;
+        if (abscissas10[k] < 0) {
+          continue;
+        }
+        double phi = M_PI * abscissas10[k];
+        double cphi = TMath::Cos(phi);
+        double sphi = TMath::Sin(phi);
+        double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cphi);
+        double gaa = b < 20 ? gGAA->Eval(b) : 1;
+        sum_phi_s += gaa * weights10[k] * cphi * cphi;
+        sum_phi_p += gaa * weights10[k] * sphi * sphi;
       }
-      sum_x_s += sum_phi_s * ff_x * x * (xh - xl);
-      sum_x_p += sum_phi_p * ff_x * x * (xh - xl);
+      double ff_b2 = flux[j];
+      sum_b2_s += sum_phi_s * ff_b2 * b2 * (b2h - b2l);
+      sum_b2_p += sum_phi_p * ff_b2 * b2 * (b2h - b2l);
     }
-    double gaa = b < 20 ? gGAA->Eval(b) : 1; // |\vec{x_t - b} - \vec{x_t}| - |b|
-    sum_b_s += sum_x_s * b * (bh - bl);
-    sum_b_p += sum_x_p * b * (bh - bl);
+    sum_b1_s += sum_b2_s * ff_b1 * b1 * (b1h - b1l);
+    sum_b1_p += sum_b2_p * ff_b1 * b1 * (b1h - b1l);
   }
-  ns = M_PI * M_PI * M * sum_b_s;
-  np = M_PI * M_PI * M * sum_b_p;
-
-  flux.clear();
-  crdGrid.clear();
+  ns = M_PI * M_PI * M * sum_b1_s;
+  np = M_PI * M_PI * M * sum_b1_p;
 }
 
 double UpcGenerator::crossSectionMZ(double m, double z)
