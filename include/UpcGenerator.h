@@ -65,153 +65,6 @@ using namespace std;
 class UpcGenerator
 {
  public:
-  UpcGenerator();
-  ~UpcGenerator();
-
-  // parse inputs, set flags, prepare caches...
-  void init();
-
-  // debug level:
-  //  0  -- no debug output
-  //  >0 -- enable debug info
-  void setDebugLevel(int level) { debug = level; }
-
-  // number of threads for two-photon luminosity calculation
-  void setNumThreads(int n) { numThreads = n; }
-
-  // ----------------------------------------------------------------------
-
-  // file parser
-  void initGeneratorFromFile();
-
-  // print parameters
-  void printParameters();
-
-  // the main method
-  void generateEvents();
-
- private:
-  // internal methods for event treating
-  // ----------------------------------------------------------------------
-  void processInPythia(vector<int>& pdgs,
-                       vector<int>& statuses,
-                       vector<int>& mothers,
-                       vector<TLorentzVector>& particles);
-
-  // helper struct for file output
-  struct {
-    int eventNumber;
-    int pdgCode;
-    int particleID;
-    int statusID;
-    int motherID;
-    double px;
-    double py;
-    double pz;
-    double e;
-  } particle;
-
-  TFile* mOutFile;
-  TTree* mOutTree;
-
-  void writeEvent(int evt,
-                  const vector<int>& pdgs,
-                  const vector<int>& statuses,
-                  const vector<int>& mothers,
-                  const vector<TLorentzVector>& particles);
-
-  // pythia helper & decayer parameters
-  int pythiaVersion{-1}; // not using Pythia at all by default
-  bool isPythiaUsed{false};
-#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  UpcPythiaBase* decayer;
-#endif
-  bool doFSR{false};
-  bool doDecays{false};
-
-#ifdef USE_HEPMC
-  // helper for HepMC output format
-  HepMC3::WriterAscii* writerHepMC;
-#endif
-
-  // number of worker threads for OpenMP
-  int numThreads{1};
-
-  // internal methods for calculations
-  // ----------------------------------------------------------------------
-
-  // Simpson integrator
-  template <typename ArrayType>
-  static double simpson(int n, ArrayType* v, double h);
-
-  // Woods-Saxon rho0 from normalization
-  double calcWSRho();
-
-  // photon fluxes
-  double fluxPoint(const double b, const double k);
-
-  static double fluxFormInt(double* x, double* par);
-
-  static double calcFormFac(double Q2);
-
-  double fluxForm(const double b, const double k, TF1* fFluxForm);
-
-  // two-photon luminosity
-  double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // polarized elementary cross sections
-  double crossSectionMZPolS(double m, double z);
-
-  double crossSectionMPolS(double m);
-
-  double crossSectionMZPolPS(double m, double z);
-
-  double crossSectionMPolPS(double m);
-
-  // two-photon luminosity for scalar part
-  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // elementary cross section for dilepton production in MZ space
-  double crossSectionMZ(double m, double z);
-
-  // elementary cross section for dilepton production in M space
-  double crossSectionM(double m);
-
-  // histogram filler for MZ-cross section
-  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
-                          double mmin, double mmax, int nm,
-                          double zmin, double zmax, int nz,
-                          int flag);
-
-  // histogram filler for M-cross section
-  void fillCrossSectionM(TH1D* hCrossSectionM,
-                         double mmin, double mmax, int nm);
-
-  // function to calculate nuclear cross section
-  // using 2D elementary cross section and two-photon luminosity
-  void nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
-
-  // nuclear form factor for momentum transfer q
-  static double nucFormFactor(double t);
-
-  // functions for calculating pair momentum
-  // accounting for non-zero photon pt
-  double getPhotonPt(double ePhot);
-  void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
-
-  // various cachers-getters for lookup tables
-  // ----------------------------------------------------------------------
-
-  // prepare G_AA
-  void prepareGAA();
-
-  // prepare form factor
-  void prepareFormFac();
-  static double getCachedFormFac(double Q2);
-
-  // prepare two photon luminosity, cache to file
-  void prepareTwoPhotonLumi();
-
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
   long seed{-1}; // seed for random numbers generator
@@ -343,6 +196,153 @@ class UpcGenerator
 
   // debug level
   static int debug;
+
+  UpcGenerator();
+  ~UpcGenerator();
+
+  // parse inputs, set flags, prepare caches...
+  void init();
+
+  // debug level:
+  //  0  -- no debug output
+  //  >0 -- enable debug info
+  void setDebugLevel(int level) { debug = level; }
+
+  // number of threads for two-photon luminosity calculation
+  void setNumThreads(int n) { numThreads = n; }
+
+  // ----------------------------------------------------------------------
+
+  // file parser
+  void initGeneratorFromFile();
+
+  // print parameters
+  void printParameters();
+
+  // the main method
+  void generateEvents();
+
+ private:
+  // helper struct for file output
+  struct {
+    int eventNumber;
+    int pdgCode;
+    int particleID;
+    int statusID;
+    int motherID;
+    double px;
+    double py;
+    double pz;
+    double e;
+  } particle;
+
+  TFile* mOutFile;
+  TTree* mOutTree;
+
+  void writeEvent(int evt,
+                  const vector<int>& pdgs,
+                  const vector<int>& statuses,
+                  const vector<int>& mothers,
+                  const vector<TLorentzVector>& particles);
+
+  // pythia helper & decayer parameters
+  int pythiaVersion{-1}; // not using Pythia at all by default
+  bool isPythiaUsed{false};
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
+  UpcPythiaBase* decayer;
+#endif
+  bool doFSR{false};
+  bool doDecays{false};
+
+#ifdef USE_HEPMC
+  // helper for HepMC output format
+  HepMC3::WriterAscii* writerHepMC;
+#endif
+
+  // number of worker threads for OpenMP
+  int numThreads{1};
+
+  // internal methods for event treating
+  // ----------------------------------------------------------------------
+  void processInPythia(vector<int>& pdgs,
+                       vector<int>& statuses,
+                       vector<int>& mothers,
+                       vector<TLorentzVector>& particles);
+
+  // internal methods for calculations
+  // ----------------------------------------------------------------------
+
+  // Simpson integrator
+  template <typename ArrayType>
+  static double simpson(int n, ArrayType* v, double h);
+
+  // Woods-Saxon rho0 from normalization
+  double calcWSRho();
+
+  // photon fluxes
+  double fluxPoint(const double b, const double k);
+
+  static double fluxFormInt(double* x, double* par);
+
+  static double calcFormFac(double Q2);
+
+  double fluxForm(const double b, const double k, TF1* fFluxForm);
+
+  // two-photon luminosity
+  double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+
+  // polarized elementary cross sections
+  double crossSectionMZPolS(double m, double z);
+
+  double crossSectionMPolS(double m);
+
+  double crossSectionMZPolPS(double m, double z);
+
+  double crossSectionMPolPS(double m);
+
+  // two-photon luminosity for scalar part
+  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+
+  // elementary cross section for dilepton production in MZ space
+  double crossSectionMZ(double m, double z);
+
+  // elementary cross section for dilepton production in M space
+  double crossSectionM(double m);
+
+  // histogram filler for MZ-cross section
+  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
+                          double mmin, double mmax, int nm,
+                          double zmin, double zmax, int nz,
+                          int flag);
+
+  // histogram filler for M-cross section
+  void fillCrossSectionM(TH1D* hCrossSectionM,
+                         double mmin, double mmax, int nm);
+
+  // function to calculate nuclear cross section
+  // using 2D elementary cross section and two-photon luminosity
+  void nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
+
+  // nuclear form factor for momentum transfer q
+  static double nucFormFactor(double t);
+
+  // functions for calculating pair momentum
+  // accounting for non-zero photon pt
+  double getPhotonPt(double ePhot);
+  void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
+
+  // various cachers-getters for lookup tables
+  // ----------------------------------------------------------------------
+
+  // prepare G_AA
+  void prepareGAA();
+
+  // prepare form factor
+  void prepareFormFac();
+  static double getCachedFormFac(double Q2);
+
+  // prepare two photon luminosity, cache to file
+  void prepareTwoPhotonLumi();
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_

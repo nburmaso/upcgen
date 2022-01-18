@@ -91,11 +91,9 @@ void UpcGenerator::init()
   printParameters();
 
   // prepare caches
-  prepareGAA();     // G_AA and Fourier-transformed G_AA
-  prepareFormFac(); // nuclear form factor
-  if (!usePolarizedCS) {
-    prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
-  }
+  prepareGAA();           // G_AA and Fourier-transformed G_AA
+  prepareFormFac();       // nuclear form factor
+  prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
 }
 
 UpcGenerator::~UpcGenerator() = default;
@@ -392,7 +390,6 @@ double UpcGenerator::fluxForm(const double b, const double k, TF1* fFluxFormInt)
 double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
 {
   // double differential luminosity
-  double D2LDMDYx = 0.;
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
 
@@ -426,15 +423,17 @@ double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const
         if (abscissas10[k] < 0) {
           continue;
         }
-        double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * TMath::Cos(M_PI * abscissas10[k]));
-        sum_phi += (b < 20.) ? (weights10[k] * gGAA->Eval(b) * 2) : (weights10[k] * 2.);
+        double phi = M_PI * abscissas10[k];
+        double b = sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cos(phi));
+        double gaa = b < 20. ? gGAA->Eval(b) : 1;
+        sum_phi += gaa * weights10[k];
       }
-      sum_b2 += flux[j] * M_PI * sum_phi * b2 * (b2h - b2l);
+      sum_b2 += flux[j] * sum_phi * b2 * (b2h - b2l);
     }
     sum += fluxForm(b1, k1, fFluxForm) * sum_b2 * b1 * (b1h - b1l);
   }
-  D2LDMDYx = M_PI * M * sum;
-  return D2LDMDYx;
+  double lumi = 2 * M_PI * M_PI * M * sum;
+  return lumi;
 }
 
 double UpcGenerator::crossSectionMPolS(double m)
@@ -445,8 +444,6 @@ double UpcGenerator::crossSectionMPolS(double m)
   if (r > 1) {
     return 0;
   }
-  //  double cs_s = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep * (1 + 1.5 * r2) *
-  //                ((1 - 0.5 * r2) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2));
   double cs_s = 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 3. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 3. / 2. * r * r) * sqrt(1 - r * r));
   return cs_s;
   // fm^2 //
@@ -474,9 +471,6 @@ double UpcGenerator::crossSectionMPolPS(double m)
   if (r > 1) {
     return 0;
   }
-  //  double cs_ps = M_PI * r2 * alpha * alpha * hc * hc / mLep / mLep *
-  //                 ((1 + r2 - 0.25 * r4) * log(-1 + 2 / r * (1 + sqrt(1 - r2))) - sqrt(1 - r2) * (1 + 0.5 * r2));
-  //  return cs_ps;
   return 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 1. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 1. / 2. * r * r) * sqrt(1 - r * r));
   // fm^2 //
 }
@@ -537,7 +531,7 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
         double phi = M_PI * abscissas10[k];
         double cphi = TMath::Cos(phi);
         double sphi = TMath::Sin(phi);
-        double b = TMath::Sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cphi);
+        double b = TMath::Sqrt(b1 * b1 + b2 * b2 - 2. * b1 * b2 * cphi);
         double gaa = b < 20 ? gGAA->Eval(b) : 1;
         sum_phi_s += gaa * weights10[k] * cphi * cphi;
         sum_phi_p += gaa * weights10[k] * sphi * sphi;
@@ -549,8 +543,8 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
     sum_b1_s += sum_b2_s * ff_b1 * b1 * (b1h - b1l);
     sum_b1_p += sum_b2_p * ff_b1 * b1 * (b1h - b1l);
   }
-  ns = M_PI * M_PI * M * sum_b1_s;
-  np = M_PI * M_PI * M * sum_b1_p;
+  ns = 2 * M_PI * M_PI * M * sum_b1_s;
+  np = 2 * M_PI * M_PI * M * sum_b1_p;
 }
 
 double UpcGenerator::crossSectionMZ(double m, double z)
@@ -708,30 +702,54 @@ double UpcGenerator::getCachedFormFac(double Q2)
 
 void UpcGenerator::prepareTwoPhotonLumi()
 {
-  // calculating two-photon luminosity (if needed)
-  // -----------------------------------------------------------------------
-  if (!gSystem->AccessPathName("hD2LDMDY.root")) {
-    PLOG_INFO << "Found precalculated 2D luminosity";
-  } else {
+  bool isFound = false;
+  if (!gSystem->AccessPathName("twoPhotonLumi.root") && !usePolarizedCS) {
+    PLOG_INFO << "Found pre-calculated unpolarized 2D luminosity";
+    isFound = true;
+  }
+  if (!gSystem->AccessPathName("twoPhotonLumiPol.root") && usePolarizedCS) {
+    PLOG_INFO << "Found pre-calculated polarized 2D luminosity";
+    isFound = true;
+  }
+  if (!isFound) {
     PLOG_INFO << "Precalculated 2D luminosity is not found. Starting all over...";
     double dy = (ymax - ymin) / (ny - 1);
     double dm = (mmax - mmin) / (nm - 1);
-    // using ether parallel or serial implementation
-#ifdef USE_OPENMP
-    auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
-    auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nm, mmin, mmax, ny, ymin, ymax);
+    TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
+    auto* f2DLumi = new TFile(fname, "recreate");
+    // histograms for unpolarized case
+    TH2D* hD2LDMDY;
+    // histograms for polarized case
+    TH2D* hD2LDMDY_s;
+    TH2D* hD2LDMDY_p;
+    if (usePolarizedCS) {
+      hD2LDMDY_s = new TH2D("hD2LDMDY_s", ";;", nm, mmin, mmax, ny, ymin, ymax);
+      hD2LDMDY_p = new TH2D("hD2LDMDY_p", ";;", nm, mmin, mmax, ny, ymin, ymax);
+    } else {
+      hD2LDMDY = new TH2D("hD2LDMDY", ";;", nm, mmin, mmax, ny, ymin, ymax);
+    }
     ROOT::EnableThreadSafety();
     int im, iy;
     int progress = 0;
     int total = ny * nm;
+    // using ether parallel or serial implementation
+#ifdef USE_OPENMP
     omp_set_num_threads(numThreads);
 #pragma omp parallel default(none)           \
-  shared(hD2LDMDY, progress) private(im, iy) \
+  shared(hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy) \
     firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
-      auto* hD2LDMDY_private = new TH2D(Form("hD2LDMDY_private_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+      TH2D* hD2LDMDY_private;
+      TH2D* hD2LDMDY_private_s;
+      TH2D* hD2LDMDY_private_p;
+      if (usePolarizedCS) {
+        hD2LDMDY_private_s = new TH2D(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+        hD2LDMDY_private_p = new TH2D(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+      } else {
+        hD2LDMDY_private = new TH2D(Form("hD2LDMDY_private_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+      }
       int threadNum = omp_get_thread_num();
       int lowM = nm * threadNum / numThreads;
       int highM = nm * (threadNum + 1) / numThreads;
@@ -739,8 +757,15 @@ void UpcGenerator::prepareTwoPhotonLumi()
         double m = mmin + dm * im;
         for (iy = 0; iy < ny; iy++) {
           double y = ymin + dy * iy;
-          double item = calcTwoPhotonLumi(m, y, fFluxFormInt, gGAA);
-          hD2LDMDY_private->SetBinContent(im, iy, item * dm * dy);
+          if (usePolarizedCS) {
+            double lumi_s, lumi_p;
+            calcTwoPhotonLumiPol(lumi_s, lumi_p, m, y, fFluxFormInt, gGAA);
+            hD2LDMDY_private_s->SetBinContent(im, iy, lumi_s * dm * dy);
+            hD2LDMDY_private_p->SetBinContent(im, iy, lumi_p * dm * dy);
+          } else {
+            double lumi = calcTwoPhotonLumi(m, y, fFluxFormInt, gGAA);
+            hD2LDMDY_private->SetBinContent(im, iy, lumi * dm * dy);
+          }
           progress++;
         }
         if (threadNum == 0) {
@@ -750,30 +775,44 @@ void UpcGenerator::prepareTwoPhotonLumi()
       }
 #pragma omp critical
       {
-        hD2LDMDY->Add(hD2LDMDY_private);
+        if (usePolarizedCS) {
+          hD2LDMDY_s->Add(hD2LDMDY_private_s);
+          hD2LDMDY_p->Add(hD2LDMDY_private_p);
+        } else {
+          hD2LDMDY->Add(hD2LDMDY_private);
+        }
       }
     }
     omp_set_num_threads(1);
 #else
-    auto* fFluxFormInt = new TF1("fFluxFormInt", fluxFormInt, 0, 10, 3);
+    auto* fFluxFormInt = new TF1(Form("fFluxFormInt", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
     auto* gGAA = new TGraph(nb, vb, vGAA);
-    auto* f2DLumi = new TFile("hD2LDMDY.root", "recreate");
-    auto* hD2LDMDY = new TH2D("hD2LDMDY", ";;", nm, mmin, mmax, ny, ymin, ymax);
-    PLOG_INFO << "Calculating 2D luminosity grid..." << 0 << "%";
-    for (int im = 0; im < nm; im++) {
+    for (im = 0; im < nm; im++) {
       double M = mmin + dm * im;
-      for (int iy = 0; iy < ny; iy++) {
+      for (iy = 0; iy < ny; iy++) {
         double y = ymin + dy * iy;
-        hD2LDMDY->SetBinContent(im, iy, D2LDMDY(M, y, fFluxFormInt, gGAA) * dm * dy);
+        if (usePolarizedCS) {
+          double lumi_s, lumi_p;
+          calcTwoPhotonLumiPol(lumi_s, lumi_p, m, y, fFluxFormInt, gGAA);
+          hD2LDMDY_s->SetBinContent(im, iy, lumi_s * dm * dy);
+          hD2LDMDY_p->SetBinContent(im, iy, lumi_p * dm * dy);
+        } else {
+          double lumi = calcTwoPhotonLumi(m, y, fFluxFormInt, gGAA);
+          hD2LDMDY->SetBinContent(im, iy, lumi * dm * dy);
+        }
       }
-      double progressBar = 100. * (double)(im + 1) / nm;
-      PLOG_INFO << "Calculating 2D luminosity grid..." << fixed << setprecision(2) << progressBar << "%";
+      double progressBar = 100. * progress / total;
+      PLOG_INFO << "Calculating two-photon luminosity: " << fixed << setprecision(2) << progressBar << "%";
     }
 #endif
-    hD2LDMDY->Write();
+    if (usePolarizedCS) {
+      hD2LDMDY_s->Write();
+      hD2LDMDY_p->Write();
+    } else {
+      hD2LDMDY->Write();
+    }
     f2DLumi->Close();
-
-    PLOG_INFO << "Two-photon luminosity was written to 'hD2LDMDY.root'";
+    PLOG_INFO << "Two-photon luminosity was written to " << fname;
   }
 }
 
@@ -785,14 +824,20 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   double dm = (mmax - mmin) / (nm - 1);
 
   TH2D* hD2LDMDY;
+  TH2D* hD2LDMDY_s;
+  TH2D* hD2LDMDY_p;
+
+  TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
+  auto* f2DLumi = new TFile(fname, "r");
 
   if (usePolarizedCS) {
     if (!hPolCSRatio) {
       PLOG_FATAL << "hPolRatio is not initialized!";
       std::_Exit(-1);
     }
+    hD2LDMDY_s = (TH2D*)f2DLumi->Get("hD2LDMDY_s");
+    hD2LDMDY_p = (TH2D*)f2DLumi->Get("hD2LDMDY_p");
   } else { // loading pre-cached two-photon luminosity
-    auto* f2DLumi = new TFile("hD2LDMDY.root", "r");
     hD2LDMDY = (TH2D*)f2DLumi->Get("hD2LDMDY");
   }
 
@@ -805,18 +850,18 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
   double cs[nm][ny];
   double cs_rat[nm][ny];
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)                           \
-  shared(cs, cs_rat, hD2LDMDY, progress) private(im, iy, ib) \
+#pragma omp parallel default(none)                                                   \
+  shared(cs, cs_rat, hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy, ib) \
     firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
     vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
     vector<vector<double>> rat_private(nm, vector<double>(ny, 0));
     TH2D* hD2LDMDY_private;
-    TF1* fFluxFormInt_private;
-    TGraph* gGAA_private;
+    TH2D* hD2LDMDY_private_s;
+    TH2D* hD2LDMDY_private_p;
     if (usePolarizedCS) {
-      fFluxFormInt_private = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
-      gGAA_private = new TGraph(nb, vb, vGAA);
+      hD2LDMDY_private_s = (TH2D*)hD2LDMDY_s->Clone(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()));
+      hD2LDMDY_private_p = (TH2D*)hD2LDMDY_p->Clone(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()));
     } else {
       hD2LDMDY_private = (TH2D*)hD2LDMDY->Clone(Form("hD2LDMDY_private_%d", omp_get_thread_num()));
     }
@@ -827,19 +872,19 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
       double m = mmin + dm * im;
       for (iy = 0; iy < ny; iy++) {
         if (!usePolarizedCS) { // unpolarized cross section
-          cs_private[im][iy] = crossSectionM(m) * hD2LDMDY_private->GetBinContent(im, iy);
+          double lumi = hD2LDMDY_private->GetBinContent(im, iy);
+          cs_private[im][iy] = crossSectionM(m) * lumi;
         } else { // polarized
           double y = ymin + dy * iy;
           double cs_s = crossSectionMPolS(m);
           double cs_p = crossSectionMPolPS(m);
-          double ns, np;
-          calcTwoPhotonLumiPol(ns, np, m, y, fFluxFormInt_private, gGAA_private);
-          double ncs_s = ns * cs_s; // scalar part
-          double ncs_p = np * cs_p; // psudoscalar part
-          double ncs = ncs_s + ncs_p;
-          ncs *= dm * dy;
-          cs_private[im][iy] = ncs * 1e7; // fm^2 -> nb
-          rat_private[im][iy] = ncs_s / ncs_p;
+          double lumi_s = hD2LDMDY_private_s->GetBinContent(im, iy);
+          double lumi_p = hD2LDMDY_private_p->GetBinContent(im, iy);
+          double nuccs_s = lumi_s * cs_s; // scalar part
+          double nuccs_p = lumi_p * cs_p; // psudoscalar part
+          double nuccs = nuccs_s + nuccs_p;
+          cs_private[im][iy] = nuccs * 1e7; // fm^2 -> nb
+          rat_private[im][iy] = nuccs_s / nuccs_p;
         }
         progress++;
       }
@@ -1135,7 +1180,6 @@ void UpcGenerator::generateEvents()
   }
 
 #ifndef USE_HEPMC
-  hNucCSYM->Write();
   mOutFile->Write();
   mOutFile->Close();
 #endif
