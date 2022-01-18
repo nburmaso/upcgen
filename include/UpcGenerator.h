@@ -67,7 +67,7 @@ class UpcGenerator
  public:
   // simulation & calculation parameters
   // ----------------------------------------------------------------------
-  long seed{-1}; // seed for random numbers generator
+  long seed{0}; // seed for random numbers generator
 
   int lepPDG{15};       // tau by default
   double mLep{1.77682}; // tau by default

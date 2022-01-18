@@ -63,7 +63,7 @@ void UpcGenerator::init()
 
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
-  gRandom->SetSeed(seed == -1 ? time(nullptr) : seed);
+  gRandom->SetSeed(seed == 0 ? time(nullptr) : seed);
 
   // initialize pythia for decays
 #ifdef USE_PYTHIA8
@@ -73,12 +73,14 @@ void UpcGenerator::init()
     decayer = new UpcPythia8Helper();
     decayer->setFSR(doFSR);
     decayer->setDecays(doDecays);
+    decayer->setSeed(seed);
     decayer->init();
   }
 #endif
 #ifdef USE_PYTHIA6
   if (pythiaVersion == 6) {
     isPythiaUsed = true;
+    decayer->setSeed(seed);
     decayer = new UpcPythia6Helper();
   }
 #endif

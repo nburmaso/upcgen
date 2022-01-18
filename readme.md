@@ -88,7 +88,7 @@ USE_POLARIZED_CS 0 # account for scalar and pseudoscalar parts of the cross sect
 PYTHIA_VERSION 8   # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
 PYTHIA8_FSR 0      # For Pythia8 only: simulate final state radiation (EM showers)
 PYTHIA8_DECAYS 0   # For Pythia8 only: switch to turn on/off lepton decays
-SEED -1            # Seed for random numbers generator. '-1' -> random seed
+SEED 0            # Seed for random numbers generator. '0' -> random seed
 ```
 
 * Note that the order, and the number of the parameters are not fixed.
