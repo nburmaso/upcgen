@@ -8,7 +8,7 @@ This is a simple event generator dedicated to dilepton production process in ult
 also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support. Note that Pythia is
 only used for tau decays and completely optional
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
-* CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
+* CMAKE 2.8 (or newer) & compiler with support of C++11
 * HepMC: It is possible to use HepMC output format. Source code and installation instructions 
 can be obtained from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
 * Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).

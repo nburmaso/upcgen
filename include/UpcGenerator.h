@@ -24,6 +24,7 @@
 #ifndef UPCGENERATOR__UPCGENERATOR_H_
 #define UPCGENERATOR__UPCGENERATOR_H_
 
+#include "UpcCalcMachine.h"
 #include "UpcPythia8Helper.h"
 #include "UpcPythia6Helper.h"
 
@@ -65,102 +66,16 @@ using namespace std;
 class UpcGenerator
 {
  public:
-  // simulation & calculation parameters
-  // ----------------------------------------------------------------------
-  long seed{0}; // seed for random numbers generator
-
-  int lepPDG{15};       // tau by default
-  double mLep{1.77682}; // tau by default
-  double aLep{0};       // lepton anomalous magnetic moment
-
-  // physics constants
-  constexpr static double alpha{1.0 / 137.035999074}; // fine structure constant
-  constexpr static double hc{0.1973269718};           // scaling factor
-  constexpr static double mProt{0.9382720813};        // proton mass
-
-  // Woods-Saxon parameters
-  static double rho0; // fm-3
-  static double R;    // fm
-  static double a;    // fm
-
-  // parameters of the nucleus
-  static double Z;
-  double A{208};
-
-  // beam parameters
-  static double sqrts;
-  static double g1;
-  static double g2;
-
-  // Gaussian integration n = 10
-  // since cos is symmetric around 0 we only need 5
-  // of the points in the gaussian integration.
-  static const int ngi10 = 10;
-  double weights10[ngi10]{0.0666713443086881,
-                          0.1494513491505806,
-                          0.2190863625159820,
-                          0.2692667193099963,
-                          0.2955242247147529,
-                          0.2955242247147529,
-                          0.2692667193099963,
-                          0.2190863625159820,
-                          0.1494513491505806,
-                          0.0666713443086881};
-
-  double abscissas10[ngi10]{-0.9739065285171717,
-                            -0.8650633666889845,
-                            -0.6794095682990244,
-                            -0.4333953941292472,
-                            -0.1488743389816312,
-                            0.1488743389816312,
-                            0.4333953941292472,
-                            0.6794095682990244,
-                            0.8650633666889845,
-                            0.9739065285171717};
-
-  // photon luminosity calculation parameters
-  const int nb1{120};
-  const int nb2{120};
-
-  // cross sections binning
-  double zmin{-1};   // min z
-  double zmax{1};    // max z
-  int nz{100};       // nbins in z = cos(theta)
-  double mmin{3.56}; // min M in GeV
-  double mmax{50.};  // max M in GeV
-  int nm{1001};      // n bins in M
-  double ymin{-6.};  // min pair rapidity
-  double ymax{6.};   // max pair rapidity
-  int ny{121};       // n bins in Y
-
-  // scaling factor
-  double factor{Z * Z * alpha / M_PI / M_PI / hc / hc};
-
-  // helper containers for calculations
-  static const int nb{200};
-  double bmax{20};
-  double db{bmax / (nb - 1)};
-  double vb[nb];
-  double vs[nb];
-  double TA[nb];
-  double rho[nb][nb];
-  double vGAA[nb];
-  double vRho[nb];
-
-  // lookup tables
-  static constexpr double Q2min{1e-9};
-  static constexpr double Q2max{100};
-  static const int nQ2{10000000};
-  static constexpr double dQ2{(Q2max - Q2min) / nQ2};
-  static double* vCachedFormFac; // Q^2-grid for possible form factor values
+  UpcGenerator();
+  ~UpcGenerator();
 
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
-  int nEvents{1000};
-  bool isPoint{true}; // flux calculation parameter
-  bool useNonzeroGamPt{true};
   bool usePolarizedCS{false};
+  long int seed{0};
+  int nEvents{1000};
+  int lepPDG{15};
   static std::map<int, double> lepMassMap;
 
   // parameters dictionary
@@ -197,9 +112,6 @@ class UpcGenerator
   // debug level
   static int debug;
 
-  UpcGenerator();
-  ~UpcGenerator();
-
   // parse inputs, set flags, prepare caches...
   void init();
 
@@ -223,6 +135,8 @@ class UpcGenerator
   void generateEvents();
 
  private:
+  UpcCalcMachine* calcMachine;
+
   // helper struct for file output
   struct {
     int eventNumber;
@@ -268,82 +182,6 @@ class UpcGenerator
                        vector<int>& statuses,
                        vector<int>& mothers,
                        vector<TLorentzVector>& particles);
-
-  // internal methods for calculations
-  // ----------------------------------------------------------------------
-
-  // Simpson integrator
-  template <typename ArrayType>
-  static double simpson(int n, ArrayType* v, double h);
-
-  // Woods-Saxon rho0 from normalization
-  double calcWSRho();
-
-  // photon fluxes
-  double fluxPoint(const double b, const double k);
-
-  static double fluxFormInt(double* x, double* par);
-
-  static double calcFormFac(double Q2);
-
-  double fluxForm(const double b, const double k, TF1* fFluxForm);
-
-  // two-photon luminosity
-  double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // polarized elementary cross sections
-  double calcCrossSectionMZPolS(double m, double z);
-
-  double calcCrossSectionMPolS(double m);
-
-  double calcCrossSectionMZPolPS(double m, double z);
-
-  double calcCrossSectionMPolPS(double m);
-
-  // two-photon luminosity for scalar part
-  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // elementary cross section for dilepton production in MZ space
-  double calcCrossSectionMZ(double m, double z);
-
-  // elementary cross section for dilepton production in M space
-  double calcCrossSectionM(double m);
-
-  // histogram filler for MZ-cross section
-  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
-                          double mmin, double mmax, int nm,
-                          double zmin, double zmax, int nz,
-                          int flag);
-
-  // histogram filler for M-cross section
-  void fillCrossSectionM(TH1D* hCrossSectionM,
-                         double mmin, double mmax, int nm);
-
-  // function to calculate nuclear cross section
-  // using 2D elementary cross section and two-photon luminosity
-  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
-
-  // nuclear form factor for momentum transfer q
-  // todo: remove and replace by realistic form factor
-  static double calcNucFormFactor(double t);
-
-  // functions for calculating pair momentum
-  // accounting for non-zero photon pt
-  double getPhotonPt(double ePhot);
-  void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
-
-  // various cachers-getters for lookup tables
-  // ----------------------------------------------------------------------
-
-  // prepare G_AA
-  void prepareGAA();
-
-  // prepare form factor
-  void prepareFormFac();
-  static double getCachedFormFac(double Q2);
-
-  // prepare two photon luminosity, cache to file
-  void prepareTwoPhotonLumi();
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_
