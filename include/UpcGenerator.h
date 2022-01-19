@@ -292,22 +292,22 @@ class UpcGenerator
   double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
   // polarized elementary cross sections
-  double crossSectionMZPolS(double m, double z);
+  double calcCrossSectionMZPolS(double m, double z);
 
-  double crossSectionMPolS(double m);
+  double calcCrossSectionMPolS(double m);
 
-  double crossSectionMZPolPS(double m, double z);
+  double calcCrossSectionMZPolPS(double m, double z);
 
-  double crossSectionMPolPS(double m);
+  double calcCrossSectionMPolPS(double m);
 
   // two-photon luminosity for scalar part
   void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
   // elementary cross section for dilepton production in MZ space
-  double crossSectionMZ(double m, double z);
+  double calcCrossSectionMZ(double m, double z);
 
   // elementary cross section for dilepton production in M space
-  double crossSectionM(double m);
+  double calcCrossSectionM(double m);
 
   // histogram filler for MZ-cross section
   void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
@@ -321,10 +321,11 @@ class UpcGenerator
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity
-  void nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
+  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
 
   // nuclear form factor for momentum transfer q
-  static double nucFormFactor(double t);
+  // todo: remove and replace by realistic form factor
+  static double calcNucFormFactor(double t);
 
   // functions for calculating pair momentum
   // accounting for non-zero photon pt

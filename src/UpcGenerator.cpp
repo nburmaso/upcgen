@@ -438,7 +438,7 @@ double UpcGenerator::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const
   return lumi;
 }
 
-double UpcGenerator::crossSectionMPolS(double m)
+double UpcGenerator::calcCrossSectionMPolS(double m)
 {
   double r = 2 * mLep / m;
   double r2 = r * r;
@@ -451,7 +451,7 @@ double UpcGenerator::crossSectionMPolS(double m)
   // fm^2 //
 }
 
-double UpcGenerator::crossSectionMZPolS(double m, double z)
+double UpcGenerator::calcCrossSectionMZPolS(double m, double z)
 {
   double mLep2 = mLep * mLep;
   double m2 = m * m;
@@ -465,7 +465,7 @@ double UpcGenerator::crossSectionMZPolS(double m, double z)
   // GeV^-2 //
 }
 
-double UpcGenerator::crossSectionMPolPS(double m)
+double UpcGenerator::calcCrossSectionMPolPS(double m)
 {
   double r = 2 * mLep / m;
   double r2 = r * r;
@@ -477,7 +477,7 @@ double UpcGenerator::crossSectionMPolPS(double m)
   // fm^2 //
 }
 
-double UpcGenerator::crossSectionMZPolPS(double m, double z)
+double UpcGenerator::calcCrossSectionMZPolPS(double m, double z)
 {
   double mLep2 = mLep * mLep;
   double m2 = m * m;
@@ -549,7 +549,7 @@ void UpcGenerator::calcTwoPhotonLumiPol(double& ns, double& np, double M, double
   np = 2 * M_PI * M_PI * M * sum_b1_p;
 }
 
-double UpcGenerator::crossSectionMZ(double m, double z)
+double UpcGenerator::calcCrossSectionMZ(double m, double z)
 {
   double s = m * m;
   double k = TMath::Sqrt(s) / 2.;              // photon/lepton energy in cm system in GeV
@@ -571,7 +571,7 @@ double UpcGenerator::crossSectionMZ(double m, double z)
   return cs; // [GeV^-2]
 }
 
-double UpcGenerator::crossSectionM(double m)
+double UpcGenerator::calcCrossSectionM(double m)
 {
   double s = m * m;               // cms invariant mass squared
   double x = 4 * mLep * mLep / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
@@ -602,13 +602,13 @@ void UpcGenerator::fillCrossSectionMZ(TH2D* hCrossSectionMZ,
     for (int iz = 0; iz <= nz; iz++) {
       z = zmin + dz * iz;
       if (flag == 0) { // the usual unpolarized cross section
-        cs = crossSectionMZ(m, z);
+        cs = calcCrossSectionMZ(m, z);
       }
       if (flag == 1) { // scalar part
-        cs = crossSectionMZPolS(m, z);
+        cs = calcCrossSectionMZPolS(m, z);
       }
       if (flag == 2) { // pseudoscalar part
-        cs = crossSectionMZPolPS(m, z);
+        cs = calcCrossSectionMZPolPS(m, z);
       }
       hCrossSectionMZ->SetBinContent(im, iz, cs);
     }
@@ -625,7 +625,7 @@ void UpcGenerator::fillCrossSectionM(TH1D* hCrossSectionM,
   double cs;
   for (int im = 0; im <= nm; im++) {
     m = mmin + dm * im;
-    cs = crossSectionM(m);
+    cs = calcCrossSectionM(m);
     hCrossSectionM->SetBinContent(im, cs);
   }
   double scalingFactor = hc * hc * 1e7; // to [nb]
@@ -818,7 +818,7 @@ void UpcGenerator::prepareTwoPhotonLumi()
   }
 }
 
-void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio)
+void UpcGenerator::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio)
 {
   PLOG_INFO << "Calculating nuclear cross section for a_lep = " << aLep;
 
@@ -875,11 +875,11 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
       for (iy = 0; iy < ny; iy++) {
         if (!usePolarizedCS) { // unpolarized cross section
           double lumi = hD2LDMDY_private->GetBinContent(im, iy);
-          cs_private[im][iy] = crossSectionM(m) * lumi;
+          cs_private[im][iy] = calcCrossSectionM(m) * lumi;
         } else { // polarized
           double y = ymin + dy * iy;
-          double cs_s = crossSectionMPolS(m);
-          double cs_p = crossSectionMPolPS(m);
+          double cs_s = calcCrossSectionMPolS(m);
+          double cs_p = calcCrossSectionMPolPS(m);
           double lumi_s = hD2LDMDY_private_s->GetBinContent(im, iy);
           double lumi_p = hD2LDMDY_private_p->GetBinContent(im, iy);
           double nuccs_s = lumi_s * cs_s; // scalar part
@@ -928,7 +928,7 @@ void UpcGenerator::nuclearCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRati
 }
 
 // Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999
-double UpcGenerator::nucFormFactor(double t)
+double UpcGenerator::calcNucFormFactor(double t)
 {
   double ffactor;
   if (Z < 7) {
@@ -957,13 +957,13 @@ double UpcGenerator::getPhotonPt(double ePhot)
   double ereds = (ePhot / gtot) * (ePhot / gtot);
   double Cm = TMath::Sqrt(3.) * ePhot / gtot;
   double arg = Cm * Cm + ereds;
-  double sFFactCM = nucFormFactor(arg);
+  double sFFactCM = calcNucFormFactor(arg);
   double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
 
   double x = gRandom->Uniform(0, 1);
   double pp = x * 5. * hc / R;
   arg = pp * pp + ereds;
-  double sFFactPt1 = nucFormFactor(arg);
+  double sFFactPt1 = calcNucFormFactor(arg);
   double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (pi2x4 * arg * arg);
 
   bool satisfy = false;
@@ -975,7 +975,7 @@ double UpcGenerator::getPhotonPt(double ePhot)
       x = gRandom->Uniform(0, 1);
       pp = x * 5 * hc / R;
       arg = pp * pp + ereds;
-      double sFFactPt2 = nucFormFactor(arg);
+      double sFFactPt2 = calcNucFormFactor(arg);
       test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);
     }
   }
@@ -1043,7 +1043,7 @@ void UpcGenerator::generateEvents()
   if (usePolarizedCS) {
     hPolCSRatio = new TH2D("hPolCSRatio", "", ny - 1, ymin, ymax, nm - 1, mmin, mmax);
   }
-  nuclearCrossSectionYM(hNucCSYM, hPolCSRatio);
+  calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
 
   if (debug > 0) {
     PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
