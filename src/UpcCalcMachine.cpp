@@ -435,7 +435,7 @@ void UpcCalcMachine::prepareBreakupProb()
 {
   constexpr double bmin = 1e-6;
   constexpr double bmax = 1000;
-  constexpr int nbc = 100000;
+  constexpr int nbc = 1000000;
   constexpr double db = (bmax - bmin) / nbc;
   for (int i = 0; i < nbc; i++) {
     double b = bmin + db * i;
@@ -448,7 +448,7 @@ double UpcCalcMachine::getCachedBreakupProb(double b)
 {
   constexpr double bmin = 1e-6;
   constexpr double bmax = 1000;
-  constexpr int nbc = 100000;
+  constexpr int nbc = 1000000;
   constexpr double db = (bmax - bmin) / nbc;
   if (breakupMode == 3 && b > bmax) {
     return 1.;
@@ -721,20 +721,22 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRa
   PLOG_INFO << "Total nuclear cross section = " << cssum * 1e-6 << " mb";
 }
 
-// todo: clean up
+// Function from Starlight
+// (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
 double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int mode)
 {
   static double ee[10001], eee[162], se[10001];
 
   double _pPhotonBreakup = 0.; // Might default the probability with a different value?
   double b = impactparameter;
-  int zp = Z; // What about _beam2? Generic approach?
-  int ap = A;
+  int zp = 82; // What about _beam2? Generic approach?
+  int ap = 208;
 
   // Was initialized at the start of the function originally, been moved inward.
   double pxn = 0.;
+  double p1n = 0.;
 
-  double _beamLorentzGamma = 2942;
+  double _beamLorentzGamma = UpcCalcMachine::g1;
   double hbarcmev = 197.3269718;
   double pi = 3.14159;
   // Used to be done prior to entering the function. Done properly for assymetric?
@@ -822,6 +824,8 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
                        .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12,
                        .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12};
 
+  static int IFIRSTP = 0;
+
   double si1 = 0, g1 = 0, o1 = 0;
   int ne = 0, ij = 0;
   double delo = 0, omax = 0, gk1m = 0;
@@ -833,11 +837,18 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
 
   double omax1n = 24.01;
 
+  if (IFIRSTP != 0)
+    goto L100;
+
+  IFIRSTP = 1;
+
   // This is dependenant on gold or lead....Might need to expand
   if (zp == 79) {
+
     ap = 197;
     si1 = 540.;
     g1 = 4.75;
+
     // peak and minimum energies for GDR excitation (in MeV)
     o1 = 13.70;
     o0 = 8.1;
@@ -849,6 +860,7 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
     o1 = 13.42;
     o0 = 7.4;
     for (int j = 1; j <= 160; j++) {
+
       sa[j] = sen[j];
     }
   }
@@ -870,31 +882,38 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
   // GDR any number of neutrons, Veyssiere et al., Nucl. Phys. A159, 561 (1970)
   for (int i = 1; i <= ne; i++) {
     ee[i] = o0 + (i - 1) * delo;
+    // cout<<" ee 1 "<<ee[i]<<"  "<<i<<endl;
+
     se[i] = scon * ee[i] * ee[i] / (((o1 * o1 - ee[i] * ee[i]) * (o1 * o1 - ee[i] * ee[i])) + ee[i] * ee[i] * g1 * g1);
   }
-  ij = ne;
+  ij = ne; // Risky?
   // 25-103 MeV, Lepretre, et al., Nucl. Phys. A367, 237 (1981)
   for (int j = 1; j <= 27; j++) {
     ij = ij + 1;
     ee[ij] = e3[j];
+    // cout<<" ee 2 "<<ee[ij]<<"  "<<ij<<endl;
+
     se[ij] = .1 * ap * s3[j] / 208.;
   }
   // 103-440 MeV, Carlos, et al., Nucl. Phys. A431, 573 (1984)
   for (int j = 1; j <= 22; j++) {
     ij = ij + 1;
     ee[ij] = e1[j];
+    // cout<<" ee 3 "<<ee[ij]<<"  "<<ij<<endl;
     se[ij] = .1 * ap * s1[j] / 208.;
   }
   // 440 MeV-2 GeV Armstrong et al.
   for (int j = 9; j <= 70; j++) {
     ij = ij + 1;
     ee[ij] = ee[ij - 1] + 25.;
+    // cout<<" ee 4 "<<ee[ij]<<"  "<<ij<<endl;
     se[ij] = .1 * (zp * sigt[j] + (ap - zp) * sigtn[j]);
   }
   // 2-16.4 GeV Michalowski; Caldwell
   for (int j = 1; j <= 11; j++) {
     ij = ij + 1;
     ee[ij] = e2[j];
+    // cout<<" ee 5 "<<ee[ij]<<"   "<<ij<<endl;
     se[ij] = .1 * ap * s2[j];
   }
   // done with initaliation
@@ -923,6 +942,10 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
   }
   ee[ij + 1] = 99999999999.;
 
+  // clear counters for 1N, XN
+L100:
+
+  p1n = 0.;
   pxn = 0.;
   // start XN calculation
   // what's the b-dependent highest energy of interest?
@@ -941,6 +964,19 @@ L212:
     gk1m = gk1;
     goto L212;
   }
+  // one neutron dissociation
+  omax = std::min(omax1n, 4. * gammatarg * (hbarcmev) / b);
+  gk1m = TMath::BesselK1(eee[1] * b / ((hbarcmev)*gammatarg));
+  k = 2;
+L102:
+  if (eee[k] < omax) {
+    gk1 = TMath::BesselK1(eee[k] * b / ((hbarcmev)*gammatarg));
+    // Like Eq3 but with only the one neutron out GDR photo cross section input
+    p1n = p1n + zcon * (eee[k] - eee[k - 1]) * .5 * (sa[k - 1] * eee[k - 1] * gk1m * gk1m + sa[k] * eee[k] * gk1 * gk1);
+    k = k + 1;
+    gk1m = gk1;
+    goto L102;
+  }
 
   if ((mode) == 1)
     _pPhotonBreakup = 1.;
@@ -950,6 +986,8 @@ L212:
     _pPhotonBreakup = exp(-2 * pxn);
   if ((mode) == 4)
     _pPhotonBreakup = 2. * exp(-pxn) * (1. - exp(-pxn));
+
+  // cout<<pxn<<" "<<zcon<<" "<<ee[k]<<" "<<se[k-1]<<" "<<gk1m<<"  "<<gk1<<"  "<<k<<"  "<<ee[k+1]<< "  "<<b<< endl;
 
   return _pPhotonBreakup;
 }
