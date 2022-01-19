@@ -83,7 +83,7 @@ BINS_Z 100         # cross section binnings: bins for z
 BINS_M 1001        #                         bins for m
 BINS_Y 121         #                         bins for y
 FLUX_POINT 1       # use point flux approximation or not
-BREAKUP_MODE 1     # 1 -- no nuclear breakup
+BREAKUP_MODE 1     # 1 -- nuclear breakup is not accounted for
                    # 2 -- XNXN
                    # 3 -- 0N0N
                    # 4 -- 0NXN (+ XN0N)
