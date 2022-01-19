@@ -101,6 +101,7 @@ class UpcGenerator
     string inBinsM{"BINS_M"};
     string inBinsY{"BINS_Y"};
     string inFluxPoint{"FLUX_POINT"};
+    string inBreakupMode{"BREAKUP_MODE"};
     string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
     string inPolarized{"USE_POLARIZED_CS"};
     string inPythiaVer{"PYTHIA_VERSION"};

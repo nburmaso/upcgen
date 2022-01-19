@@ -66,8 +66,8 @@ class UpcCalcMachine
   static double a;    // fm
 
   // parameters of the nucleus
-  static double Z;
-  double A{208};
+  static int Z;
+  int A{208};
 
   // lepton parameters
   double mLep{1.77682}; // tau by default
@@ -123,9 +123,8 @@ class UpcCalcMachine
   double factor{Z * Z * alpha / M_PI / M_PI / hc / hc};
 
   // helper containers for calculations
+  // ----------------------------------------------------------------------
   static const int nb{200};
-  double bmax{20};
-  double db{bmax / (nb - 1)};
   double vb[nb]{};
   double vs[nb]{};
   double TA[nb]{};
@@ -136,14 +135,20 @@ class UpcCalcMachine
   // lookup tables
   static constexpr double Q2min{1e-9};
   static constexpr double Q2max{100};
-  static const int nQ2{10000000};
+  static constexpr int nQ2{10000000};
   static constexpr double dQ2{(Q2max - Q2min) / nQ2};
   static double* vCachedFormFac; // Q^2-grid for possible form factor values
+  double* vCachedBreakup;        // b-grid for possible breakup probabilities
 
   // simulation parameters
   bool isPoint{true}; // flux calculation parameter
   bool useNonzeroGamPt{true};
   bool usePolarizedCS{false};
+  // 1 -- no breakup
+  // 2 -- XNXN
+  // 3 -- 0N0N
+  // 4 -- 0NXN (+ XN0N)
+  int breakupMode{1};
 
   // debug level
   static int debug;
@@ -152,6 +157,9 @@ class UpcCalcMachine
   int numThreads{1};
 
   void init();
+
+  // methods for cross section calculation
+  // ----------------------------------------------------------------------
 
   // Simpson integrator
   template <typename ArrayType>
@@ -204,6 +212,8 @@ class UpcCalcMachine
   // using 2D elementary cross section and two-photon luminosity
   void calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
 
+  double calcBreakupProb(double b, int mode);
+
   // nuclear form factor for momentum transfer q
   // todo: remove and replace by realistic form factor
   static double calcNucFormFactor(double t);
@@ -218,6 +228,10 @@ class UpcCalcMachine
 
   // prepare G_AA
   void prepareGAA();
+
+  // prepare nuclear breakup probability
+  void prepareBreakupProb();
+  double getCachedBreakupProb(double b);
 
   // prepare form factor
   void prepareFormFac();

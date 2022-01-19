@@ -31,19 +31,24 @@ using namespace std;
 double UpcCalcMachine::rho0 = 0;
 double UpcCalcMachine::R = 6.68;
 double UpcCalcMachine::a = 0.447;
-double UpcCalcMachine::Z = 82;
+int UpcCalcMachine::Z = 82;
 double UpcCalcMachine::sqrts = 5020;
 double UpcCalcMachine::g1 = sqrts / (2. * mProt);
 double UpcCalcMachine::g2 = sqrts / (2. * mProt);
 int UpcCalcMachine::debug = 0;
 double* UpcCalcMachine::vCachedFormFac = new double[UpcCalcMachine::nQ2];
 
-UpcCalcMachine::UpcCalcMachine() = default;
+UpcCalcMachine::UpcCalcMachine()
+{
+  constexpr int nbc = 10000000;
+  vCachedBreakup = new double[nbc];
+};
 
 UpcCalcMachine::~UpcCalcMachine() = default;
 
 void UpcCalcMachine::init()
 {
+  PLOG_INFO << "Initializing caches ...";
   // update scaling factor
   factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
 
@@ -51,8 +56,11 @@ void UpcCalcMachine::init()
   rho0 = calcWSRho();
 
   // prepare caches
-  prepareGAA();           // G_AA and Fourier-transformed G_AA
-  prepareFormFac();       // nuclear form factor
+  prepareGAA();     // G_AA and Fourier-transformed G_AA
+  prepareFormFac(); // nuclear form factor
+  if (breakupMode > 1) {
+    prepareBreakupProb();
+  }
   prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
 }
 
@@ -71,6 +79,8 @@ double UpcCalcMachine::simpson(int n, ArrayType* v, double h)
 
 double UpcCalcMachine::calcWSRho()
 {
+  double bmax = 20;
+  double db = bmax / (nb - 1);
   for (int ib = 0; ib < nb; ib++) {
     double r = ib * db;
     vRho[ib] = r * r / (1 + exp((r - R) / a));
@@ -175,8 +185,9 @@ double UpcCalcMachine::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, con
         }
         double phi = M_PI * abscissas10[k];
         double b = sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cos(phi));
+        double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
         double gaa = b < 20. ? gGAA->Eval(b) : 1;
-        sum_phi += gaa * weights10[k];
+        sum_phi += breakup * gaa * weights10[k];
       }
       sum_b2 += flux[j] * sum_phi * b2 * (b2h - b2l);
     }
@@ -282,9 +293,10 @@ void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, doub
         double cphi = TMath::Cos(phi);
         double sphi = TMath::Sin(phi);
         double b = TMath::Sqrt(b1 * b1 + b2 * b2 - 2. * b1 * b2 * cphi);
+        double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
         double gaa = b < 20 ? gGAA->Eval(b) : 1;
-        sum_phi_s += gaa * weights10[k] * cphi * cphi;
-        sum_phi_p += gaa * weights10[k] * sphi * sphi;
+        sum_phi_s += breakup * gaa * weights10[k] * cphi * cphi;
+        sum_phi_p += breakup * gaa * weights10[k] * sphi * sphi;
       }
       double ff_b2 = flux[j];
       sum_b2_s += sum_phi_s * ff_b2 * b2 * (b2h - b2l);
@@ -382,6 +394,8 @@ void UpcCalcMachine::fillCrossSectionM(TH1D* hCrossSectionM,
 
 void UpcCalcMachine::prepareGAA()
 {
+  double bmax = 20;
+  double db = bmax / (nb - 1);
   double ssm = pow(sqrts, 2) / pow(2 * mProt + 2.1206, 2);
   double csNN = 0.1 * (34.41 + 0.2720 * pow(log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
   // calculate rho and TA
@@ -415,6 +429,39 @@ void UpcCalcMachine::prepareGAA()
     }
     vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
   }
+}
+
+void UpcCalcMachine::prepareBreakupProb()
+{
+  constexpr double bmin = 1e-6;
+  constexpr double bmax = 1000;
+  constexpr int nbc = 100000;
+  constexpr double db = (bmax - bmin) / nbc;
+  for (int i = 0; i < nbc; i++) {
+    double b = bmin + db * i;
+    double prob = calcBreakupProb(b, breakupMode);
+    vCachedBreakup[i] = prob;
+  }
+}
+
+double UpcCalcMachine::getCachedBreakupProb(double b)
+{
+  constexpr double bmin = 1e-6;
+  constexpr double bmax = 1000;
+  constexpr int nbc = 100000;
+  constexpr double db = (bmax - bmin) / nbc;
+  if (breakupMode == 3 && b > bmax) {
+    return 1.;
+  }
+  if ((breakupMode == 2 || breakupMode == 4) && b > bmax) {
+    return 0.;
+  }
+  double frac = (b - bmin) / db;
+  int idx1 = floor(frac);
+  double prob1 = vCachedBreakup[idx1];
+  double prob2 = vCachedBreakup[idx1 + 1];
+  double prob = prob1 + (prob2 - prob1) * (frac - idx1);
+  return prob;
 }
 
 double UpcCalcMachine::calcFormFac(double Q2)
@@ -672,6 +719,239 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRa
   hCrossSectionYM->Scale(1e-6); // nb -> mb
 
   PLOG_INFO << "Total nuclear cross section = " << cssum * 1e-6 << " mb";
+}
+
+// todo: clean up
+double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int mode)
+{
+  static double ee[10001], eee[162], se[10001];
+
+  double _pPhotonBreakup = 0.; // Might default the probability with a different value?
+  double b = impactparameter;
+  int zp = Z; // What about _beam2? Generic approach?
+  int ap = A;
+
+  // Was initialized at the start of the function originally, been moved inward.
+  double pxn = 0.;
+
+  double _beamLorentzGamma = 2942;
+  double hbarcmev = 197.3269718;
+  double pi = 3.14159;
+  // Used to be done prior to entering the function. Done properly for assymetric?
+  double gammatarg = 2. * _beamLorentzGamma * _beamLorentzGamma - 1.;
+  double omaxx = 0.;
+  // This was done prior entering the function as well
+  if (_beamLorentzGamma > 500.) {
+    omaxx = 1.E10;
+  } else {
+    omaxx = 1.E7;
+  }
+
+  double e1[23] = {0., 103., 106., 112., 119., 127., 132., 145., 171., 199., 230., 235.,
+                   254., 280., 300., 320., 330., 333., 373., 390., 420., 426., 440.};
+  double s1[23] = {0., 12.0, 11.5, 12.0, 12.0, 12.0, 15.0, 17.0, 28.0, 33.0,
+                   52.0, 60.0, 70.0, 76.0, 85.0, 86.0, 89.0, 89.0, 75.0, 76.0, 69.0, 59.0, 61.0};
+  double e2[12] = {0., 2000., 3270., 4100., 4810., 6210., 6600.,
+                   7790., 8400., 9510., 13600., 16400.};
+  double s2[12] = {0., .1266, .1080, .0805, .1017, .0942, .0844, .0841, .0755, .0827,
+                   .0626, .0740};
+  double e3[29] = {0., 26., 28., 30., 32., 34., 36., 38., 40., 44., 46., 48., 50., 52., 55.,
+                   57., 62., 64., 66., 69., 72., 74., 76., 79., 82., 86., 92., 98., 103.};
+  double s3[29] = {0., 30., 21.5, 22.5, 18.5, 17.5, 15., 14.5, 19., 17.5, 16., 14.,
+                   20., 16.5, 17.5, 17., 15.5, 18., 15.5, 15.5, 15., 13.5, 18., 14.5, 15.5, 12.5, 13.,
+                   13., 12.};
+  static double sa[161] = {0., 0., .004, .008, .013, .017, .021, .025, .029, .034, .038, .042, .046,
+                           .051, .055, .059, .063, .067, .072, .076, .08, .085, .09, .095, .1, .108, .116,
+                           .124, .132, .14, .152, .164, .176, .188, .2, .22, .24, .26, .28, .3, .32, .34,
+                           .36, .38, .4, .417, .433, .450, .467, .483, .5, .51, .516, .52, .523, .5245,
+                           .525, .5242,
+                           .5214, .518, .512, .505, .495, .482, .469, .456, .442, .428, .414, .4, .386,
+                           .370, .355, .34, .325, .310, .295, .280, .265, .25, .236, .222, .208, .194,
+                           .180, .166,
+                           .152, .138, .124, .11, .101, .095, .09, .085, .08, .076, .072, .069, .066,
+                           .063, .06, .0575, .055, .0525, .05, .04875, .0475, .04625, .045, .04375,
+                           .0425, .04125, .04, .03875, .0375, .03625, .035, .03375, .0325, .03125, .03,
+                           .02925, .0285, .02775, .027, .02625, .0255, .02475, .024, .02325, .0225,
+                           .02175, .021, .02025, .0195, .01875, .018, .01725, .0165, .01575, .015,
+                           .01425, .0135, .01275, .012, .01125, .0105, .00975, .009, .00825, .0075,
+                           .00675, .006, .00525, .0045, .00375, .003, .00225, .0015, .00075, 0.};
+
+  double sen[161] = {0., 0., .012, .025, .038, .028, .028, .038, .035, .029, .039, .035,
+                     .038, .032, .038, .041, .041, .049, .055, .061, .072, .076, .070, .067,
+                     .080, .103, .125, .138, .118, .103, .129, .155, .170, .180, .190, .200,
+                     .215, .250, .302, .310, .301, .315, .330, .355, .380, .400, .410, .420,
+                     .438, .456, .474, .492, .510, .533, .556, .578, .6, .62, .63, .638,
+                     .640, .640, .637, .631, .625, .618, .610, .600, .580, .555, .530, .505,
+                     .480, .455, .435, .410, .385, .360, .340, .320, .300, .285, .270, .255,
+                     .240, .225, .210, .180, .165, .150, .140, .132, .124, .116, .108, .100,
+                     .092, .084, .077, .071, .066, .060, .055, .051, .048, .046, .044, .042,
+                     .040, .038, .036, .034, .032, .030, .028, .027, .026, .025, .025, .025,
+                     .024, .024, .024, .024, .024, .023, .023, .023, .023, .023, .022, .022,
+                     .022, .022, .022, .021, .021, .021, .020, .020,
+                     .020, .019, .018, .017, .016, .015, .014, .013, .012, .011, .010, .009,
+                     .008, .007, .006, .005, .004, .003, .002, .001, 0.};
+
+  // gammay,p gamma,n of Armstrong begin at 265 incr 25
+
+  double sigt[160] = {0., .4245, .4870, .5269, .4778, .4066, .3341, .2444, .2245, .2005,
+                      .1783, .1769, .1869, .1940, .2117, .2226, .2327, .2395, .2646, .2790, .2756,
+                      .2607, .2447, .2211, .2063, .2137, .2088, .2017, .2050, .2015, .2121, .2175,
+                      .2152, .1917, .1911, .1747, .1650, .1587, .1622, .1496, .1486, .1438, .1556,
+                      .1468, .1536, .1544, .1536, .1468, .1535, .1442, .1515, .1559, .1541, .1461,
+                      .1388, .1565, .1502, .1503, .1454, .1389, .1445, .1425, .1415, .1424, .1432,
+                      .1486, .1539, .1354, .1480, .1443, .1435, .1491, .1435, .1380, .1317, .1445,
+                      .1375, .1449, .1359, .1383, .1390, .1361, .1286, .1359, .1395, .1327, .1387,
+                      .1431, .1403, .1404, .1389, .1410, .1304, .1363, .1241, .1284, .1299, .1325,
+                      .1343, .1387, .1328, .1444, .1334, .1362, .1302, .1338, .1339, .1304, .1314,
+                      .1287, .1404, .1383, .1292, .1436, .1280, .1326, .1321, .1268, .1278, .1243,
+                      .1239, .1271, .1213, .1338, .1287, .1343, .1231, .1317, .1214, .1370, .1232,
+                      .1301, .1348, .1294, .1278, .1227, .1218, .1198, .1193, .1342, .1323, .1248,
+                      .1220, .1139, .1271, .1224, .1347, .1249, .1163, .1362, .1236, .1462, .1356,
+                      .1198, .1419, .1324, .1288, .1336, .1335, .1266};
+
+  double sigtn[160] = {0., .3125, .3930, .4401, .4582, .3774, .3329, .2996, .2715, .2165,
+                       .2297, .1861, .1551, .2020, .2073, .2064, .2193, .2275, .2384, .2150, .2494,
+                       .2133, .2023, .1969, .1797, .1693, .1642, .1463, .1280, .1555, .1489, .1435,
+                       .1398, .1573, .1479, .1493, .1417, .1403, .1258, .1354, .1394, .1420, .1364,
+                       .1325, .1455, .1326, .1397, .1286, .1260, .1314, .1378, .1353, .1264, .1471,
+                       .1650, .1311, .1261, .1348, .1277, .1518, .1297, .1452, .1453, .1598, .1323,
+                       .1234, .1212, .1333, .1434, .1380, .1330, .12, .12, .12, .12, .12, .12, .12, .12,
+                       .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12,
+                       .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12,
+                       .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12,
+                       .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12,
+                       .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12, .12};
+
+  double si1 = 0, g1 = 0, o1 = 0;
+  int ne = 0, ij = 0;
+  double delo = 0, omax = 0, gk1m = 0;
+  static double scon = 0., zcon = 0., o0 = 0.;
+
+  double x = 0, y = 0, eps = 0, eta = 0, em = 0, exx = 0, s = 0, ictr = 0, pom = 0, vec = 0, gk1 = 0;
+
+  //  maximum energy for GDR dissocation (in target frame, in MeV)
+
+  double omax1n = 24.01;
+
+  // This is dependenant on gold or lead....Might need to expand
+  if (zp == 79) {
+    ap = 197;
+    si1 = 540.;
+    g1 = 4.75;
+    // peak and minimum energies for GDR excitation (in MeV)
+    o1 = 13.70;
+    o0 = 8.1;
+  } else {
+    zp = 82; // assumed to be lead
+    ap = 208;
+    si1 = 640.;
+    g1 = 4.05;
+    o1 = 13.42;
+    o0 = 7.4;
+    for (int j = 1; j <= 160; j++) {
+      sa[j] = sen[j];
+    }
+  }
+  // Part II of initialization
+  delo = .05;
+  //.1 to turn mb into fm^2
+  scon = .1 * g1 * g1 * si1;
+  zcon = zp / (gammatarg * (pi) * (hbarcmev)) * zp / (gammatarg * (pi) * (hbarcmev)) / 137.04; // alpha?
+
+  // single neutron from GDR, Veyssiere et al. Nucl. Phys. A159, 561 (1970)
+  for (int i = 1; i <= 160; i++) {
+    eee[i] = o0 + .1 * (i - 1);
+    sa[i] = 100. * sa[i];
+  }
+  // See Baltz, Rhoades-Brown, and Weneser, Phys. Rev. E 54, 4233 (1996)
+  // for details of the following photo cross-sections
+  eee[161] = 24.1;
+  ne = int((25. - o0) / delo) + 1;
+  // GDR any number of neutrons, Veyssiere et al., Nucl. Phys. A159, 561 (1970)
+  for (int i = 1; i <= ne; i++) {
+    ee[i] = o0 + (i - 1) * delo;
+    se[i] = scon * ee[i] * ee[i] / (((o1 * o1 - ee[i] * ee[i]) * (o1 * o1 - ee[i] * ee[i])) + ee[i] * ee[i] * g1 * g1);
+  }
+  ij = ne;
+  // 25-103 MeV, Lepretre, et al., Nucl. Phys. A367, 237 (1981)
+  for (int j = 1; j <= 27; j++) {
+    ij = ij + 1;
+    ee[ij] = e3[j];
+    se[ij] = .1 * ap * s3[j] / 208.;
+  }
+  // 103-440 MeV, Carlos, et al., Nucl. Phys. A431, 573 (1984)
+  for (int j = 1; j <= 22; j++) {
+    ij = ij + 1;
+    ee[ij] = e1[j];
+    se[ij] = .1 * ap * s1[j] / 208.;
+  }
+  // 440 MeV-2 GeV Armstrong et al.
+  for (int j = 9; j <= 70; j++) {
+    ij = ij + 1;
+    ee[ij] = ee[ij - 1] + 25.;
+    se[ij] = .1 * (zp * sigt[j] + (ap - zp) * sigtn[j]);
+  }
+  // 2-16.4 GeV Michalowski; Caldwell
+  for (int j = 1; j <= 11; j++) {
+    ij = ij + 1;
+    ee[ij] = e2[j];
+    se[ij] = .1 * ap * s2[j];
+  }
+  // done with initaliation
+  // Regge paramteres
+  x = .0677;
+  y = .129;
+  eps = .0808;
+  eta = .4525;
+  em = .94;
+  exx = pow(10, .05);
+
+  // Regge model for high energy
+  s = .002 * em * ee[ij];
+  // make sure we reach LHC energies
+  ictr = 100;
+  if (gammatarg > (2. * 150. * 150.))
+    ictr = 150;
+  for (int j = 1; j <= ictr; j++) {
+    ij = ij + 1;
+    s = s * exx;
+    ee[ij] = 1000. * .5 * (s - em * em) / em;
+    // cout<<" ee 6 "<<ee[ij]<<"   "<<ij<<endl;
+    pom = x * pow(s, eps);
+    vec = y * pow(s, (-eta));
+    se[ij] = .1 * .65 * ap * (pom + vec);
+  }
+  ee[ij + 1] = 99999999999.;
+
+  pxn = 0.;
+  // start XN calculation
+  // what's the b-dependent highest energy of interest?
+
+  omax = std::min(omaxx, 4. * gammatarg * (hbarcmev) / b);
+  if (omax < o0)
+    return _pPhotonBreakup;
+  gk1m = TMath::BesselK1(ee[1] * b / ((hbarcmev)*gammatarg));
+  int k = 2;
+L212:
+  if (ee[k] < omax) {
+    gk1 = TMath::BesselK1(ee[k] * b / ((hbarcmev)*gammatarg));
+    // Eq. 3 of BCW--NIM in Physics Research A 417 (1998) pp1-8:
+    pxn = pxn + zcon * (ee[k] - ee[k - 1]) * .5 * (se[k - 1] * ee[k - 1] * gk1m * gk1m + se[k] * ee[k] * gk1 * gk1);
+    k = k + 1;
+    gk1m = gk1;
+    goto L212;
+  }
+
+  if ((mode) == 1)
+    _pPhotonBreakup = 1.;
+  if ((mode) == 2)
+    _pPhotonBreakup = (1 - exp(-1 * pxn)) * (1 - exp(-1 * pxn));
+  if ((mode) == 3)
+    _pPhotonBreakup = exp(-2 * pxn);
+  if ((mode) == 4)
+    _pPhotonBreakup = 2. * exp(-pxn) * (1. - exp(-pxn));
+
+  return _pPhotonBreakup;
 }
 
 // Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999

@@ -147,13 +147,16 @@ void UpcGenerator::initGeneratorFromFile()
         UpcCalcMachine::a = stod(parValue);
       }
       if (parameter == parDict.inNucZ) {
-        UpcCalcMachine::Z = stod(parValue);
+        UpcCalcMachine::Z = stoi(parValue);
       }
       if (parameter == parDict.inNucA) {
-        calcMachine->A = stod(parValue);
+        calcMachine->A = stoi(parValue);
       }
       if (parameter == parDict.inFluxPoint) {
         calcMachine->isPoint = stoi(parValue);
+      }
+      if (parameter == parDict.inBreakupMode) {
+        calcMachine->breakupMode = stoi(parValue);
       }
       if (parameter == parDict.inPythiaVer) {
         pythiaVersion = stoi(parValue);
@@ -206,7 +209,9 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "BINS_M " << calcMachine->nm;
   PLOG_WARNING << "BINS_Y " << calcMachine->ny;
   PLOG_WARNING << "FLUX_POINT " << calcMachine->isPoint;
+  PLOG_WARNING << "BREAKUP_MODE " << calcMachine->breakupMode;
   PLOG_WARNING << "NON_ZERO_GAM_PT " << calcMachine->useNonzeroGamPt;
+  PLOG_WARNING << "USE_POLARIZED_CS " << usePolarizedCS;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
   PLOG_WARNING << "PYTHIA8_FSR " << doFSR;
   PLOG_WARNING << "PYTHIA8_DECAYS " << doDecays;

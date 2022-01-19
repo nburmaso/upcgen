@@ -83,12 +83,16 @@ BINS_Z 100         # cross section binnings: bins for z
 BINS_M 1001        #                         bins for m
 BINS_Y 121         #                         bins for y
 FLUX_POINT 1       # use point flux approximation or not
+BREAKUP_MODE 1     # 1 -- no nuclear breakup
+                   # 2 -- XNXN
+                   # 3 -- 0N0N
+                   # 4 -- 0NXN (+ XN0N)
 NON_ZERO_GAM_PT 0  # account for non-zero photon transverse momentum in photoproduction
 USE_POLARIZED_CS 0 # account for scalar and pseudoscalar parts of the cross section
 PYTHIA_VERSION 8   # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
 PYTHIA8_FSR 0      # For Pythia8 only: simulate final state radiation (EM showers)
 PYTHIA8_DECAYS 0   # For Pythia8 only: switch to turn on/off lepton decays
-SEED 0            # Seed for random numbers generator. '0' -> random seed
+SEED 0             # Seed for random numbers generator. '0' -> random seed
 ```
 
 * Note that the order, and the number of the parameters are not fixed.
