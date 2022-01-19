@@ -992,24 +992,6 @@ L102:
   return _pPhotonBreakup;
 }
 
-// Ref.: S.R.Klein, J.Nystrand, PRC 60 014903, 1999
-double UpcCalcMachine::calcNucFormFactor(double t)
-{
-  double ffactor;
-  if (Z < 7) {
-    ffactor = exp(-R * R * t * t / (6 * hc * hc));
-  }
-  if (Z >= 7) {
-    double q = TMath::Sqrt(t);
-    double qR = q * R / hc;
-    double invqR = hc / (q * R);
-    ffactor = (TMath::Sin(qR) - qR * TMath::Cos(qR)) * 3. * invqR * invqR * invqR;
-    const double a0 = 0.7; // [fm]
-    ffactor = ffactor / (1. + (a0 * a0 * t) / (hc * hc));
-  }
-  return ffactor;
-}
-
 // Function from Starlight
 // (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
 double UpcCalcMachine::getPhotonPt(double ePhot)
@@ -1022,13 +1004,13 @@ double UpcCalcMachine::getPhotonPt(double ePhot)
   double ereds = (ePhot / gtot) * (ePhot / gtot);
   double Cm = TMath::Sqrt(3.) * ePhot / gtot;
   double arg = Cm * Cm + ereds;
-  double sFFactCM = calcNucFormFactor(arg);
+  double sFFactCM = getCachedFormFac(arg);
   double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
 
   double x = gRandom->Uniform(0, 1);
   double pp = x * 5. * hc / R;
   arg = pp * pp + ereds;
-  double sFFactPt1 = calcNucFormFactor(arg);
+  double sFFactPt1 = getCachedFormFac(arg);
   double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (pi2x4 * arg * arg);
 
   bool satisfy = false;
@@ -1040,7 +1022,7 @@ double UpcCalcMachine::getPhotonPt(double ePhot)
       x = gRandom->Uniform(0, 1);
       pp = x * 5 * hc / R;
       arg = pp * pp + ereds;
-      double sFFactPt2 = calcNucFormFactor(arg);
+      double sFFactPt2 = getCachedFormFac(arg);
       test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);
     }
   }

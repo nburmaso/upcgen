@@ -214,10 +214,6 @@ class UpcCalcMachine
 
   double calcBreakupProb(double b, int mode);
 
-  // nuclear form factor for momentum transfer q
-  // todo: remove and replace by realistic form factor
-  static double calcNucFormFactor(double t);
-
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
   double getPhotonPt(double ePhot);
