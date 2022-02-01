@@ -47,6 +47,8 @@
 #include "plog/Log.h"
 
 #include <fstream>
+#include <map>
+#include <random>
 
 class UpcCalcMachine
 {
@@ -210,7 +212,7 @@ class UpcCalcMachine
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity
-  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio);
+  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, std::vector<std::vector<double>>& hPolCSRatio);
 
   double calcBreakupProb(double b, int mode);
 

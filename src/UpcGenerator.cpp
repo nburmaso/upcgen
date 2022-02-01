@@ -20,6 +20,7 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "UpcGenerator.h"
+#include "UpcSampler.h"
 
 using namespace std;
 
@@ -303,12 +304,16 @@ void UpcGenerator::generateEvents()
   int nm = calcMachine->nm;
   double mmin = calcMachine->mmin;
   double mmax = calcMachine->mmax;
+  double dm = (mmax - mmin) / nm;
   int nz = calcMachine->nz;
   double zmin = calcMachine->zmin;
   double zmax = calcMachine->zmax;
+  double dz = (zmax - zmin) / nz;
   int ny = calcMachine->ny;
   double ymin = calcMachine->ymin;
   double ymax = calcMachine->ymax;
+  double dy = (ymax - ymin) / ny;
+
   double aLep = calcMachine->aLep;
   double mLep = calcMachine->mLep;
 
@@ -335,9 +340,9 @@ void UpcGenerator::generateEvents()
   // calculating nuclear cross section in YM space
   // -----------------------------------------------------------------------
   auto* hNucCSYM = new TH2D("hNucCSYM", "", ny - 1, ymin, ymax, nm - 1, mmin, mmax);
-  TH2D* hPolCSRatio;
+  vector<vector<double>> hPolCSRatio;
   if (usePolarizedCS) {
-    hPolCSRatio = new TH2D("hPolCSRatio", "", ny - 1, ymin, ymax, nm - 1, mmin, mmax);
+    hPolCSRatio.resize(ny, vector<double>(nm));
   }
   calcMachine->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
 
@@ -366,6 +371,100 @@ void UpcGenerator::generateEvents()
   vector<int> statuses;
   vector<int> mothers;
   vector<TLorentzVector> particles;
+
+  if (doPtCut) {
+    for (int mBin = 1; mBin <= nm; mBin++) {
+      double zCut = cutsZ[mBin - 1];
+      int zCutBinUp = hCrossSectionMZ->GetXaxis()->FindBin(zCut);
+      int zCutBinLow = hCrossSectionMZ->GetXaxis()->FindBin(-zCut);
+      for (int zBin = zCutBinUp + 1; zBin <= nz; zBin++) {
+        hCrossSectionMZ->SetBinContent(mBin, zBin, 0);
+      }
+      for (int zBin = 1; zBin < zCutBinLow; zBin++) {
+        hCrossSectionMZ->SetBinContent(mBin, zBin, 0);
+      }
+    }
+  }
+
+  // setting up samplers
+  // -----------------------------------------------------------------------
+  auto* hNucCSM = hNucCSYM->ProjectionY();
+  vector<double> mGrid(nm, 0.);
+  for (int i = 0; i < nm; i++) {
+    mGrid[i] = mmin + i * dm;
+  }
+
+  vector<double> yGrid(ny, 0.);
+  for (int i = 0; i < ny; i++) {
+    yGrid[i] = ymin + i * dy;
+  }
+
+  vector<double> zGrid(nz, 0.);
+  for (int i = 0; i < nz; i++) {
+    zGrid[i] = zmin + i * dz;
+  }
+
+  // sampler for nuclear cross section
+  auto* samplerNuc = new UpcSampler();
+  samplerNuc->setSeed(seed);
+  samplerNuc->setDistr1D(hNucCSM, nm);
+  samplerNuc->setDistr2D(hNucCSYM, ny, nm);
+  samplerNuc->setYGrid(mGrid);
+  samplerNuc->setXGrid(yGrid);
+
+  // sampler for unpolarized cs
+  TH2D* hCrossSectionZM;
+  UpcSampler* samplerElem;
+
+  // samplers for polarized cs
+  TH2D* hCrossSectionZMPolS;
+  TH2D* hCrossSectionZMPolPS;
+  UpcSampler* samplerElemS;
+  UpcSampler* samplerElemPS;
+
+  if (!usePolarizedCS) {
+    hCrossSectionZM = new TH2D("hCrossSectionZM", "",
+                               nz, zmin, zmax,
+                               nm, mmin, mmax);
+    for (int i = 1; i <= nz; i++) {
+      for (int j = 1; j <= nm; j++) {
+        hCrossSectionZM->SetBinContent(i, j, hCrossSectionMZ->GetBinContent(j, i));
+      }
+    }
+    samplerElem = new UpcSampler();
+    samplerElem->setSeed(seed);
+    samplerElem->setDistr2D(hCrossSectionZM, nz, nm);
+    samplerElem->setXGrid(zGrid);
+    samplerElem->setYGrid(mGrid);
+  } else {
+    hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", "",
+                               nz, zmin, zmax,
+                               nm, mmin, mmax);
+    hCrossSectionZMPolPS = new TH2D("hCrossSectionZMPolPS", "",
+                                   nz, zmin, zmax,
+                                   nm, mmin, mmax);
+    for (int i = 1; i <= nz; i++) {
+      for (int j = 1; j <= nm; j++) {
+        hCrossSectionZMPolS->SetBinContent(i, j, hCrossSectionMZPolS->GetBinContent(j, i));
+        hCrossSectionZMPolPS->SetBinContent(i, j, hCrossSectionMZPolPS->GetBinContent(j, i));
+      }
+    }
+
+    samplerElemS = new UpcSampler();
+    samplerElemS->setSeed(seed);
+    samplerElemS->setDistr2D(hCrossSectionZMPolS, nz, nm);
+    samplerElemS->setXGrid(zGrid);
+    samplerElemS->setYGrid(mGrid);
+
+    samplerElemPS = new UpcSampler();
+    samplerElemPS->setSeed(seed);
+    samplerElemPS->setDistr2D(hCrossSectionZMPolPS, nz, nm);
+    samplerElemPS->setXGrid(zGrid);
+    samplerElemPS->setYGrid(mGrid);
+  }
+
+  // generationg events
+  // -----------------------------------------------------------------------
 
 #ifndef USE_HEPMC
   // initialize file output
@@ -398,43 +497,27 @@ void UpcGenerator::generateEvents()
       PLOG_INFO << "Event number: " << evt + 1;
     }
 
-    double yPair;
-    double mPair;
+    // pick pair m and y from nuclear cross section
+    int yPairBin;
+    int mPairBin;
+    samplerNuc->sample2D(mPairBin, yPairBin);
+    double mPair = mGrid[mPairBin];
+    double yPair = yGrid[yPairBin];
 
-    hNucCSYM->GetRandom2(yPair, mPair);
-
-    TH1D* hCSSliceAtM;
-    if (!usePolarizedCS) {
-      int binM = hCrossSectionMZ->GetXaxis()->FindBin(mPair);
-      hCSSliceAtM = hCrossSectionMZ->ProjectionY("sliceM", binM, binM);
-    } else {
-      int frBinY = hPolCSRatio->GetXaxis()->FindBin(yPair);
-      int frBinM = hPolCSRatio->GetYaxis()->FindBin(mPair);
-      double frac = hPolCSRatio->GetBinContent(frBinM, frBinY);
+    // pick z = cos(theta) for corresponding m from elem. cross section
+    double cost;
+    if (usePolarizedCS) {
+      double frac = hPolCSRatio[yPairBin][mPairBin];
       bool pickScalar = gRandom->Uniform(0, 1) < frac;
       if (pickScalar) {
-        int binM = hCrossSectionMZPolS->GetXaxis()->FindBin(mPair);
-        hCSSliceAtM = hCrossSectionMZPolS->ProjectionY("sliceM", binM, binM);
+        samplerElemS->sampleXAtY(mPairBin, cost);
       } else {
-        int binM = hCrossSectionMZPolPS->GetXaxis()->FindBin(mPair);
-        hCSSliceAtM = hCrossSectionMZPolPS->ProjectionY("sliceM", binM, binM);
+        samplerElemPS->sampleXAtY(mPairBin, cost);
       }
+    } else {
+      samplerElem->sampleXAtY(mPairBin, cost);
     }
 
-    if (doPtCut) {
-      int mBin = hNucCSYM->GetYaxis()->FindBin(mPair);
-      double zCut = cutsZ[mBin - 1];
-      int zCutBinUp = hCSSliceAtM->GetXaxis()->FindBin(zCut);
-      int zCutBinLow = hCSSliceAtM->GetXaxis()->FindBin(-zCut);
-      for (int zBin = zCutBinUp + 1; zBin <= hCSSliceAtM->GetNbinsX(); zBin++) {
-        hCSSliceAtM->SetBinContent(zBin, 0);
-      }
-      for (int zBin = 1; zBin < zCutBinLow; zBin++) {
-        hCSSliceAtM->SetBinContent(zBin, 0);
-      }
-    }
-
-    double cost = hCSSliceAtM->GetRandom();
     double theta = TMath::ACos(cost);
     double phi = gRandom->Uniform(0., 2. * M_PI);
 
@@ -474,7 +557,6 @@ void UpcGenerator::generateEvents()
     statuses.clear();
     mothers.clear();
     particles.clear();
-    delete hCSSliceAtM;
   }
 
 #ifndef USE_HEPMC

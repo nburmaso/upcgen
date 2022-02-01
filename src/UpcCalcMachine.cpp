@@ -357,10 +357,10 @@ void UpcCalcMachine::fillCrossSectionMZ(TH2D* hCrossSectionMZ,
   double dm = (mmax - mmin) / nm;
   double dz = (zmax - zmin) / nz;
   double cs;
-  for (int im = 0; im <= nm; im++) {
-    m = mmin + dm * im;
-    for (int iz = 0; iz <= nz; iz++) {
-      z = zmin + dz * iz;
+  for (int im = 1; im <= nm; im++) {
+    m = mmin + dm * (im - 1);
+    for (int iz = 1; iz <= nz; iz++) {
+      z = zmin + dz * (iz - 1);
       if (flag == 0) { // the usual unpolarized cross section
         cs = calcCrossSectionMZ(m, z);
       }
@@ -613,7 +613,7 @@ void UpcCalcMachine::prepareTwoPhotonLumi()
   }
 }
 
-void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRatio)
+void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
 {
   PLOG_INFO << "Calculating nuclear cross section for a_lep = " << aLep;
 
@@ -628,10 +628,6 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRa
   auto* f2DLumi = new TFile(fname, "r");
 
   if (usePolarizedCS) {
-    if (!hPolCSRatio) {
-      PLOG_FATAL << "hPolRatio is not initialized!";
-      std::_Exit(-1);
-    }
     hD2LDMDY_s = (TH2D*)f2DLumi->Get("hD2LDMDY_s");
     hD2LDMDY_p = (TH2D*)f2DLumi->Get("hD2LDMDY_p");
   } else { // loading pre-cached two-photon luminosity
@@ -647,7 +643,7 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRa
   double cs[nm][ny];
   double cs_rat[nm][ny];
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)                                                   \
+#pragma omp parallel default(none)                                                                 \
   shared(cs, cs_rat, hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy, ib) \
     firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
@@ -711,12 +707,10 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, TH2D* hPolCSRa
       hCrossSectionYM->SetBinContent(j + 1, i + 1, cs_ij);
       if (usePolarizedCS) {
         double rat_ij = (cs_rat[i][j] + cs_rat[i + 1][j] + cs_rat[i][j + 1] + cs_rat[i + 1][j + 1]) / 4.;
-        hPolCSRatio->SetBinContent(j + 1, i + 1, rat_ij);
+        hPolCSRatio[j][i] = rat_ij;
       }
     }
   }
-
-  hCrossSectionYM->Scale(1e-6); // nb -> mb
 
   PLOG_INFO << "Total nuclear cross section = " << cssum * 1e-6 << " mb";
 }
