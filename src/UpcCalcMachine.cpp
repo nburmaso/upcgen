@@ -33,8 +33,8 @@ double UpcCalcMachine::R = 6.68;
 double UpcCalcMachine::a = 0.447;
 int UpcCalcMachine::Z = 82;
 double UpcCalcMachine::sqrts = 5020;
-double UpcCalcMachine::g1 = sqrts / (2. * mProt);
-double UpcCalcMachine::g2 = sqrts / (2. * mProt);
+double UpcCalcMachine::g1 = sqrts / (2. * phys_consts::mProt);
+double UpcCalcMachine::g2 = sqrts / (2. * phys_consts::mProt);
 int UpcCalcMachine::debug = 0;
 double* UpcCalcMachine::vCachedFormFac = new double[UpcCalcMachine::nQ2];
 
@@ -42,15 +42,40 @@ UpcCalcMachine::UpcCalcMachine()
 {
   constexpr int nbc = 10000000;
   vCachedBreakup = new double[nbc];
-};
+}
 
 UpcCalcMachine::~UpcCalcMachine() = default;
+
+void UpcCalcMachine::setElemProcess(int procID)
+{
+  switch (procID) {
+    case 10: { // dielectron photoproduction
+      int pdg = 11;
+      elemProcess = new UpcTwoPhotonDilep(pdg);
+      break;
+    }
+    case 11: { // dimuon photoproduction
+      int pdg = 13;
+      elemProcess = new UpcTwoPhotonDilep(pdg);
+      break;
+    }
+    case 12: { // dimuon photoproduction
+      int pdg = 15;
+      elemProcess = new UpcTwoPhotonDilep(pdg);
+      break;
+    }
+    default: {
+      PLOG_FATAL << "Unknown process ID! Check manual and enter a correct ID! Exiting...";
+      std::_Exit(-1);
+    }
+  }
+}
 
 void UpcCalcMachine::init()
 {
   PLOG_INFO << "Initializing caches ...";
   // update scaling factor
-  factor = Z * Z * alpha / M_PI / M_PI / hc / hc;
+  factor = Z * Z * phys_consts::alpha / M_PI / M_PI / phys_consts::hc / phys_consts::hc;
 
   // calculate Woods-Saxon rho0 from R and a
   rho0 = calcWSRho();
@@ -93,7 +118,7 @@ double UpcCalcMachine::fluxPoint(const double b, const double k)
 {
   // flux divided by k
   double g = g1;
-  double x = b * k / g / hc;
+  double x = b * k / g / phys_consts::hc;
   double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
   double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
   double result = factor * k / g / g * (K1 * K1 + K0 * K0 / g / g);
@@ -116,7 +141,7 @@ double UpcCalcMachine::fluxFormInt(double* x, double* par)
 
   double t = k * k + w * w / g / g;
   double ff = getCachedFormFac(t);
-  double result = k * k * ff / t * TMath::BesselJ1(b * k / hc);
+  double result = k * k * ff / t * TMath::BesselJ1(b * k / phys_consts::hc);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
   }
@@ -155,8 +180,8 @@ double UpcCalcMachine::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, con
 
   double b1min = isPoint ? 1 * R : 0.05 * R;
   double b2min = isPoint ? 1 * R : 0.05 * R;
-  double b1max = TMath::Max(5. * g1 * hc / k1, 5 * R);
-  double b2max = TMath::Max(5. * g2 * hc / k2, 5 * R);
+  double b1max = TMath::Max(5. * g1 * phys_consts::hc / k1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * phys_consts::hc / k2, 5 * R);
   double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
   double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
 
@@ -197,58 +222,6 @@ double UpcCalcMachine::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, con
   return lumi;
 }
 
-double UpcCalcMachine::calcCrossSectionMPolS(double m)
-{
-  double r = 2 * mLep / m;
-  double r2 = r * r;
-  double r4 = r2 * r2;
-  if (r > 1) {
-    return 0;
-  }
-  double cs_s = 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 3. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 3. / 2. * r * r) * sqrt(1 - r * r));
-  return cs_s;
-  // fm^2 //
-}
-
-double UpcCalcMachine::calcCrossSectionMZPolS(double m, double z)
-{
-  double mLep2 = mLep * mLep;
-  double m2 = m * m;
-  double z2 = z * z;
-  double cs_s = 2 * M_PI * alpha * alpha;
-  cs_s *= m2 - 4 * mLep2;
-  cs_s *= sqrt(m2 - 4 * mLep2);
-  cs_s *= (4 * mLep2 * (3 - 2 * z2 + z2 * z2)) + m2 * (1 - z2 * z2);
-  cs_s /= m2 * m * (m2 * (1 - z2) + 4 * mLep2 * z2) * (m2 * (1 - z2) + 4 * mLep2 * z2);
-  return cs_s;
-  // GeV^-2 //
-}
-
-double UpcCalcMachine::calcCrossSectionMPolPS(double m)
-{
-  double r = 2 * mLep / m;
-  double r2 = r * r;
-  double r4 = r2 * r2;
-  if (r > 1) {
-    return 0;
-  }
-  return 4 * M_PI * alpha * alpha * hc * hc / m / m * ((1 + r * r - 1. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 1. / 2. * r * r) * sqrt(1 - r * r));
-  // fm^2 //
-}
-
-double UpcCalcMachine::calcCrossSectionMZPolPS(double m, double z)
-{
-  double mLep2 = mLep * mLep;
-  double m2 = m * m;
-  double z2 = z * z;
-  double cs_s = 2 * M_PI * alpha * alpha;
-  cs_s *= sqrt(m2 - 4 * mLep2);
-  cs_s *= m2 * m2 * (1 - z2 * z2) + 8 * m2 * mLep2 * (1 - z2 + z2 * z2) - 16 * mLep2 * mLep2 * (1 - z2) * (1 - z2);
-  cs_s /= m2 * m * (m2 * (1 - z2) + 4 * mLep2 * z2) * (m2 * (1 - z2) + 4 * mLep2 * z2);
-  return cs_s;
-  // GeV^-2 //
-}
-
 void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
 {
   double k1 = M / 2. * exp(Y);
@@ -256,8 +229,8 @@ void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, doub
 
   double b1min = isPoint ? 1 * R : 0.05 * R;
   double b2min = isPoint ? 1 * R : 0.05 * R;
-  double b1max = TMath::Max(5. * g1 * hc / k1, 5 * R);
-  double b2max = TMath::Max(5. * g2 * hc / k2, 5 * R);
+  double b1max = TMath::Max(5. * g1 * phys_consts::hc / k1, 5 * R);
+  double b2max = TMath::Max(5. * g2 * phys_consts::hc / k2, 5 * R);
   double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
   double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
 
@@ -309,45 +282,6 @@ void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, doub
   np = 2 * M_PI * M_PI * M * sum_b1_p;
 }
 
-double UpcCalcMachine::calcCrossSectionMZ(double m, double z)
-{
-  double s = m * m;
-  double k = TMath::Sqrt(s) / 2.;              // photon/lepton energy in cm system in GeV
-  double p = TMath::Sqrt(k * k - mLep * mLep); // outgoing lepton momentum in GeV
-  double norm = 2 * M_PI * alpha * alpha / s * p / k;
-  double kt = -2 * k * (k - z * p) / mLep / mLep;
-  double ku = -2 * k * (k + z * p) / mLep / mLep;
-  double ks = kt + ku;
-  double kp = kt * ku;
-  double kq = 1. / kt + 1. / ku;
-  double kr = ku / kt + kt / ku;
-  double cs = 0;
-  cs += -8. * (4. * kq * kq + 4. * kq - kr);
-  cs += 16. * (2. + kr) * aLep;
-  cs += 4. * (2. - 4. * ks + kr) * aLep * aLep;
-  cs += -8. * (2. + 2. * ks + kr) * aLep * aLep * aLep;
-  cs += -4. * (4. + 2. * ks + 2. * kr - kp) * aLep * aLep * aLep * aLep;
-  cs *= norm;
-  return cs; // [GeV^-2]
-}
-
-double UpcCalcMachine::calcCrossSectionM(double m)
-{
-  double s = m * m;               // cms invariant mass squared
-  double x = 4 * mLep * mLep / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
-  double b = TMath::Sqrt(1 - x);  // lepton relativistic velocity in cms
-  double y = atanh(b);            // lepton rapidity in cms
-  double cs = 0;
-  cs += (2 + 2 * x - x * x) * y - b * (1 + x);
-  cs += 4 * y * aLep;
-  cs += (4 * b / x + y) * aLep * aLep;
-  cs += (4 * b / x - 2 * y) * aLep * aLep * aLep;
-  cs += ((7. / 12.) * b / x + (1. / 6.) * b / x / x - 0.5 * y) * aLep * aLep * aLep * aLep;
-  cs *= 4 * hc * hc * 1e7 * alpha * alpha * M_PI / s;
-  return cs;
-  // [nb] //
-}
-
 void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
                                         double zmin, double zmax, int nz,
                                         double mmin, double mmax, int nm,
@@ -362,41 +296,26 @@ void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
     for (int iz = 1; iz <= nz; iz++) {
       z = zmin + dz * (iz - 1);
       if (flag == 0) { // the usual unpolarized cross section
-        cs = calcCrossSectionMZ(m, z);
+        cs = elemProcess->calcCrossSectionZM(z, m);
       }
       if (flag == 1) { // scalar part
-        cs = calcCrossSectionMZPolS(m, z);
+        cs = elemProcess->calcCrossSectionZMPolS(z, m);
       }
       if (flag == 2) { // pseudoscalar part
-        cs = calcCrossSectionMZPolPS(m, z);
+        cs = elemProcess->calcCrossSectionZMPolPS(z, m);
       }
       hCrossSectionZM->SetBinContent(iz, im, cs);
     }
   }
-  double scalingFactor = hc * hc * 1e7; // to [nb]
+  double scalingFactor = phys_consts::hc * phys_consts::hc * 1e7; // to [nb]
   hCrossSectionZM->Scale(scalingFactor / dm);
-}
-
-void UpcCalcMachine::fillCrossSectionM(TH1D* hCrossSectionM,
-                                       double mmin, double mmax, int nm)
-{
-  double m;
-  double dm = (mmax - mmin) / nm;
-  double cs;
-  for (int im = 0; im <= nm; im++) {
-    m = mmin + dm * im;
-    cs = calcCrossSectionM(m);
-    hCrossSectionM->SetBinContent(im, cs);
-  }
-  double scalingFactor = hc * hc * 1e7; // to [nb]
-  hCrossSectionM->Scale(scalingFactor);
 }
 
 void UpcCalcMachine::prepareGAA()
 {
   double bmax = 20;
   double db = bmax / (nb - 1);
-  double ssm = pow(sqrts, 2) / pow(2 * mProt + 2.1206, 2);
+  double ssm = pow(sqrts, 2) / pow(2 * phys_consts::mProt + 2.1206, 2);
   double csNN = 0.1 * (34.41 + 0.2720 * pow(log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
   // calculate rho and TA
   double TAb[nb];
@@ -466,7 +385,7 @@ double UpcCalcMachine::getCachedBreakupProb(double b)
 
 double UpcCalcMachine::calcFormFac(double Q2)
 {
-  double Q = sqrt(Q2) / hc;
+  double Q = sqrt(Q2) / phys_consts::hc;
   double coshVal = TMath::CosH(M_PI * Q * a);
   double sinhVal = TMath::SinH(M_PI * Q * a);
   double ff = 4 * M_PI * M_PI * rho0 * a * a * a / (Q * a * Q * a * sinhVal * sinhVal) *
@@ -615,7 +534,7 @@ void UpcCalcMachine::prepareTwoPhotonLumi()
 
 void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
 {
-  PLOG_INFO << "Calculating nuclear cross section for a_lep = " << aLep;
+  PLOG_INFO << "Calculating nuclear cross section";
 
   double dy = (ymax - ymin) / (ny - 1);
   double dm = (mmax - mmin) / (nm - 1);
@@ -643,9 +562,9 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<
   double cs[nm][ny];
   double cs_rat[nm][ny];
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)                                                                 \
+#pragma omp parallel default(none)                                                   \
   shared(cs, cs_rat, hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy, ib) \
-    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
+    firstprivate(elemProcess, nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
   {
     vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
     vector<vector<double>> rat_private(nm, vector<double>(ny, 0));
@@ -666,10 +585,10 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<
       for (iy = 0; iy < ny; iy++) {
         if (!usePolarizedCS) { // unpolarized cross section
           double lumi = hD2LDMDY_private->GetBinContent(im, iy);
-          cs_private[im][iy] = calcCrossSectionM(m) * lumi;
+          cs_private[im][iy] = elemProcess->calcCrossSectionM(m) * lumi;
         } else { // polarized
-          double cs_s = calcCrossSectionMPolS(m);
-          double cs_p = calcCrossSectionMPolPS(m);
+          double cs_s = elemProcess->calcCrossSectionMPolS(m);
+          double cs_p = elemProcess->calcCrossSectionMPolPS(m);
           double lumi_s = hD2LDMDY_private_s->GetBinContent(im, iy);
           double lumi_p = hD2LDMDY_private_p->GetBinContent(im, iy);
           double nuccs_s = lumi_s * cs_s; // scalar part
@@ -1002,7 +921,7 @@ double UpcCalcMachine::getPhotonPt(double ePhot)
   double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
 
   double x = gRandom->Uniform(0, 1);
-  double pp = x * 5. * hc / R;
+  double pp = x * 5. * phys_consts::hc / R;
   arg = pp * pp + ereds;
   double sFFactPt1 = getCachedFormFac(arg);
   double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (pi2x4 * arg * arg);
@@ -1014,7 +933,7 @@ double UpcCalcMachine::getPhotonPt(double ePhot)
       satisfy = true;
     } else {
       x = gRandom->Uniform(0, 1);
-      pp = x * 5 * hc / R;
+      pp = x * 5 * phys_consts::hc / R;
       arg = pp * pp + ereds;
       double sFFactPt2 = getCachedFormFac(arg);
       test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);

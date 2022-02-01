@@ -19,10 +19,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-// helper class for calculations
+/// helper class for calculations
 
 #ifndef UPCGENERATOR_INCLUDE_UPCCALCMACHINE_H_
 #define UPCGENERATOR_INCLUDE_UPCCALCMACHINE_H_
+
+#include "UpcPhysConstants.h"
+#include "UpcElemProcess.h"
+#include "UpcTwoPhotonDilep.h"
 
 #include "TClonesArray.h"
 #include "TF1.h"
@@ -58,9 +62,9 @@ class UpcCalcMachine
   ~UpcCalcMachine();
 
   // physics constants
-  constexpr static double alpha{1.0 / 137.035999074}; // fine structure constant
-  constexpr static double hc{0.1973269718};           // scaling factor
-  constexpr static double mProt{0.9382720813};        // proton mass
+  // constexpr static double alpha{1.0 / 137.035999074}; // fine structure constant
+  // constexpr static double hc{0.1973269718};           // scaling factor
+  // constexpr static double mProt{0.9382720813};        // proton mass
 
   // Woods-Saxon parameters
   static double rho0; // fm-3
@@ -70,10 +74,6 @@ class UpcCalcMachine
   // parameters of the nucleus
   static int Z;
   int A{208};
-
-  // lepton parameters
-  double mLep{1.77682}; // tau by default
-  double aLep{0};       // lepton anomalous magnetic moment
 
   // beam parameters
   static double sqrts;
@@ -122,7 +122,7 @@ class UpcCalcMachine
   int ny{121};       // n bins in Y
 
   // scaling factor
-  double factor{Z * Z * alpha / M_PI / M_PI / hc / hc};
+  double factor{Z * Z * phys_consts::alpha / M_PI / M_PI / phys_consts::hc / phys_consts::hc};
 
   // helper containers for calculations
   // ----------------------------------------------------------------------
@@ -158,6 +158,10 @@ class UpcCalcMachine
   // openmp: n threads
   int numThreads{1};
 
+  // elementary process setter
+  void setElemProcess(int procID);
+  UpcElemProcess* elemProcess;
+
   void init();
 
   // methods for cross section calculation
@@ -182,33 +186,14 @@ class UpcCalcMachine
   // two-photon luminosity
   double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
-  // polarized elementary cross sections
-  double calcCrossSectionMZPolS(double m, double z);
-
-  double calcCrossSectionMPolS(double m);
-
-  double calcCrossSectionMZPolPS(double m, double z);
-
-  double calcCrossSectionMPolPS(double m);
-
   // two-photon luminosity for scalar part
   void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // elementary cross section for dilepton production in MZ space
-  double calcCrossSectionMZ(double m, double z);
-
-  // elementary cross section for dilepton production in M space
-  double calcCrossSectionM(double m);
 
   // histogram filler for MZ-cross section
   void fillCrossSectionZM(TH2D* hCrossSectionZM,
                           double mmin, double mmax, int nm,
                           double zmin, double zmax, int nz,
                           int flag);
-
-  // histogram filler for M-cross section
-  void fillCrossSectionM(TH1D* hCrossSectionM,
-                         double mmin, double mmax, int nm);
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity

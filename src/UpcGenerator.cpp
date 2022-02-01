@@ -20,21 +20,16 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "UpcGenerator.h"
+#include "UpcPhysConstants.h"
 #include "UpcSampler.h"
 
 using namespace std;
 
 // out-of-line initialization for static members
 int UpcGenerator::debug = 0;
-std::map<int, double> UpcGenerator::lepMassMap;
 
 UpcGenerator::UpcGenerator()
 {
-  // populating lepton mass map
-  // data from PDG
-  lepMassMap[11] = 0.000510998946;
-  lepMassMap[13] = 0.1056583745;
-  lepMassMap[15] = 1.77686;
   calcMachine = new UpcCalcMachine();
 }
 
@@ -42,10 +37,18 @@ void UpcGenerator::init()
 {
   // get parameters from file
   initGeneratorFromFile();
+  PLOG_WARNING << "Check inputs:";
+  printParameters();
 
-  calcMachine->mLep = lepMassMap[lepPDG];
   calcMachine->numThreads = numThreads;
   calcMachine->init();
+  calcMachine->setElemProcess(procID);
+
+  // if not dummy, set for dilepton photoproduction
+  if (aLep > -9999 && (procID >= 10 && procID <= 12)) {
+    auto* proc = (UpcTwoPhotonDilep*)calcMachine->elemProcess;
+    proc->aLep = aLep;
+  }
 
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
@@ -74,9 +77,6 @@ void UpcGenerator::init()
   if (!isPythiaUsed) {
     PLOG_WARNING << "Decays with Pythia are not used!";
   }
-
-  PLOG_WARNING << "Check inputs:";
-  printParameters();
 }
 
 UpcGenerator::~UpcGenerator() = default;
@@ -99,14 +99,14 @@ void UpcGenerator::initGeneratorFromFile()
       }
       if (parameter == parDict.inCMSqrtS) {
         UpcCalcMachine::sqrts = stod(parValue);
-        UpcCalcMachine::g1 = UpcCalcMachine::sqrts / (2. * UpcCalcMachine::mProt);
-        UpcCalcMachine::g2 = UpcCalcMachine::sqrts / (2. * UpcCalcMachine::mProt);
+        UpcCalcMachine::g1 = UpcCalcMachine::sqrts / (2. * phys_consts::mProt);
+        UpcCalcMachine::g2 = UpcCalcMachine::sqrts / (2. * phys_consts::mProt);
       }
-      if (parameter == parDict.inLepPDG) {
-        lepPDG = stoi(parValue);
+      if (parameter == parDict.inProcID) {
+        procID = stoi(parValue);
       }
       if (parameter == parDict.inLepA) {
-        calcMachine->aLep = stod(parValue);
+        aLep = stod(parValue);
       }
       if (parameter == parDict.inDoPtCut) {
         doPtCut = stoi(parValue);
@@ -195,8 +195,8 @@ void UpcGenerator::printParameters()
   PLOG_WARNING << "WS_A " << UpcCalcMachine::a;
   PLOG_WARNING << "(CALCULATED) WS_RHO0 " << UpcCalcMachine::rho0;
   PLOG_WARNING << "SQRTS " << UpcCalcMachine::sqrts;
-  PLOG_WARNING << "LEP_PDG " << lepPDG;
-  PLOG_WARNING << "LEP_A " << calcMachine->aLep;
+  PLOG_WARNING << "PROC_ID " << procID;
+  PLOG_WARNING << "LEP_A " << aLep;
   PLOG_WARNING << "NEVENTS " << nEvents;
   PLOG_WARNING << "DO_PT_CUT " << doPtCut;
   PLOG_WARNING << "PT_MIN " << minPt;
@@ -314,8 +314,9 @@ void UpcGenerator::generateEvents()
   double ymax = calcMachine->ymax;
   double dy = (ymax - ymin) / ny;
 
-  double aLep = calcMachine->aLep;
-  double mLep = calcMachine->mLep;
+  // mass of a particle in final state
+  double mPart = calcMachine->elemProcess->mPart;
+  int partPDG = calcMachine->elemProcess->partPDG;
 
   if (usePolarizedCS) {
     hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", ";m [gev]; z; cs [nb/gev]",
@@ -346,15 +347,11 @@ void UpcGenerator::generateEvents()
   }
   calcMachine->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
 
-  if (debug > 0) {
-    PLOG_DEBUG << "a_lep = " << aLep << ", min. pt = " << minPt;
-  }
-
   vector<double> cutsZ(hNucCSYM->GetNbinsY());
   if (doPtCut) {
     for (int mBin = 1; mBin <= nm; mBin++) {
       double mass = hNucCSYM->GetYaxis()->GetBinLowEdge(mBin);
-      double sqt = TMath::Sqrt(mass * mass * 0.25 - mLep * mLep);
+      double sqt = TMath::Sqrt(mass * mass * 0.25 - mPart * mPart);
       if (sqt <= minPt) {
         cutsZ[mBin - 1] = 0;
         for (int yBin = 1; yBin <= ny; yBin++) {
@@ -455,8 +452,8 @@ void UpcGenerator::generateEvents()
 #ifndef USE_HEPMC
   // initialize file output
   PLOG_WARNING << "Using ROOT tree for output!";
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.root", aLep, minPt);
-  mOutFile = new TFile(Form("events_%.3f_%.0f.root", aLep, minPt), "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
+  PLOG_INFO << "Events will be written to " << "events.root";
+  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
   mOutTree = new TTree("particles", "Generated particles");
   mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
   mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
@@ -470,8 +467,8 @@ void UpcGenerator::generateEvents()
   mOutTree->SetAutoSave(0);
 #else
   PLOG_WARNING << "Using HepMC format for output!";
-  PLOG_INFO << "Events will be written to " << Form("events_%.3f_%.0f.hepmc", aLep, minPt);
-  writerHepMC = new HepMC3::WriterAscii(Form("events_%.3f_%.0f.hepmc", aLep, minPt));
+  PLOG_INFO << "Events will be written to " << "events.hepmc";
+  writerHepMC = new HepMC3::WriterAscii("events.hepmc");
 #endif
 
   PLOG_INFO << "Generating " << nEvents << " events...";
@@ -509,12 +506,12 @@ void UpcGenerator::generateEvents()
 
     TLorentzVector pPair;
     calcMachine->getPairMomentum(mPair, yPair, pPair);
-    double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mLep * mLep);
+    double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
     TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
     TLorentzVector tlLep1, tlLep2;
-    tlLep1.SetVectM(vLep, mLep);
-    tlLep2.SetVectM(-vLep, mLep);
+    tlLep1.SetVectM(vLep, mPart);
+    tlLep2.SetVectM(-vLep, mPart);
     particles.emplace_back(tlLep1);
     particles.emplace_back(tlLep2);
 
@@ -523,8 +520,8 @@ void UpcGenerator::generateEvents()
     particles[1].Boost(boost);
 
     int sign = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
-    pdgs.emplace_back(sign * lepPDG);
-    pdgs.emplace_back(-sign * lepPDG);
+    pdgs.emplace_back(sign * partPDG);
+    pdgs.emplace_back(-sign * partPDG);
     mothers.emplace_back(-1);
     mothers.emplace_back(-1);
     statuses.emplace_back(23);

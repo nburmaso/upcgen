@@ -68,8 +68,8 @@ NUCLEUS_A 208      # atomic mass of the incoming nuclei
 WS_R 6.68          # Woods-Saxon parameters: R
 WS_A 0.447         #                         a
 SQRTS 5020         # sqrt(s) in the CM frame
-LEP_PDG 15         # lepton code according to Monte Carlo numbering scheme from PDG
-LEP_A 0            # lepton anomalous magnetic moment
+PROC_ID 12         # process ID -- see list of available processes below
+LEP_A 0            # lepton anomalous magnetic moment -- used in case if dilepton photoproduction is chosen
 NEVENTS 1000       # number of events to be generated
 DO_PT_CUT 0        # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0           # pt cut
@@ -95,16 +95,24 @@ PYTHIA8_DECAYS 0   # For Pythia8 only: switch to turn on/off lepton decays
 SEED 0             # Seed for random numbers generator. '0' -> random seed
 ```
 
-* Note that the order, and the number of the parameters are not fixed.
-* If a parameter is not specified by user, the default value will be used.
-* IMPORTANT: make sure that you have built the generator with support of a desired Pythia version,
-that you are going to pass via `PYTHIA_VERSION`
-* Note that `PYTHIA8_FSR` and `PYTHIA8_DECAYS` only work for Pythia8. Decays are always enabled if
-the generator runs with Pythia6.
+### List of available processes
 
-### Tips
+| ID | Process |
+|----|---------|
+|`10`| Dielectron photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;e^{&plus;}e^{-}) |
+|`11`| Dimuon photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\mu^{&plus;}\mu^{-}) |
+|`12`| Ditau photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\tau^{&plus;}\tau^{-}) |
+
+### Tips and notes
 
 * The generator calculates two-photon luminosity and caches it into `twoPhotonLumi.root` (or `twoPhotonLumiPol.root`
 for the polarized cross section). This file will be picked automatically if found. The calculation process 
 may take a lot of time, so you may want to keep pre-calculated grid for further usage. Note that you need to 
 recalculate it in case if you have changed grid input parameters (e.g., binning and/or range in M/Y).
+* At the moment, polarized cross section is only supported for dileptons. 
+* Note that the order, and the number of the parameters are not fixed.
+* If a parameter is not specified by user, the default value will be used.
+* IMPORTANT: make sure that you have built the generator with support of a desired Pythia version,
+  that you are going to pass via `PYTHIA_VERSION`
+* Note that `PYTHIA8_FSR` and `PYTHIA8_DECAYS` only work for Pythia8. Decays are always enabled if
+  the generator runs with Pythia6.

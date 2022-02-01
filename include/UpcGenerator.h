@@ -69,14 +69,16 @@ class UpcGenerator
   UpcGenerator();
   ~UpcGenerator();
 
+  // process-specific parameters
+  int procID;
+  double aLep{-9999}; // dummy value
+
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
   bool usePolarizedCS{false};
   long int seed{0};
   int nEvents{1000};
-  int lepPDG{15};
-  static std::map<int, double> lepMassMap;
 
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???
@@ -86,7 +88,7 @@ class UpcGenerator
     string inWSRadius{"WS_R"};
     string inWSA{"WS_A"};
     string inCMSqrtS{"SQRTS"};
-    string inLepPDG{"LEP_PDG"};
+    string inProcID{"PROC_ID"};
     string inLepA{"LEP_A"};
     string inDoPtCut{"DO_PT_CUT"};
     string inNEvents{"NEVENTS"};
