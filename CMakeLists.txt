@@ -20,12 +20,22 @@
 ##########################################################################
 
 cmake_minimum_required(VERSION 2.8)
+
+set(CMAKE_C_COMPILER "clang")
+set(CMAKE_CXX_COMPILER "clang++")
+
 project(UpcGenerator)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
-option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" OFF)
+# debug build
+# set(CMAKE_BUILD_TYPE Debug)
+# set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+# set(CMAKE_CXX_FLAGS_DEBUG "-g")
+# set(CMAKE_CXX_FLAGS "-O0")
+
+option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" ON)
+option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" ON)
 option(BUILD_WITH_OPENMP "Build with OpenMP support" ON)
 option(BUILD_WITH_HEPMC "Build with HepMC output support" OFF)
 

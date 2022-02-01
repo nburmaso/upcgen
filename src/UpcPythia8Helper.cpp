@@ -44,6 +44,13 @@ void UpcPythia8Helper::init()
     mPythia8->readString("ProcessLevel:all = off");
     mPythia8->readString("PartonShowers:Model = 1");
   }
+  if (mSeed == 0) {
+    mPythia8->readString("Random:setSeed = on");
+    mPythia8->readString("Random:seed = 0");
+  } else {
+    mPythia8->readString("Random:setSeed = off");
+    mPythia8->readString(Form("Random:seed = %ld", mSeed));
+  }
   mPythia8->readString("SoftQCD:elastic = on");
   mPythia8->init();
 }

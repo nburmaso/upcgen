@@ -8,7 +8,7 @@ This is a simple event generator dedicated to dilepton production process in ult
 also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support. Note that Pythia is
 only used for tau decays and completely optional
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
-* CMAKE 2.8 (or newer) & gcc 4.8.5 (or newer)
+* CMAKE 2.8 (or newer) & compiler with support of C++11
 * HepMC: It is possible to use HepMC output format. Source code and installation instructions 
 can be obtained from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
 * Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
@@ -63,30 +63,36 @@ Input parameters can be specified in the `parameters.in` file. The example can b
 repository. Available parameters are the following:
 
 ```
-NUCLEUS_Z 82      # atomic number of the incoming nuclei
-NUCLEUS_A 208     # atomic mass of the incoming nuclei
-WS_R 6.68         # Woods-Saxon parameters: R
-WS_A 0.447        #                         a
-SQRTS 5020        # sqrt(s) in the CM frame
-LEP_PDG 15        # lepton code according to Monte Carlo numbering scheme from PDG
-LEP_A 0           # lepton anomalous magnetic moment
-NEVENTS 1000      # number of events to be generated
-DO_PT_CUT 0       # enable pt cut: 0 -- off, 1 -- on
-PT_MIN 0          # pt cut
-ZMIN -1           # min. z = cos(theta) for the elementary cross section
-ZMAX 1            # max. z = cos(theta) for the elementary cross section
-MMIN 3.56         # min. m for the elementary/nuclear cross section
-MMAX 50           # max. m for the elementary/nuclear cross section
-YMIN -6           # min. y for the nuclear cross section
-YMAX 6            # max. y for the nuclear cross section
-BINS_Z 100        # cross section binnings: bins for z
-BINS_M 1001       #                         bins for m
-BINS_Y 121        #                         bins for y
-FLUX_POINT 1      # use point flux approximation or not
-PYTHIA_VERSION 8  # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
-PYTHIA8_FSR 0     # For Pythia8 only: simulate final state radiation (EM showers)
-PYTHIA8_DECAYS 0  # For Pythia8 only: switch to turn on/off lepton decays
-SEED -1           # Seed for random numbers generator. '-1' -> random seed
+NUCLEUS_Z 82       # atomic number of the incoming nuclei
+NUCLEUS_A 208      # atomic mass of the incoming nuclei
+WS_R 6.68          # Woods-Saxon parameters: R
+WS_A 0.447         #                         a
+SQRTS 5020         # sqrt(s) in the CM frame
+LEP_PDG 15         # lepton code according to Monte Carlo numbering scheme from PDG
+LEP_A 0            # lepton anomalous magnetic moment
+NEVENTS 1000       # number of events to be generated
+DO_PT_CUT 0        # enable pt cut: 0 -- off, 1 -- on
+PT_MIN 0           # pt cut
+ZMIN -1            # min. z = cos(theta) for the elementary cross section
+ZMAX 1             # max. z = cos(theta) for the elementary cross section
+MMIN 3.56          # min. m for the elementary/nuclear cross section
+MMAX 50            # max. m for the elementary/nuclear cross section
+YMIN -6            # min. y for the nuclear cross section
+YMAX 6             # max. y for the nuclear cross section
+BINS_Z 100         # cross section binnings: bins for z
+BINS_M 1001        #                         bins for m
+BINS_Y 121         #                         bins for y
+FLUX_POINT 1       # use point flux approximation or not
+BREAKUP_MODE 1     # 1 -- nuclear breakup is not accounted for
+                   # 2 -- XNXN
+                   # 3 -- 0N0N
+                   # 4 -- 0NXN (+ XN0N)
+NON_ZERO_GAM_PT 0  # account for non-zero photon transverse momentum in photoproduction
+USE_POLARIZED_CS 0 # account for scalar and pseudoscalar parts of the cross section
+PYTHIA_VERSION 8   # Pythia version: 6, 8 or -1. -1 means that Pythia will not be used at all
+PYTHIA8_FSR 0      # For Pythia8 only: simulate final state radiation (EM showers)
+PYTHIA8_DECAYS 0   # For Pythia8 only: switch to turn on/off lepton decays
+SEED 0             # Seed for random numbers generator. '0' -> random seed
 ```
 
 * Note that the order, and the number of the parameters are not fixed.
@@ -98,7 +104,7 @@ the generator runs with Pythia6.
 
 ### Tips
 
-* The generator calculates two-photon luminosity and caches it into `hD2LDMDY.root`. 
-This file will be picked automatically if found. The calculation process may take a lot of time,
-so you may want to keep pre-calculated grid for further usage. Note that you need to recalculate
-it in case if you have changed grid input parameters (e.g., binning and/or range in M/Y).
+* The generator calculates two-photon luminosity and caches it into `twoPhotonLumi.root` (or `twoPhotonLumiPol.root`
+for the polarized cross section). This file will be picked automatically if found. The calculation process 
+may take a lot of time, so you may want to keep pre-calculated grid for further usage. Note that you need to 
+recalculate it in case if you have changed grid input parameters (e.g., binning and/or range in M/Y).

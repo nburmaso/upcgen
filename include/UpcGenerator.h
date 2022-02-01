@@ -24,6 +24,7 @@
 #ifndef UPCGENERATOR__UPCGENERATOR_H_
 #define UPCGENERATOR__UPCGENERATOR_H_
 
+#include "UpcCalcMachine.h"
 #include "UpcPythia8Helper.h"
 #include "UpcPythia6Helper.h"
 
@@ -68,6 +69,53 @@ class UpcGenerator
   UpcGenerator();
   ~UpcGenerator();
 
+  // simulation parameters
+  bool doPtCut{false};
+  double minPt{0};
+  bool usePolarizedCS{false};
+  long int seed{0};
+  int nEvents{1000};
+  int lepPDG{15};
+  static std::map<int, double> lepMassMap;
+
+  // parameters dictionary
+  // todo: use <any> from c++17 for a neat parsing???
+  struct InputPars {
+    string inNucZ{"NUCLEUS_Z"};
+    string inNucA{"NUCLEUS_A"};
+    string inWSRadius{"WS_R"};
+    string inWSA{"WS_A"};
+    string inCMSqrtS{"SQRTS"};
+    string inLepPDG{"LEP_PDG"};
+    string inLepA{"LEP_A"};
+    string inDoPtCut{"DO_PT_CUT"};
+    string inNEvents{"NEVENTS"};
+    string inLowPt{"PT_MIN"};
+    string inLowZ{"ZMIN"};
+    string inHiZ{"ZMAX"};
+    string inLowM{"MMIN"};
+    string inHiM{"MMAX"};
+    string inLowY{"YMIN"};
+    string inHiY{"YMAX"};
+    string inBinsZ{"BINS_Z"};
+    string inBinsM{"BINS_M"};
+    string inBinsY{"BINS_Y"};
+    string inFluxPoint{"FLUX_POINT"};
+    string inBreakupMode{"BREAKUP_MODE"};
+    string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
+    string inPolarized{"USE_POLARIZED_CS"};
+    string inPythiaVer{"PYTHIA_VERSION"};
+    string inPythia8FSR{"PYTHIA8_FSR"};
+    string inPythia8Decays{"PYTHIA8_DECAYS"};
+    string inSeed{"SEED"};
+  };
+
+  // debug level
+  static int debug;
+
+  // parse inputs, set flags, prepare caches...
+  void init();
+
   // debug level:
   //  0  -- no debug output
   //  >0 -- enable debug info
@@ -88,12 +136,7 @@ class UpcGenerator
   void generateEvents();
 
  private:
-  // internal methods for event treating
-  // ----------------------------------------------------------------------
-  void processInPythia(vector<int>& pdgs,
-                       vector<int>& statuses,
-                       vector<int>& mothers,
-                       vector<TLorentzVector>& particles);
+  UpcCalcMachine* calcMachine;
 
   // helper struct for file output
   struct {
@@ -134,159 +177,12 @@ class UpcGenerator
   // number of worker threads for OpenMP
   int numThreads{1};
 
-  // internal methods for calculations
+  // internal methods for event treating
   // ----------------------------------------------------------------------
-
-  // Simpson integrator
-  static double simpson(int n, double* v, double h);
-
-  // Woods-Saxon rho0 from normalization
-  double calcWSRho();
-
-  // photon fluxes
-  double fluxPoint(const double b, const double k, const double g);
-
-  static double fluxFormInt(double* x, double* par);
-
-  double fluxForm(const double b, const double k, const double g, TF1* fFluxForm);
-
-  // two-photon luminosity
-  double D2LDMDY(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
-
-  // elementary cross section for dilepton production in MZ space
-  double crossSectionMZ(double s, double z);
-
-  // elementary cross section for dilepton production in M space
-  double crossSectionM(double m);
-
-  // histogram filler for MZ-cross section
-  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
-                          double mmin, double mmax, int nm,
-                          double zmin, double zmax, int nz);
-
-  // histogram filler for M-cross section
-  void fillCrossSectionM(TH1D* hCrossSectionM,
-                         double mmin, double mmax, int nm);
-
-  // function to calculate nuclear cross section
-  // using 2D elementary cross section and 2-gamma luminosity
-  void nuclearCrossSectionYM(TH2D* hCrossSectionYM);
-
-  // nuclear form factor for momentum transfer q
-  static double nucFormFactor(double t);
-
-  // functions for calculating pair momentum
-  // accounting for non-zero photon pt
-  double getPhotonPt(double ePhot);
-  void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
-
-  // simulation & calculation parameters
-  // ----------------------------------------------------------------------
-  long seed{-1}; // seed for random numbers generator
-
-  int lepPDG{15};       // tau by default
-  double mLep{1.77682}; // tau by default
-  double aLep{0};       // lepton anomalous magnetic moment
-
-  // physics constants
-  const double alpha{1.0 / 137.035999074};  // fine structure constant
-  constexpr static double hc{0.1973269718}; // scaling factor
-  const double mProt{0.9382720813};         // proton mass
-
-  // Woods-Saxon parameters
-  static double rho0; // fm-3
-  static double R;    // fm
-  static double a;    // fm
-
-  // parameters of the nucleus
-  static double Z;
-  double A{208};
-
-  // beam parameters
-  double sqrts{5020};
-  double g1{sqrts / (2. * mProt)};
-  double g2{sqrts / (2. * mProt)};
-
-  // Gaussian integration n = 10
-  // since cos is symmetric around 0 we only need 5
-  // of the points in the gaussian integration.
-  static const int ngi = 5;
-  double weights[ngi]{0.2955242247147529, 0.2692667193099963,
-                      0.2190863625159820, 0.1494513491505806,
-                      0.0666713443086881};
-  double abscissas[ngi]{0.1488743389816312, 0.4333953941292472,
-                        0.6794095682990244, 0.8650633666889845,
-                        0.9739065285171717};
-
-  // photon luminosity calculation parameters
-  const int nb1{120};
-  const int nb2{120};
-
-  // cross sections binning
-  double zmin{-1};   // min z
-  double zmax{1};    // max z
-  int nz{100};       // nbins in z = cos(theta)
-  double mmin{3.56}; // min M in GeV
-  double mmax{50.};  // max M in GeV
-  int nm{1001};      // n bins in M
-  double ymin{-6.};  // min pair rapidity
-  double ymax{6.};   // max pair rapidity
-  int ny{121};       // n bins in Y
-
-  // scaling factor
-  double factor{Z * Z * alpha / M_PI / M_PI / hc / hc};
-
-  // helper containers for calculations
-  static const int nb{200};
-  double bmax{20};
-  double db{bmax / (nb - 1)};
-  double vb[nb];
-  double vs[nb];
-  double TA[nb];
-  double rho[nb][nb];
-  double vGAA[nb];
-  double vRho[nb];
-
-  // simulation parameters
-  bool doPtCut{false};
-  double minPt{0};
-  int nEvents{1000};
-  bool isPoint{true}; // flux calculation parameter
-  bool useNonzeroGamPt{true};
-  static std::map<int, double> lepMassMap;
-
-  // parameters dictionary
-  // todo: use <any> from c++17 for a neat parsing???
-  struct InputPars {
-    string inNucZ{"NUCLEUS_Z"};
-    string inNucA{"NUCLEUS_A"};
-    string inWSRadius{"WS_R"};
-    string inWSA{"WS_A"};
-    string inCMSqrtS{"SQRTS"};
-    string inLepPDG{"LEP_PDG"};
-    string inLepA{"LEP_A"};
-    string inDoPtCut{"DO_PT_CUT"};
-    string inNEvents{"NEVENTS"};
-    string inLowPt{"PT_MIN"};
-    string inLowZ{"ZMIN"};
-    string inHiZ{"ZMAX"};
-    string inLowM{"MMIN"};
-    string inHiM{"MMAX"};
-    string inLowY{"YMIN"};
-    string inHiY{"YMAX"};
-    string inBinsZ{"BINS_Z"};
-    string inBinsM{"BINS_M"};
-    string inBinsY{"BINS_Y"};
-    string inFluxPoint{"FLUX_POINT"};
-    string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
-    string inPythiaVer{"PYTHIA_VERSION"};
-    string inPythia8FSR{"PYTHIA8_FSR"};
-    string inPythia8Decays{"PYTHIA8_DECAYS"};
-    string inSeed{"SEED"};
-  };
-
-  // debug level
-  static int debug;
+  void processInPythia(vector<int>& pdgs,
+                       vector<int>& statuses,
+                       vector<int>& mothers,
+                       vector<TLorentzVector>& particles);
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_

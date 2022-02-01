@@ -53,9 +53,7 @@ int main(int argc, char** argv)
   auto* upcGenerator = new UpcGenerator();
   upcGenerator->setDebugLevel(debugLevel);
   upcGenerator->setNumThreads(numThreads);
-
-  PLOG_WARNING << "Check inputs:";
-  upcGenerator->printParameters();
+  upcGenerator->init();
 
   PLOG_INFO << "Starting generation process...";
   upcGenerator->generateEvents();
