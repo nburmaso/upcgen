@@ -348,9 +348,9 @@ double UpcCalcMachine::calcCrossSectionM(double m)
   // [nb] //
 }
 
-void UpcCalcMachine::fillCrossSectionMZ(TH2D* hCrossSectionMZ,
-                                        double mmin, double mmax, int nm,
+void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
                                         double zmin, double zmax, int nz,
+                                        double mmin, double mmax, int nm,
                                         int flag)
 {
   double m, z;
@@ -370,11 +370,11 @@ void UpcCalcMachine::fillCrossSectionMZ(TH2D* hCrossSectionMZ,
       if (flag == 2) { // pseudoscalar part
         cs = calcCrossSectionMZPolPS(m, z);
       }
-      hCrossSectionMZ->SetBinContent(im, iz, cs);
+      hCrossSectionZM->SetBinContent(iz, im, cs);
     }
   }
   double scalingFactor = hc * hc * 1e7; // to [nb]
-  hCrossSectionMZ->Scale(scalingFactor / dm);
+  hCrossSectionZM->Scale(scalingFactor / dm);
 }
 
 void UpcCalcMachine::fillCrossSectionM(TH1D* hCrossSectionM,

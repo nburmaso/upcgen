@@ -297,9 +297,9 @@ void UpcGenerator::writeEvent(int evt,
 
 void UpcGenerator::generateEvents()
 {
-  TH2D* hCrossSectionMZ;
-  TH2D* hCrossSectionMZPolS;
-  TH2D* hCrossSectionMZPolPS;
+  TH2D* hCrossSectionZM;
+  TH2D* hCrossSectionZMPolS;
+  TH2D* hCrossSectionZMPolPS;
 
   int nm = calcMachine->nm;
   double mmin = calcMachine->mmin;
@@ -318,23 +318,23 @@ void UpcGenerator::generateEvents()
   double mLep = calcMachine->mLep;
 
   if (usePolarizedCS) {
-    hCrossSectionMZPolS = new TH2D("hCrossSectionMZPolS", ";m [gev]; z; cs [nb/gev]",
-                                   nm, mmin, mmax,
-                                   nz, zmin, zmax);
+    hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", ";m [gev]; z; cs [nb/gev]",
+                                   nz, zmin, zmax,
+                                   nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionMZ(hCrossSectionMZPolS, mmin, mmax, nm, zmin, zmax, nz, 1);
+    calcMachine->fillCrossSectionZM(hCrossSectionZMPolS, zmin, zmax, nz, mmin, mmax, nm, 1);
 
-    hCrossSectionMZPolPS = new TH2D("hCrossSectionMZPolPs", ";m [gev]; z; cs [nb/gev]",
-                                    nm, mmin, mmax,
-                                    nz, zmin, zmax);
+    hCrossSectionZMPolPS = new TH2D("hCrossSectionZMPolPS", ";m [gev]; z; cs [nb/gev]",
+                                    nz, zmin, zmax,
+                                    nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionMZ(hCrossSectionMZPolPS, mmin, mmax, nm, zmin, zmax, nz, 2);
+    calcMachine->fillCrossSectionZM(hCrossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
   } else {
-    hCrossSectionMZ = new TH2D("hCrossSectionMZ", ";m [gev]; z; cs [nb/gev]",
-                               nm, mmin, mmax,
-                               nz, zmin, zmax);
+    hCrossSectionZM = new TH2D("hCrossSectionMZ", ";m [gev]; z; cs [nb/gev]",
+                               nz, zmin, zmax,
+                               nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionMZ(hCrossSectionMZ, mmin, mmax, nm, zmin, zmax, nz, 0);
+    calcMachine->fillCrossSectionZM(hCrossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
   }
 
   // calculating nuclear cross section in YM space
@@ -352,12 +352,12 @@ void UpcGenerator::generateEvents()
 
   vector<double> cutsZ(hNucCSYM->GetNbinsY());
   if (doPtCut) {
-    for (int mBin = 1; mBin <= hNucCSYM->GetNbinsY(); mBin++) {
+    for (int mBin = 1; mBin <= nm; mBin++) {
       double mass = hNucCSYM->GetYaxis()->GetBinLowEdge(mBin);
       double sqt = TMath::Sqrt(mass * mass * 0.25 - mLep * mLep);
       if (sqt <= minPt) {
         cutsZ[mBin - 1] = 0;
-        for (int yBin = 1; yBin <= hNucCSYM->GetNbinsX(); yBin++) {
+        for (int yBin = 1; yBin <= ny; yBin++) {
           hNucCSYM->SetBinContent(yBin, mBin, 0);
         }
         continue;
@@ -375,13 +375,23 @@ void UpcGenerator::generateEvents()
   if (doPtCut) {
     for (int mBin = 1; mBin <= nm; mBin++) {
       double zCut = cutsZ[mBin - 1];
-      int zCutBinUp = hCrossSectionMZ->GetXaxis()->FindBin(zCut);
-      int zCutBinLow = hCrossSectionMZ->GetXaxis()->FindBin(-zCut);
+      int zCutBinUp = hCrossSectionZM->GetXaxis()->FindBin(zCut);
+      int zCutBinLow = hCrossSectionZM->GetXaxis()->FindBin(-zCut);
       for (int zBin = zCutBinUp + 1; zBin <= nz; zBin++) {
-        hCrossSectionMZ->SetBinContent(mBin, zBin, 0);
+        hCrossSectionZM->SetBinContent(zBin, mBin, 0);
       }
       for (int zBin = 1; zBin < zCutBinLow; zBin++) {
-        hCrossSectionMZ->SetBinContent(mBin, zBin, 0);
+        hCrossSectionZM->SetBinContent(zBin, mBin, 0);
+      }
+      if (usePolarizedCS) {
+        for (int zBin = zCutBinUp + 1; zBin <= nz; zBin++) {
+          hCrossSectionZMPolS->SetBinContent(zBin, mBin, 0);
+          hCrossSectionZMPolPS->SetBinContent(zBin, mBin, 0);
+        }
+        for (int zBin = 1; zBin < zCutBinLow; zBin++) {
+          hCrossSectionZMPolS->SetBinContent(zBin, mBin, 0);
+          hCrossSectionZMPolPS->SetBinContent(zBin, mBin, 0);
+        }
       }
     }
   }
@@ -413,43 +423,19 @@ void UpcGenerator::generateEvents()
   samplerNuc->setXGrid(yGrid);
 
   // sampler for unpolarized cs
-  TH2D* hCrossSectionZM;
   UpcSampler* samplerElem;
 
   // samplers for polarized cs
-  TH2D* hCrossSectionZMPolS;
-  TH2D* hCrossSectionZMPolPS;
   UpcSampler* samplerElemS;
   UpcSampler* samplerElemPS;
 
   if (!usePolarizedCS) {
-    hCrossSectionZM = new TH2D("hCrossSectionZM", "",
-                               nz, zmin, zmax,
-                               nm, mmin, mmax);
-    for (int i = 1; i <= nz; i++) {
-      for (int j = 1; j <= nm; j++) {
-        hCrossSectionZM->SetBinContent(i, j, hCrossSectionMZ->GetBinContent(j, i));
-      }
-    }
     samplerElem = new UpcSampler();
     samplerElem->setSeed(seed);
     samplerElem->setDistr2D(hCrossSectionZM, nz, nm);
     samplerElem->setXGrid(zGrid);
     samplerElem->setYGrid(mGrid);
   } else {
-    hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", "",
-                               nz, zmin, zmax,
-                               nm, mmin, mmax);
-    hCrossSectionZMPolPS = new TH2D("hCrossSectionZMPolPS", "",
-                                   nz, zmin, zmax,
-                                   nm, mmin, mmax);
-    for (int i = 1; i <= nz; i++) {
-      for (int j = 1; j <= nm; j++) {
-        hCrossSectionZMPolS->SetBinContent(i, j, hCrossSectionMZPolS->GetBinContent(j, i));
-        hCrossSectionZMPolPS->SetBinContent(i, j, hCrossSectionMZPolPS->GetBinContent(j, i));
-      }
-    }
-
     samplerElemS = new UpcSampler();
     samplerElemS->setSeed(seed);
     samplerElemS->setDistr2D(hCrossSectionZMPolS, nz, nm);

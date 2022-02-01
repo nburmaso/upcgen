@@ -201,7 +201,7 @@ class UpcCalcMachine
   double calcCrossSectionM(double m);
 
   // histogram filler for MZ-cross section
-  void fillCrossSectionMZ(TH2D* hCrossSectionMZ,
+  void fillCrossSectionZM(TH2D* hCrossSectionZM,
                           double mmin, double mmax, int nm,
                           double zmin, double zmax, int nz,
                           int flag);
