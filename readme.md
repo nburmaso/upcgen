@@ -102,6 +102,7 @@ SEED 0             # Seed for random numbers generator. '0' -> random seed
 |`10`| Dielectron photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;e^{&plus;}e^{-}) |
 |`11`| Dimuon photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\mu^{&plus;}\mu^{-}) |
 |`12`| Ditau photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\tau^{&plus;}\tau^{-}) |
+|`20`| Dipion photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\pi^{0}\pi^{0}) |
 
 ### Tips and notes
 

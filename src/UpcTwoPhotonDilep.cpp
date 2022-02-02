@@ -29,6 +29,7 @@ using namespace std;
 UpcTwoPhotonDilep::UpcTwoPhotonDilep(int partPDG)
 {
   this->partPDG = partPDG;
+  isCharged = true;
   // populating lepton mass map
   // data from PDG
   if (partPDG == 11) { // electron

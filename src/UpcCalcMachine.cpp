@@ -64,6 +64,10 @@ void UpcCalcMachine::setElemProcess(int procID)
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
+    case 20: { // pi0pi0 meson photoproduction
+      elemProcess = new UpcTwoPhotonDipion();
+      break;
+    }
     default: {
       PLOG_FATAL << "Unknown process ID! Check manual and enter a correct ID! Exiting...";
       std::_Exit(-1);
@@ -291,10 +295,10 @@ void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
   double dm = (mmax - mmin) / nm;
   double dz = (zmax - zmin) / nz;
   double cs;
-  for (int im = 1; im <= nm; im++) {
-    m = mmin + dm * (im - 1);
-    for (int iz = 1; iz <= nz; iz++) {
-      z = zmin + dz * (iz - 1);
+  for (int im = 0; im < nm; im++) {
+    m = mmin + dm * im;
+    for (int iz = 0; iz < nz; iz++) {
+      z = zmin + dz * iz;
       if (flag == 0) { // the usual unpolarized cross section
         cs = elemProcess->calcCrossSectionZM(z, m);
       }

@@ -185,6 +185,11 @@ class UpcGenerator
                        vector<int>& statuses,
                        vector<int>& mothers,
                        vector<TLorentzVector>& particles);
+
+  void processPions(vector<int>& pdgs,
+                    vector<int>& statuses,
+                    vector<int>& mothers,
+                    vector<TLorentzVector>& particles);
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_

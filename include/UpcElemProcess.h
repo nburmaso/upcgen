@@ -36,6 +36,9 @@ class UpcElemProcess
   // pdg code of a particle
   int partPDG;
 
+  // final-state is charged or not
+  bool isCharged;
+
   // `standard` unpolarized cross sections
   virtual double calcCrossSectionM(double m) = 0;
 

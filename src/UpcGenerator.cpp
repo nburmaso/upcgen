@@ -37,6 +37,24 @@ void UpcGenerator::init()
 {
   // get parameters from file
   initGeneratorFromFile();
+
+  // sanity checks
+  if (procID == 20) {
+    // for gamma+gamma -> pi0 pi0 grid size is set explicitly
+    // because elem. cross sections are already stored in files
+    PLOG_WARNING << "For dipion photoproduction grid sizes along Z and M are fixed -- see parameters check";
+    calcMachine->zmin = -1;
+    calcMachine->zmax = 1;
+    calcMachine->nz = 100;
+    calcMachine->mmin = 0.;
+    calcMachine->mmax = 5.;
+    calcMachine->nm = 100;
+    if (usePolarizedCS) {
+      PLOG_WARNING << "For dipion photoproduction polarized cross section is not available";
+      usePolarizedCS = false;
+    }
+  }
+
   PLOG_WARNING << "Check inputs:";
   printParameters();
 
@@ -252,6 +270,67 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
 #endif
 }
 
+void UpcGenerator::processPions(vector<int>& pdgs,
+                                vector<int>& statuses,
+                                vector<int>& mothers,
+                                vector<TLorentzVector>& particles)
+{
+  const int status = 33; // code from pythia 8: outgoing particles from subsequent subprocesses
+  vector<TLorentzVector> photons(4);
+
+  // first pion
+  double mPhot1 = 0.;
+  double ePhot1 = particles[0].M() / 2.;
+  double pPhot1 = sqrt(ePhot1 * ePhot1 - mPhot1 * mPhot1);
+  double phi1 = gRandom->Uniform(0., 2. * M_PI);
+  double cost1 = gRandom->Uniform(-1., 1.);
+  double theta1 = acos(cost1);
+  TVector3 vPhot1;
+  vPhot1.SetMagThetaPhi(pPhot1, theta1, phi1);
+  photons[0].SetVectM(-vPhot1, mPhot1);
+  photons[1].SetVectM(vPhot1, mPhot1);
+  TVector3 boost1 = particles[0].BoostVector();
+  TVector3 zAxis1 = particles[0].Vect().Unit();
+  photons[0].RotateUz(zAxis1);
+  photons[1].RotateUz(zAxis1);
+  photons[0].Boost(boost1);
+  photons[1].Boost(boost1);
+  pdgs.emplace_back(22);
+  statuses.emplace_back(status);
+  mothers.emplace_back(0);
+  particles.emplace_back(photons[0]);
+  pdgs.emplace_back(22);
+  statuses.emplace_back(status);
+  mothers.emplace_back(0);
+  particles.emplace_back(photons[1]);
+
+  // second pion
+  double mPhot2 = 0.;
+  double ePhot2 = particles[1].M() / 2.;
+  double pPhot2 = sqrt(ePhot2 * ePhot2 - mPhot2 * mPhot2);
+  double phi2 = gRandom->Uniform(0., 2. * M_PI);
+  double cost2 = gRandom->Uniform(-1., 1.);
+  double theta2 = acos(cost2);
+  TVector3 vPhot2;
+  vPhot2.SetMagThetaPhi(pPhot2, theta2, phi2);
+  photons[2].SetVectM(-vPhot2, mPhot2);
+  photons[3].SetVectM(vPhot2, mPhot2);
+  TVector3 boost2 = particles[1].BoostVector();
+  TVector3 zAxis2 = particles[1].Vect().Unit();
+  photons[2].RotateUz(zAxis2);
+  photons[3].RotateUz(zAxis2);
+  photons[2].Boost(boost2);
+  photons[3].Boost(boost2);
+  pdgs.emplace_back(22);
+  statuses.emplace_back(status);
+  mothers.emplace_back(1);
+  particles.emplace_back(photons[2]);
+  pdgs.emplace_back(22);
+  statuses.emplace_back(status);
+  mothers.emplace_back(1);
+  particles.emplace_back(photons[3]);
+}
+
 void UpcGenerator::writeEvent(int evt,
                               const vector<int>& pdgs,
                               const vector<int>& statuses,
@@ -264,7 +343,7 @@ void UpcGenerator::writeEvent(int evt,
     particle.pdgCode = pdgs[i];
     particle.particleID = i;
     particle.statusID = statuses[i];
-    particle.motherID = i <= 1 ? -1 : mothers[i]; // first two particles = primary leptons
+    particle.motherID = i <= 1 ? -1 : mothers[i]; // first two particles are primary
     particle.px = particles[i].Px();
     particle.py = particles[i].Py();
     particle.pz = particles[i].Pz();
@@ -317,6 +396,7 @@ void UpcGenerator::generateEvents()
   // mass of a particle in final state
   double mPart = calcMachine->elemProcess->mPart;
   int partPDG = calcMachine->elemProcess->partPDG;
+  bool isCharged = calcMachine->elemProcess->isCharged;
 
   if (usePolarizedCS) {
     hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", ";m [gev]; z; cs [nb/gev]",
@@ -519,9 +599,17 @@ void UpcGenerator::generateEvents()
     particles[0].Boost(boost);
     particles[1].Boost(boost);
 
-    int sign = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
-    pdgs.emplace_back(sign * partPDG);
-    pdgs.emplace_back(-sign * partPDG);
+    int sign1, sign2;
+    if (isCharged) {
+      sign1 = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
+      sign2 = -sign1;
+    } else {
+      sign1 = 1;
+      sign2 = 1;
+    }
+
+    pdgs.emplace_back(sign1 * partPDG);
+    pdgs.emplace_back(sign2 * partPDG);
     mothers.emplace_back(-1);
     mothers.emplace_back(-1);
     statuses.emplace_back(23);
@@ -530,8 +618,13 @@ void UpcGenerator::generateEvents()
     // lepton decays for taus
     // todo: at the moment "fsr" and "decays" flags
     //       are only really meaningful for pythia8
-    if ((doFSR || doDecays) && isPythiaUsed) {
+    if ((doFSR || doDecays) && isPythiaUsed && (procID >= 10 && procID <= 12)) {
       processInPythia(pdgs, statuses, mothers, particles);
+    }
+
+    // uniform pion decays into photon pairs
+    if (procID == 20) {
+      processPions(pdgs, statuses, mothers, particles);
     }
 
     writeEvent(evt, pdgs, statuses, mothers, particles);

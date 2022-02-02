@@ -27,6 +27,7 @@
 #include "UpcPhysConstants.h"
 #include "UpcElemProcess.h"
 #include "UpcTwoPhotonDilep.h"
+#include "UpcTwoPhotonDipion.h"
 
 #include "TClonesArray.h"
 #include "TF1.h"
