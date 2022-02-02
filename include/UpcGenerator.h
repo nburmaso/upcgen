@@ -24,7 +24,7 @@
 #ifndef UPCGENERATOR__UPCGENERATOR_H_
 #define UPCGENERATOR__UPCGENERATOR_H_
 
-#include "UpcCalcMachine.h"
+#include "UpcCrossSection.h"
 #include "UpcPythia8Helper.h"
 #include "UpcPythia6Helper.h"
 
@@ -138,7 +138,7 @@ class UpcGenerator
   void generateEvents();
 
  private:
-  UpcCalcMachine* calcMachine;
+  UpcCrossSection* nucProcessCS;
 
   // helper struct for file output
   struct {

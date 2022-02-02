@@ -21,8 +21,8 @@
 
 /// helper class for calculations
 
-#ifndef UPCGENERATOR_INCLUDE_UPCCALCMACHINE_H_
-#define UPCGENERATOR_INCLUDE_UPCCALCMACHINE_H_
+#ifndef UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_
+#define UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_
 
 #include "UpcPhysConstants.h"
 #include "UpcElemProcess.h"
@@ -55,17 +55,12 @@
 #include <map>
 #include <random>
 
-class UpcCalcMachine
+class UpcCrossSection
 {
 
  public:
-  UpcCalcMachine();
-  ~UpcCalcMachine();
-
-  // physics constants
-  // constexpr static double alpha{1.0 / 137.035999074}; // fine structure constant
-  // constexpr static double hc{0.1973269718};           // scaling factor
-  // constexpr static double mProt{0.9382720813};        // proton mass
+  UpcCrossSection();
+  ~UpcCrossSection();
 
   // Woods-Saxon parameters
   static double rho0; // fm-3
@@ -225,4 +220,4 @@ class UpcCalcMachine
   void prepareTwoPhotonLumi();
 };
 
-#endif // UPCGENERATOR_INCLUDE_UPCCALCMACHINE_H_
+#endif // UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_

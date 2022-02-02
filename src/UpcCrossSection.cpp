@@ -19,7 +19,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-#include "UpcCalcMachine.h"
+#include "UpcCrossSection.h"
 
 #ifdef USE_OPENMP
 #include <omp.h>
@@ -28,25 +28,25 @@
 using namespace std;
 
 // out-of-line initialization for static members
-double UpcCalcMachine::rho0 = 0;
-double UpcCalcMachine::R = 6.68;
-double UpcCalcMachine::a = 0.447;
-int UpcCalcMachine::Z = 82;
-double UpcCalcMachine::sqrts = 5020;
-double UpcCalcMachine::g1 = sqrts / (2. * phys_consts::mProt);
-double UpcCalcMachine::g2 = sqrts / (2. * phys_consts::mProt);
-int UpcCalcMachine::debug = 0;
-double* UpcCalcMachine::vCachedFormFac = new double[UpcCalcMachine::nQ2];
+double UpcCrossSection::rho0 = 0;
+double UpcCrossSection::R = 6.68;
+double UpcCrossSection::a = 0.447;
+int UpcCrossSection::Z = 82;
+double UpcCrossSection::sqrts = 5020;
+double UpcCrossSection::g1 = sqrts / (2. * phys_consts::mProt);
+double UpcCrossSection::g2 = sqrts / (2. * phys_consts::mProt);
+int UpcCrossSection::debug = 0;
+double* UpcCrossSection::vCachedFormFac = new double[UpcCrossSection::nQ2];
 
-UpcCalcMachine::UpcCalcMachine()
+UpcCrossSection::UpcCrossSection()
 {
   constexpr int nbc = 10000000;
   vCachedBreakup = new double[nbc];
 }
 
-UpcCalcMachine::~UpcCalcMachine() = default;
+UpcCrossSection::~UpcCrossSection() = default;
 
-void UpcCalcMachine::setElemProcess(int procID)
+void UpcCrossSection::setElemProcess(int procID)
 {
   switch (procID) {
     case 10: { // dielectron photoproduction
@@ -75,7 +75,7 @@ void UpcCalcMachine::setElemProcess(int procID)
   }
 }
 
-void UpcCalcMachine::init()
+void UpcCrossSection::init()
 {
   PLOG_INFO << "Initializing caches ...";
   // update scaling factor
@@ -94,7 +94,7 @@ void UpcCalcMachine::init()
 }
 
 template <typename ArrayType>
-double UpcCalcMachine::simpson(int n, ArrayType* v, double h)
+double UpcCrossSection::simpson(int n, ArrayType* v, double h)
 {
   double sum = v[0] + v[n - 1];
   for (int i = 1; i < n - 1; i += 2) {
@@ -106,7 +106,7 @@ double UpcCalcMachine::simpson(int n, ArrayType* v, double h)
   return sum * h / 3;
 }
 
-double UpcCalcMachine::calcWSRho()
+double UpcCrossSection::calcWSRho()
 {
   double bmax = 20;
   double db = bmax / (nb - 1);
@@ -118,7 +118,7 @@ double UpcCalcMachine::calcWSRho()
   return wsRho0;
 }
 
-double UpcCalcMachine::fluxPoint(const double b, const double k)
+double UpcCrossSection::fluxPoint(const double b, const double k)
 {
   // flux divided by k
   double g = g1;
@@ -132,7 +132,7 @@ double UpcCalcMachine::fluxPoint(const double b, const double k)
   return result;
 }
 
-double UpcCalcMachine::fluxFormInt(double* x, double* par)
+double UpcCrossSection::fluxFormInt(double* x, double* par)
 {
   double k = x[0];
   double b = par[0];
@@ -152,7 +152,7 @@ double UpcCalcMachine::fluxFormInt(double* x, double* par)
   return result;
 }
 
-double UpcCalcMachine::fluxForm(const double b, const double k, TF1* fFluxFormInt)
+double UpcCrossSection::fluxForm(const double b, const double k, TF1* fFluxFormInt)
 {
   // flux divided by k
   if (isPoint) {
@@ -176,7 +176,7 @@ double UpcCalcMachine::fluxForm(const double b, const double k, TF1* fFluxFormIn
   return result;
 }
 
-double UpcCalcMachine::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
+double UpcCrossSection::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
 {
   // double differential luminosity
   double k1 = M / 2. * exp(Y);
@@ -226,7 +226,7 @@ double UpcCalcMachine::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, con
   return lumi;
 }
 
-void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
+void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
 {
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
@@ -286,7 +286,7 @@ void UpcCalcMachine::calcTwoPhotonLumiPol(double& ns, double& np, double M, doub
   np = 2 * M_PI * M_PI * M * sum_b1_p;
 }
 
-void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
+void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
                                         double zmin, double zmax, int nz,
                                         double mmin, double mmax, int nm,
                                         int flag)
@@ -315,7 +315,7 @@ void UpcCalcMachine::fillCrossSectionZM(TH2D* hCrossSectionZM,
   hCrossSectionZM->Scale(scalingFactor / dm);
 }
 
-void UpcCalcMachine::prepareGAA()
+void UpcCrossSection::prepareGAA()
 {
   double bmax = 20;
   double db = bmax / (nb - 1);
@@ -354,7 +354,7 @@ void UpcCalcMachine::prepareGAA()
   }
 }
 
-void UpcCalcMachine::prepareBreakupProb()
+void UpcCrossSection::prepareBreakupProb()
 {
   constexpr double bmin = 1e-6;
   constexpr double bmax = 1000;
@@ -367,7 +367,7 @@ void UpcCalcMachine::prepareBreakupProb()
   }
 }
 
-double UpcCalcMachine::getCachedBreakupProb(double b)
+double UpcCrossSection::getCachedBreakupProb(double b)
 {
   constexpr double bmin = 1e-6;
   constexpr double bmax = 1000;
@@ -387,7 +387,7 @@ double UpcCalcMachine::getCachedBreakupProb(double b)
   return prob;
 }
 
-double UpcCalcMachine::calcFormFac(double Q2)
+double UpcCrossSection::calcFormFac(double Q2)
 {
   double Q = sqrt(Q2) / phys_consts::hc;
   double coshVal = TMath::CosH(M_PI * Q * a);
@@ -398,7 +398,7 @@ double UpcCalcMachine::calcFormFac(double Q2)
   return ff;
 }
 
-void UpcCalcMachine::prepareFormFac()
+void UpcCrossSection::prepareFormFac()
 {
   for (int iQ2 = 0; iQ2 < nQ2; iQ2++) {
     double Q2 = Q2min + iQ2 * dQ2;
@@ -407,7 +407,7 @@ void UpcCalcMachine::prepareFormFac()
   }
 }
 
-double UpcCalcMachine::getCachedFormFac(double Q2)
+double UpcCrossSection::getCachedFormFac(double Q2)
 {
   if (Q2 > Q2max) {
     return 0;
@@ -420,7 +420,7 @@ double UpcCalcMachine::getCachedFormFac(double Q2)
   return ff;
 }
 
-void UpcCalcMachine::prepareTwoPhotonLumi()
+void UpcCrossSection::prepareTwoPhotonLumi()
 {
   bool isFound = false;
   if (!gSystem->AccessPathName("twoPhotonLumi.root") && !usePolarizedCS) {
@@ -536,7 +536,7 @@ void UpcCalcMachine::prepareTwoPhotonLumi()
   }
 }
 
-void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
+void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
 {
   PLOG_INFO << "Calculating nuclear cross section";
 
@@ -640,7 +640,7 @@ void UpcCalcMachine::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<
 
 // Function from Starlight
 // (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
-double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int mode)
+double UpcCrossSection::calcBreakupProb(const double impactparameter, const int mode)
 {
   static double ee[10001], eee[162], se[10001];
 
@@ -653,7 +653,7 @@ double UpcCalcMachine::calcBreakupProb(const double impactparameter, const int m
   double pxn = 0.;
   double p1n = 0.;
 
-  double _beamLorentzGamma = UpcCalcMachine::g1;
+  double _beamLorentzGamma = UpcCrossSection::g1;
   double hbarcmev = 197.3269718;
   double pi = 3.14159;
   // Used to be done prior to entering the function. Done properly for assymetric?
@@ -911,7 +911,7 @@ L102:
 
 // Function from Starlight
 // (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
-double UpcCalcMachine::getPhotonPt(double ePhot)
+double UpcCrossSection::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
   double y1 = TMath::ACosH(g1);
@@ -947,7 +947,7 @@ double UpcCalcMachine::getPhotonPt(double ePhot)
   return pp;
 }
 
-void UpcCalcMachine::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
+void UpcCrossSection::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)
 {
   if (!useNonzeroGamPt) {
     double mtPair = mPair; // pairPt = 0

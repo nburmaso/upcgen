@@ -30,7 +30,7 @@ int UpcGenerator::debug = 0;
 
 UpcGenerator::UpcGenerator()
 {
-  calcMachine = new UpcCalcMachine();
+  nucProcessCS = new UpcCrossSection();
 }
 
 void UpcGenerator::init()
@@ -43,12 +43,12 @@ void UpcGenerator::init()
     // for gamma+gamma -> pi0 pi0 grid size is set explicitly
     // because elem. cross sections are already stored in files
     PLOG_WARNING << "For dipion photoproduction grid sizes along Z and M are fixed -- see parameters check";
-    calcMachine->zmin = -1;
-    calcMachine->zmax = 1;
-    calcMachine->nz = 100;
-    calcMachine->mmin = 0.;
-    calcMachine->mmax = 5.;
-    calcMachine->nm = 100;
+    nucProcessCS->zmin = -1;
+    nucProcessCS->zmax = 1;
+    nucProcessCS->nz = 100;
+    nucProcessCS->mmin = 0.;
+    nucProcessCS->mmax = 5.;
+    nucProcessCS->nm = 100;
     if (usePolarizedCS) {
       PLOG_WARNING << "For dipion photoproduction polarized cross section is not available";
       usePolarizedCS = false;
@@ -58,13 +58,13 @@ void UpcGenerator::init()
   PLOG_WARNING << "Check inputs:";
   printParameters();
 
-  calcMachine->numThreads = numThreads;
-  calcMachine->init();
-  calcMachine->setElemProcess(procID);
+  nucProcessCS->numThreads = numThreads;
+  nucProcessCS->init();
+  nucProcessCS->setElemProcess(procID);
 
   // if not dummy, set for dilepton photoproduction
   if (aLep > -9999 && (procID >= 10 && procID <= 12)) {
-    auto* proc = (UpcTwoPhotonDilep*)calcMachine->elemProcess;
+    auto* proc = (UpcTwoPhotonDilep*)nucProcessCS->elemProcess;
     proc->aLep = aLep;
   }
 
@@ -116,9 +116,9 @@ void UpcGenerator::initGeneratorFromFile()
         nEvents = stoi(parValue);
       }
       if (parameter == parDict.inCMSqrtS) {
-        UpcCalcMachine::sqrts = stod(parValue);
-        UpcCalcMachine::g1 = UpcCalcMachine::sqrts / (2. * phys_consts::mProt);
-        UpcCalcMachine::g2 = UpcCalcMachine::sqrts / (2. * phys_consts::mProt);
+        UpcCrossSection::sqrts = stod(parValue);
+        UpcCrossSection::g1 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
+        UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
       }
       if (parameter == parDict.inProcID) {
         procID = stoi(parValue);
@@ -133,49 +133,49 @@ void UpcGenerator::initGeneratorFromFile()
         minPt = stod(parValue);
       }
       if (parameter == parDict.inLowZ) {
-        calcMachine->zmin = stod(parValue);
+        nucProcessCS->zmin = stod(parValue);
       }
       if (parameter == parDict.inHiZ) {
-        calcMachine->zmax = stod(parValue);
+        nucProcessCS->zmax = stod(parValue);
       }
       if (parameter == parDict.inLowM) {
-        calcMachine->mmin = stod(parValue);
+        nucProcessCS->mmin = stod(parValue);
       }
       if (parameter == parDict.inHiM) {
-        calcMachine->mmax = stod(parValue);
+        nucProcessCS->mmax = stod(parValue);
       }
       if (parameter == parDict.inLowY) {
-        calcMachine->ymin = stod(parValue);
+        nucProcessCS->ymin = stod(parValue);
       }
       if (parameter == parDict.inHiY) {
-        calcMachine->ymax = stod(parValue);
+        nucProcessCS->ymax = stod(parValue);
       }
       if (parameter == parDict.inBinsZ) {
-        calcMachine->nz = stoi(parValue);
+        nucProcessCS->nz = stoi(parValue);
       }
       if (parameter == parDict.inBinsM) {
-        calcMachine->nm = stoi(parValue);
+        nucProcessCS->nm = stoi(parValue);
       }
       if (parameter == parDict.inBinsY) {
-        calcMachine->ny = stoi(parValue);
+        nucProcessCS->ny = stoi(parValue);
       }
       if (parameter == parDict.inWSRadius) {
-        UpcCalcMachine::R = stod(parValue);
+        UpcCrossSection::R = stod(parValue);
       }
       if (parameter == parDict.inWSA) {
-        UpcCalcMachine::a = stod(parValue);
+        UpcCrossSection::a = stod(parValue);
       }
       if (parameter == parDict.inNucZ) {
-        UpcCalcMachine::Z = stoi(parValue);
+        UpcCrossSection::Z = stoi(parValue);
       }
       if (parameter == parDict.inNucA) {
-        calcMachine->A = stoi(parValue);
+        nucProcessCS->A = stoi(parValue);
       }
       if (parameter == parDict.inFluxPoint) {
-        calcMachine->isPoint = stoi(parValue);
+        nucProcessCS->isPoint = stoi(parValue);
       }
       if (parameter == parDict.inBreakupMode) {
-        calcMachine->breakupMode = stoi(parValue);
+        nucProcessCS->breakupMode = stoi(parValue);
       }
       if (parameter == parDict.inPythiaVer) {
         pythiaVersion = stoi(parValue);
@@ -187,10 +187,10 @@ void UpcGenerator::initGeneratorFromFile()
         doDecays = stoi(parValue);
       }
       if (parameter == parDict.inNonzeroGamPt) {
-        calcMachine->useNonzeroGamPt = stoi(parValue);
+        nucProcessCS->useNonzeroGamPt = stoi(parValue);
       }
       if (parameter == parDict.inPolarized) {
-        calcMachine->usePolarizedCS = stoi(parValue);
+        nucProcessCS->usePolarizedCS = stoi(parValue);
         usePolarizedCS = stoi(parValue);
       }
       if (parameter == parDict.inSeed) {
@@ -207,29 +207,29 @@ void UpcGenerator::initGeneratorFromFile()
 void UpcGenerator::printParameters()
 {
   PLOG_WARNING << "OMP_NTHREADS " << numThreads;
-  PLOG_WARNING << "NUCLEUS_Z " << UpcCalcMachine::Z;
-  PLOG_WARNING << "NUCLEUS_A " << calcMachine->A;
-  PLOG_WARNING << "WS_R " << UpcCalcMachine::R;
-  PLOG_WARNING << "WS_A " << UpcCalcMachine::a;
-  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << UpcCalcMachine::rho0;
-  PLOG_WARNING << "SQRTS " << UpcCalcMachine::sqrts;
+  PLOG_WARNING << "NUCLEUS_Z " << UpcCrossSection::Z;
+  PLOG_WARNING << "NUCLEUS_A " << nucProcessCS->A;
+  PLOG_WARNING << "WS_R " << UpcCrossSection::R;
+  PLOG_WARNING << "WS_A " << UpcCrossSection::a;
+  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << UpcCrossSection::rho0;
+  PLOG_WARNING << "SQRTS " << UpcCrossSection::sqrts;
   PLOG_WARNING << "PROC_ID " << procID;
   PLOG_WARNING << "LEP_A " << aLep;
   PLOG_WARNING << "NEVENTS " << nEvents;
   PLOG_WARNING << "DO_PT_CUT " << doPtCut;
   PLOG_WARNING << "PT_MIN " << minPt;
-  PLOG_WARNING << "ZMIN " << calcMachine->zmin;
-  PLOG_WARNING << "ZMAX " << calcMachine->zmax;
-  PLOG_WARNING << "MMIN " << calcMachine->mmin;
-  PLOG_WARNING << "MMAX " << calcMachine->mmax;
-  PLOG_WARNING << "YMIN " << calcMachine->ymin;
-  PLOG_WARNING << "YMAX " << calcMachine->ymax;
-  PLOG_WARNING << "BINS_Z " << calcMachine->nz;
-  PLOG_WARNING << "BINS_M " << calcMachine->nm;
-  PLOG_WARNING << "BINS_Y " << calcMachine->ny;
-  PLOG_WARNING << "FLUX_POINT " << calcMachine->isPoint;
-  PLOG_WARNING << "BREAKUP_MODE " << calcMachine->breakupMode;
-  PLOG_WARNING << "NON_ZERO_GAM_PT " << calcMachine->useNonzeroGamPt;
+  PLOG_WARNING << "ZMIN " << nucProcessCS->zmin;
+  PLOG_WARNING << "ZMAX " << nucProcessCS->zmax;
+  PLOG_WARNING << "MMIN " << nucProcessCS->mmin;
+  PLOG_WARNING << "MMAX " << nucProcessCS->mmax;
+  PLOG_WARNING << "YMIN " << nucProcessCS->ymin;
+  PLOG_WARNING << "YMAX " << nucProcessCS->ymax;
+  PLOG_WARNING << "BINS_Z " << nucProcessCS->nz;
+  PLOG_WARNING << "BINS_M " << nucProcessCS->nm;
+  PLOG_WARNING << "BINS_Y " << nucProcessCS->ny;
+  PLOG_WARNING << "FLUX_POINT " << nucProcessCS->isPoint;
+  PLOG_WARNING << "BREAKUP_MODE " << nucProcessCS->breakupMode;
+  PLOG_WARNING << "NON_ZERO_GAM_PT " << nucProcessCS->useNonzeroGamPt;
   PLOG_WARNING << "USE_POLARIZED_CS " << usePolarizedCS;
   PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
   PLOG_WARNING << "PYTHIA8_FSR " << doFSR;
@@ -380,42 +380,42 @@ void UpcGenerator::generateEvents()
   TH2D* hCrossSectionZMPolS;
   TH2D* hCrossSectionZMPolPS;
 
-  int nm = calcMachine->nm;
-  double mmin = calcMachine->mmin;
-  double mmax = calcMachine->mmax;
+  int nm = nucProcessCS->nm;
+  double mmin = nucProcessCS->mmin;
+  double mmax = nucProcessCS->mmax;
   double dm = (mmax - mmin) / nm;
-  int nz = calcMachine->nz;
-  double zmin = calcMachine->zmin;
-  double zmax = calcMachine->zmax;
+  int nz = nucProcessCS->nz;
+  double zmin = nucProcessCS->zmin;
+  double zmax = nucProcessCS->zmax;
   double dz = (zmax - zmin) / nz;
-  int ny = calcMachine->ny;
-  double ymin = calcMachine->ymin;
-  double ymax = calcMachine->ymax;
+  int ny = nucProcessCS->ny;
+  double ymin = nucProcessCS->ymin;
+  double ymax = nucProcessCS->ymax;
   double dy = (ymax - ymin) / ny;
 
   // mass of a particle in final state
-  double mPart = calcMachine->elemProcess->mPart;
-  int partPDG = calcMachine->elemProcess->partPDG;
-  bool isCharged = calcMachine->elemProcess->isCharged;
+  double mPart = nucProcessCS->elemProcess->mPart;
+  int partPDG = nucProcessCS->elemProcess->partPDG;
+  bool isCharged = nucProcessCS->elemProcess->isCharged;
 
   if (usePolarizedCS) {
     hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", ";m [gev]; z; cs [nb/gev]",
                                    nz, zmin, zmax,
                                    nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionZM(hCrossSectionZMPolS, zmin, zmax, nz, mmin, mmax, nm, 1);
+    nucProcessCS->fillCrossSectionZM(hCrossSectionZMPolS, zmin, zmax, nz, mmin, mmax, nm, 1);
 
     hCrossSectionZMPolPS = new TH2D("hCrossSectionZMPolPS", ";m [gev]; z; cs [nb/gev]",
                                     nz, zmin, zmax,
                                     nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionZM(hCrossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
+    nucProcessCS->fillCrossSectionZM(hCrossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
   } else {
     hCrossSectionZM = new TH2D("hCrossSectionMZ", ";m [gev]; z; cs [nb/gev]",
                                nz, zmin, zmax,
                                nm, mmin, mmax);
 
-    calcMachine->fillCrossSectionZM(hCrossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
+    nucProcessCS->fillCrossSectionZM(hCrossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
   }
 
   // calculating nuclear cross section in YM space
@@ -425,7 +425,7 @@ void UpcGenerator::generateEvents()
   if (usePolarizedCS) {
     hPolCSRatio.resize(ny, vector<double>(nm));
   }
-  calcMachine->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
+  nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
 
   vector<double> cutsZ(hNucCSYM->GetNbinsY());
   if (doPtCut) {
@@ -494,10 +494,10 @@ void UpcGenerator::generateEvents()
   // sampler for nuclear cross section
   auto* samplerNuc = new UpcSampler();
   samplerNuc->setSeed(seed);
-  samplerNuc->setDistr1D(hNucCSM, nm);
-  samplerNuc->setDistr2D(hNucCSYM, ny, nm);
   samplerNuc->setYGrid(mGrid);
   samplerNuc->setXGrid(yGrid);
+  samplerNuc->setDistr1D(hNucCSM, nm);
+  samplerNuc->setDistr2D(hNucCSYM, ny, nm);
 
   // sampler for unpolarized cs
   UpcSampler* samplerElem;
@@ -509,21 +509,21 @@ void UpcGenerator::generateEvents()
   if (!usePolarizedCS) {
     samplerElem = new UpcSampler();
     samplerElem->setSeed(seed);
-    samplerElem->setDistr2D(hCrossSectionZM, nz, nm);
     samplerElem->setXGrid(zGrid);
     samplerElem->setYGrid(mGrid);
+    samplerElem->setDistr2D(hCrossSectionZM, nz, nm);
   } else {
     samplerElemS = new UpcSampler();
     samplerElemS->setSeed(seed);
-    samplerElemS->setDistr2D(hCrossSectionZMPolS, nz, nm);
     samplerElemS->setXGrid(zGrid);
     samplerElemS->setYGrid(mGrid);
+    samplerElemS->setDistr2D(hCrossSectionZMPolS, nz, nm);
 
     samplerElemPS = new UpcSampler();
     samplerElemPS->setSeed(seed);
-    samplerElemPS->setDistr2D(hCrossSectionZMPolPS, nz, nm);
     samplerElemPS->setXGrid(zGrid);
     samplerElemPS->setYGrid(mGrid);
+    samplerElemPS->setDistr2D(hCrossSectionZMPolPS, nz, nm);
   }
 
   // generationg events
@@ -585,7 +585,7 @@ void UpcGenerator::generateEvents()
     double phi = gRandom->Uniform(0., 2. * M_PI);
 
     TLorentzVector pPair;
-    calcMachine->getPairMomentum(mPair, yPair, pPair);
+    nucProcessCS->getPairMomentum(mPair, yPair, pPair);
     double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
     TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
