@@ -53,9 +53,8 @@ possible).
 
 The default number of threads is 1.
 
-Generated events will be stored to `events_{a_lep}_{pt_cut}.root`, where `a_lep` is a value of the anomalous magnetic
-moment and `pt_cut` is a minimal transverse momentum for a pair of leptons. If the generator is built with HepMC flag,
-events will be written to `events_{a_lep}_{pt_cut}.hepmc2`
+Generated events will be stored to `events.root`. If the generator is built with HepMC flag,
+events will be written to `events.hepmc2`
 
 ### Input parameters
 
