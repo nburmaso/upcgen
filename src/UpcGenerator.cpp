@@ -46,9 +46,9 @@ void UpcGenerator::init()
     nucProcessCS->zmin = -1;
     nucProcessCS->zmax = 1;
     nucProcessCS->nz = 100;
-    nucProcessCS->mmin = 0.;
+    nucProcessCS->mmin = 0.275;
     nucProcessCS->mmax = 5.;
-    nucProcessCS->nm = 100;
+    nucProcessCS->nm = 91;
     if (usePolarizedCS) {
       PLOG_WARNING << "For dipion photoproduction polarized cross section is not available";
       usePolarizedCS = false;
@@ -206,35 +206,35 @@ void UpcGenerator::initGeneratorFromFile()
 
 void UpcGenerator::printParameters()
 {
-  PLOG_WARNING << "OMP_NTHREADS " << numThreads;
-  PLOG_WARNING << "NUCLEUS_Z " << UpcCrossSection::Z;
-  PLOG_WARNING << "NUCLEUS_A " << nucProcessCS->A;
-  PLOG_WARNING << "WS_R " << UpcCrossSection::R;
-  PLOG_WARNING << "WS_A " << UpcCrossSection::a;
-  PLOG_WARNING << "(CALCULATED) WS_RHO0 " << UpcCrossSection::rho0;
-  PLOG_WARNING << "SQRTS " << UpcCrossSection::sqrts;
-  PLOG_WARNING << "PROC_ID " << procID;
-  PLOG_WARNING << "LEP_A " << aLep;
-  PLOG_WARNING << "NEVENTS " << nEvents;
-  PLOG_WARNING << "DO_PT_CUT " << doPtCut;
-  PLOG_WARNING << "PT_MIN " << minPt;
-  PLOG_WARNING << "ZMIN " << nucProcessCS->zmin;
-  PLOG_WARNING << "ZMAX " << nucProcessCS->zmax;
-  PLOG_WARNING << "MMIN " << nucProcessCS->mmin;
-  PLOG_WARNING << "MMAX " << nucProcessCS->mmax;
-  PLOG_WARNING << "YMIN " << nucProcessCS->ymin;
-  PLOG_WARNING << "YMAX " << nucProcessCS->ymax;
-  PLOG_WARNING << "BINS_Z " << nucProcessCS->nz;
-  PLOG_WARNING << "BINS_M " << nucProcessCS->nm;
-  PLOG_WARNING << "BINS_Y " << nucProcessCS->ny;
-  PLOG_WARNING << "FLUX_POINT " << nucProcessCS->isPoint;
-  PLOG_WARNING << "BREAKUP_MODE " << nucProcessCS->breakupMode;
-  PLOG_WARNING << "NON_ZERO_GAM_PT " << nucProcessCS->useNonzeroGamPt;
-  PLOG_WARNING << "USE_POLARIZED_CS " << usePolarizedCS;
-  PLOG_WARNING << "PYTHIA_VERSION " << pythiaVersion;
-  PLOG_WARNING << "PYTHIA8_FSR " << doFSR;
-  PLOG_WARNING << "PYTHIA8_DECAYS " << doDecays;
-  PLOG_WARNING << "SEED " << seed;
+  PLOG_INFO << "OMP_NTHREADS " << numThreads;
+  PLOG_INFO << "NUCLEUS_Z " << UpcCrossSection::Z;
+  PLOG_INFO << "NUCLEUS_A " << nucProcessCS->A;
+  PLOG_INFO << "WS_R " << UpcCrossSection::R;
+  PLOG_INFO << "WS_A " << UpcCrossSection::a;
+  PLOG_INFO << "(CALCULATED) WS_RHO0 " << UpcCrossSection::rho0;
+  PLOG_INFO << "SQRTS " << UpcCrossSection::sqrts;
+  PLOG_INFO << "PROC_ID " << procID;
+  PLOG_INFO << "LEP_A " << aLep;
+  PLOG_INFO << "NEVENTS " << nEvents;
+  PLOG_INFO << "DO_PT_CUT " << doPtCut;
+  PLOG_INFO << "PT_MIN " << minPt;
+  PLOG_INFO << "ZMIN " << nucProcessCS->zmin;
+  PLOG_INFO << "ZMAX " << nucProcessCS->zmax;
+  PLOG_INFO << "MMIN " << nucProcessCS->mmin;
+  PLOG_INFO << "MMAX " << nucProcessCS->mmax;
+  PLOG_INFO << "YMIN " << nucProcessCS->ymin;
+  PLOG_INFO << "YMAX " << nucProcessCS->ymax;
+  PLOG_INFO << "BINS_Z " << nucProcessCS->nz;
+  PLOG_INFO << "BINS_M " << nucProcessCS->nm;
+  PLOG_INFO << "BINS_Y " << nucProcessCS->ny;
+  PLOG_INFO << "FLUX_POINT " << nucProcessCS->isPoint;
+  PLOG_INFO << "BREAKUP_MODE " << nucProcessCS->breakupMode;
+  PLOG_INFO << "NON_ZERO_GAM_PT " << nucProcessCS->useNonzeroGamPt;
+  PLOG_INFO << "USE_POLARIZED_CS " << usePolarizedCS;
+  PLOG_INFO << "PYTHIA_VERSION " << pythiaVersion;
+  PLOG_INFO << "PYTHIA8_FSR " << doFSR;
+  PLOG_INFO << "PYTHIA8_DECAYS " << doDecays;
+  PLOG_INFO << "SEED " << seed;
 }
 
 void UpcGenerator::processInPythia(vector<int>& pdgs,
