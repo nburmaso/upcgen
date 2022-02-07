@@ -23,6 +23,8 @@
 #include "UpcPhysConstants.h"
 #include "UpcSampler.h"
 
+#include "UpcTwoPhotonDipion.h"
+
 using namespace std;
 
 // out-of-line initialization for static members
@@ -38,7 +40,24 @@ void UpcGenerator::init()
   // get parameters from file
   initGeneratorFromFile();
 
-  // sanity checks
+  // sanity checks: lbyl
+  if (procID == 1) {
+    // for gamma+gamma -> gamma+gamma grid size is set explicitly
+    // because elem. cross sections are already stored in files
+    PLOG_WARNING << "For light-by-light scattering grid sizes along Z and M are fixed -- see parameters check";
+    nucProcessCS->zmin = -0.99;
+    nucProcessCS->zmax = 0.99;
+    nucProcessCS->nz = 197;
+    nucProcessCS->mmin = 0.05;
+    nucProcessCS->mmax = 5.;
+    nucProcessCS->nm = 1000;
+    if (usePolarizedCS) {
+      PLOG_WARNING << "For light-by-light scattering polarized cross section is not available";
+      usePolarizedCS = false;
+    }
+  }
+
+  // sanity checks: pi0pi0
   if (procID == 20) {
     // for gamma+gamma -> pi0 pi0 grid size is set explicitly
     // because elem. cross sections are already stored in files
@@ -280,7 +299,7 @@ void UpcGenerator::processPions(vector<int>& pdgs,
 
   // first pion
   double mPhot1 = 0.;
-  double ePhot1 = particles[0].M() / 2.;
+  double ePhot1 = particles[0].Mag() / 2.;
   double pPhot1 = sqrt(ePhot1 * ePhot1 - mPhot1 * mPhot1);
   double phi1 = gRandom->Uniform(0., 2. * M_PI);
   double cost1 = gRandom->Uniform(-1., 1.);
@@ -306,7 +325,7 @@ void UpcGenerator::processPions(vector<int>& pdgs,
 
   // second pion
   double mPhot2 = 0.;
-  double ePhot2 = particles[1].M() / 2.;
+  double ePhot2 = particles[1].Mag() / 2.;
   double pPhot2 = sqrt(ePhot2 * ePhot2 - mPhot2 * mPhot2);
   double phi2 = gRandom->Uniform(0., 2. * M_PI);
   double cost2 = gRandom->Uniform(-1., 1.);
@@ -411,11 +430,12 @@ void UpcGenerator::generateEvents()
 
     nucProcessCS->fillCrossSectionZM(hCrossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
   } else {
-    hCrossSectionZM = new TH2D("hCrossSectionMZ", ";m [gev]; z; cs [nb/gev]",
+    hCrossSectionZM = new TH2D("hCrossSectionZM_", ";m [gev]; z; cs [nb/gev]",
                                nz, zmin, zmax,
                                nm, mmin, mmax);
 
     nucProcessCS->fillCrossSectionZM(hCrossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
+    // hCrossSectionZM = ((UpcTwoPhotonDipion*)nucProcessCS->elemProcess)->hCrossSectionZM;
   }
 
   // calculating nuclear cross section in YM space
@@ -586,7 +606,7 @@ void UpcGenerator::generateEvents()
 
     TLorentzVector pPair;
     nucProcessCS->getPairMomentum(mPair, yPair, pPair);
-    double pMag = TMath::Sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
+    double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
     TVector3 vLep;
     vLep.SetMagThetaPhi(pMag, theta, phi);
     TLorentzVector tlLep1, tlLep2;
@@ -636,6 +656,10 @@ void UpcGenerator::generateEvents()
   }
 
 #ifndef USE_HEPMC
+  if (debug > 0) {
+    hNucCSM->Write();
+    hNucCSYM->Write();
+  }
   mOutFile->Write();
   mOutFile->Close();
 #endif

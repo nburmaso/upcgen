@@ -19,32 +19,29 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-/// disclaimer: cross section calculated by Mariola Klusek-Gawenda et al
-/// see https://arxiv.org/pdf/1302.4204.pdf for more information
-
-#include "UpcTwoPhotonDipion.h"
+#include "UpcTwoPhotonLbyL.h"
 
 #include "TFile.h"
 
-UpcTwoPhotonDipion::UpcTwoPhotonDipion()
+UpcTwoPhotonLbyL::UpcTwoPhotonLbyL()
 {
-  mPart = 0.1349770; // pi0 mass from PDG
-  partPDG = 111;
+  mPart = 0.0;
+  partPDG = 22;
   isCharged = false;
 
   // load cross sections from files
-  auto* f_m = new TFile("../cross_sections/pi0pi0/cross_section_m.root");
+  auto* f_m = new TFile("../cross_sections/lbyl/cross_section_m.root");
   hCrossSectionM = (TH1D*)f_m->Get("hCrossSectionM");
   hCrossSectionM->SetDirectory(nullptr);
   f_m->Close();
 
-  auto* f_zm = new TFile("../cross_sections/pi0pi0/cross_section_zm.root");
+  auto* f_zm = new TFile("../cross_sections/lbyl/cross_section_zm.root");
   hCrossSectionZM = (TH2D*)f_zm->Get("hCrossSectionZM");
   hCrossSectionZM->SetDirectory(nullptr);
   f_zm->Close();
 }
 
-double UpcTwoPhotonDipion::calcCrossSectionM(double m)
+double UpcTwoPhotonLbyL::calcCrossSectionM(double m)
 {
   int binM = hCrossSectionM->GetXaxis()->FindBin(m);
   double cs = hCrossSectionM->GetBinContent(binM);
@@ -52,7 +49,7 @@ double UpcTwoPhotonDipion::calcCrossSectionM(double m)
   // [nb]
 }
 
-double UpcTwoPhotonDipion::calcCrossSectionZM(double z, double m)
+double UpcTwoPhotonLbyL::calcCrossSectionZM(double z, double m)
 {
   int binZ = hCrossSectionZM->GetXaxis()->FindBin(z);
   int binM = hCrossSectionZM->GetYaxis()->FindBin(m);

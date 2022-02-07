@@ -49,6 +49,10 @@ UpcCrossSection::~UpcCrossSection() = default;
 void UpcCrossSection::setElemProcess(int procID)
 {
   switch (procID) {
+    case 1: { // light-by-light
+      elemProcess = new UpcTwoPhotonLbyL();
+      break;
+    }
     case 10: { // dielectron photoproduction
       int pdg = 11;
       elemProcess = new UpcTwoPhotonDilep(pdg);
@@ -292,13 +296,13 @@ void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
                                         int flag)
 {
   double m, z;
-  double dm = (mmax - mmin) / nm;
-  double dz = (zmax - zmin) / nz;
+  double dm = (mmax - mmin) / (nm - 1);
+  double dz = (zmax - zmin) / (nz - 1);
   double cs;
-  for (int im = 0; im < nm; im++) {
-    m = mmin + dm * im;
-    for (int iz = 0; iz < nz; iz++) {
-      z = zmin + dz * iz;
+  for (int im = 1; im <= nm; im++) {
+    m = mmin + dm * (im - 1);
+    for (int iz = 1; iz <= nz; iz++) {
+      z = zmin + dz * (iz - 1);
       if (flag == 0) { // the usual unpolarized cross section
         cs = elemProcess->calcCrossSectionZM(z, m);
       }

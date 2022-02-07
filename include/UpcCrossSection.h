@@ -28,6 +28,7 @@
 #include "UpcElemProcess.h"
 #include "UpcTwoPhotonDilep.h"
 #include "UpcTwoPhotonDipion.h"
+#include "UpcTwoPhotonLbyL.h"
 
 #include "TClonesArray.h"
 #include "TF1.h"
