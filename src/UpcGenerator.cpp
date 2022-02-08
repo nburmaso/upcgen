@@ -49,7 +49,7 @@ void UpcGenerator::init()
     nucProcessCS->zmax = 0.99;
     nucProcessCS->nz = 197;
     nucProcessCS->mmin = 0.05;
-    nucProcessCS->mmax = 5.;
+    nucProcessCS->mmax = 50.;
     nucProcessCS->nm = 1000;
     if (usePolarizedCS) {
       PLOG_WARNING << "For light-by-light scattering polarized cross section is not available";
