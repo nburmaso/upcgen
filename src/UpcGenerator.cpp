@@ -215,6 +215,15 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inSeed) {
         seed = stol(parValue);
       }
+      if (parameter == parDict.inDoMCut) {
+        nucProcessCS->doMassCut = stoi(parValue);
+      }
+      if (parameter == parDict.inLowMCut) {
+        nucProcessCS->lowMCut = stod(parValue);
+      }
+      if (parameter == parDict.inHighMCut) {
+        nucProcessCS->hiMCut = stod(parValue);
+      }
     }
     fInputs.close();
   } else {
@@ -254,6 +263,9 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "PYTHIA8_FSR " << doFSR;
   PLOG_INFO << "PYTHIA8_DECAYS " << doDecays;
   PLOG_INFO << "SEED " << seed;
+  PLOG_INFO << "DO_M_CUT " << nucProcessCS->doMassCut;
+  PLOG_INFO << "LOW_M_CUT " << nucProcessCS->lowMCut;
+  PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
 }
 
 void UpcGenerator::processInPythia(vector<int>& pdgs,
@@ -493,57 +505,21 @@ void UpcGenerator::generateEvents()
     }
   }
 
-  // setting up samplers
+  // setting up histograms for sampling
   // -----------------------------------------------------------------------
   auto* hNucCSM = hNucCSYM->ProjectionY();
-  vector<double> mGrid(nm, 0.);
-  for (int i = 0; i < nm; i++) {
-    mGrid[i] = mmin + i * dm;
-  }
-
-  vector<double> yGrid(ny, 0.);
-  for (int i = 0; i < ny; i++) {
-    yGrid[i] = ymin + i * dy;
-  }
-
-  vector<double> zGrid(nz, 0.);
-  for (int i = 0; i < nz; i++) {
-    zGrid[i] = zmin + i * dz;
-  }
-
-  // sampler for nuclear cross section
-  auto* samplerNuc = new UpcSampler();
-  samplerNuc->setSeed(seed);
-  samplerNuc->setYGrid(mGrid);
-  samplerNuc->setXGrid(yGrid);
-  samplerNuc->setDistr1D(hNucCSM, nm);
-  samplerNuc->setDistr2D(hNucCSYM, ny, nm);
-
-  // sampler for unpolarized cs
-  UpcSampler* samplerElem;
-
-  // samplers for polarized cs
-  UpcSampler* samplerElemS;
-  UpcSampler* samplerElemPS;
-
+  vector<TH1D*> hCrossSecsZ(nm);
+  vector<TH1D*> hCrossSecsZ_S(nm);
+  vector<TH1D*> hCrossSecsZ_PS(nm);
   if (!usePolarizedCS) {
-    samplerElem = new UpcSampler();
-    samplerElem->setSeed(seed);
-    samplerElem->setXGrid(zGrid);
-    samplerElem->setYGrid(mGrid);
-    samplerElem->setDistr2D(hCrossSectionZM, nz, nm);
+    for (int i = 0; i < nm; i++) {
+      hCrossSecsZ[i] = hCrossSectionZM->ProjectionX(Form("hCrossSecsZ_%d", i), i, i);
+    }
   } else {
-    samplerElemS = new UpcSampler();
-    samplerElemS->setSeed(seed);
-    samplerElemS->setXGrid(zGrid);
-    samplerElemS->setYGrid(mGrid);
-    samplerElemS->setDistr2D(hCrossSectionZMPolS, nz, nm);
-
-    samplerElemPS = new UpcSampler();
-    samplerElemPS->setSeed(seed);
-    samplerElemPS->setXGrid(zGrid);
-    samplerElemPS->setYGrid(mGrid);
-    samplerElemPS->setDistr2D(hCrossSectionZMPolPS, nz, nm);
+    for (int i = 0; i < nm; i++) {
+      hCrossSecsZ_S[i] = hCrossSectionZMPolS->ProjectionX(Form("hCrossSecsZPolS_%d", i), i, i);
+      hCrossSecsZ_PS[i] = hCrossSectionZMPolPS->ProjectionX(Form("hCrossSecsZPolPS_%d", i), i, i);
+    }
   }
 
   // generationg events
@@ -552,8 +528,9 @@ void UpcGenerator::generateEvents()
 #ifndef USE_HEPMC
   // initialize file output
   PLOG_WARNING << "Using ROOT tree for output!";
-  PLOG_INFO << "Events will be written to " << "events.root";
-  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 5); // using LZ4 with level 5 compression
+  PLOG_INFO << "Events will be written to "
+            << "events.root";
+  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
   mOutTree = new TTree("particles", "Generated particles");
   mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
   mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
@@ -567,7 +544,8 @@ void UpcGenerator::generateEvents()
   mOutTree->SetAutoSave(0);
 #else
   PLOG_WARNING << "Using HepMC format for output!";
-  PLOG_INFO << "Events will be written to " << "events.hepmc";
+  PLOG_INFO << "Events will be written to "
+            << "events.hepmc";
   writerHepMC = new HepMC3::WriterAscii("events.hepmc");
 #endif
 
@@ -581,11 +559,10 @@ void UpcGenerator::generateEvents()
     }
 
     // pick pair m and y from nuclear cross section
-    int yPairBin;
-    int mPairBin;
-    samplerNuc->sample2D(mPairBin, yPairBin);
-    double mPair = mGrid[mPairBin];
-    double yPair = yGrid[yPairBin];
+    double mPair, yPair;
+    hNucCSYM->GetRandom2(yPair, mPair);
+    int yPairBin = hNucCSYM->GetXaxis()->FindBin(yPair);
+    int mPairBin = hNucCSYM->GetYaxis()->FindBin(mPair);
 
     // pick z = cos(theta) for corresponding m from elem. cross section
     double cost;
@@ -593,27 +570,32 @@ void UpcGenerator::generateEvents()
       double frac = hPolCSRatio[yPairBin][mPairBin];
       bool pickScalar = gRandom->Uniform(0, 1) < frac;
       if (pickScalar) {
-        samplerElemS->sampleXAtY(mPairBin, cost);
+        cost = hCrossSecsZ_S[mPairBin]->GetRandom();
       } else {
-        samplerElemPS->sampleXAtY(mPairBin, cost);
+        cost = hCrossSecsZ_PS[mPairBin]->GetRandom();
       }
     } else {
-      samplerElem->sampleXAtY(mPairBin, cost);
+      cost = hCrossSecsZ[mPairBin]->GetRandom();
     }
 
-    double theta = TMath::ACos(cost);
-    double phi = gRandom->Uniform(0., 2. * M_PI);
+    double theta1 = acos(cost);
+    double theta2 = acos(-cost);
+    double phi1 = gRandom->Uniform(0., 2. * M_PI);
+    double phi2 = phi1 > M_PI ? phi1 - M_PI : phi1 + M_PI;
 
     TLorentzVector pPair;
     nucProcessCS->getPairMomentum(mPair, yPair, pPair);
     double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
-    TVector3 vLep;
-    vLep.SetMagThetaPhi(pMag, theta, phi);
-    TLorentzVector tlLep1, tlLep2;
-    tlLep1.SetVectM(vLep, mPart);
-    tlLep2.SetVectM(-vLep, mPart);
-    particles.emplace_back(tlLep1);
-    particles.emplace_back(tlLep2);
+
+    TVector3 vec1, vec2;
+    vec1.SetMagThetaPhi(pMag, theta1, phi1);
+    vec2.SetMagThetaPhi(pMag, theta2, phi2);
+
+    TLorentzVector tlVec1, tlVec2;
+    tlVec1.SetVectM(vec1, mPart);
+    tlVec2.SetVectM(vec2, mPart);
+    particles.emplace_back(tlVec1);
+    particles.emplace_back(tlVec2);
 
     TVector3 boost = pPair.BoostVector();
     particles[0].Boost(boost);

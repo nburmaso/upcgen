@@ -110,6 +110,10 @@ class UpcGenerator
     string inPythia8FSR{"PYTHIA8_FSR"};
     string inPythia8Decays{"PYTHIA8_DECAYS"};
     string inSeed{"SEED"};
+    // fixme : to be removed
+    string inDoMCut{"DO_M_CUT"};
+    string inLowMCut{"LOW_M_CUT"};
+    string inHighMCut{"HIGH_M_CUT"};
   };
 
   // debug level

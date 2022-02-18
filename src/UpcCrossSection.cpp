@@ -50,7 +50,7 @@ void UpcCrossSection::setElemProcess(int procID)
 {
   switch (procID) {
     case 1: { // light-by-light
-      elemProcess = new UpcTwoPhotonLbyL();
+      elemProcess = new UpcTwoPhotonLbyL(doMassCut, lowMCut, hiMCut);
       break;
     }
     case 10: { // dielectron photoproduction
@@ -69,7 +69,7 @@ void UpcCrossSection::setElemProcess(int procID)
       break;
     }
     case 20: { // pi0pi0 meson photoproduction
-      elemProcess = new UpcTwoPhotonDipion();
+      elemProcess = new UpcTwoPhotonDipion(doMassCut, lowMCut, hiMCut);
       break;
     }
     default: {
@@ -296,8 +296,8 @@ void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
                                         int flag)
 {
   double m, z;
-  double dm = (mmax - mmin) / (nm - 1);
-  double dz = (zmax - zmin) / (nz - 1);
+  double dm = (mmax - mmin) / nm;
+  double dz = (zmax - zmin) / nz;
   double cs;
   for (int im = 1; im <= nm; im++) {
     m = mmin + dm * (im - 1);

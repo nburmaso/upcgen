@@ -23,7 +23,7 @@
 
 #include "TFile.h"
 
-UpcTwoPhotonLbyL::UpcTwoPhotonLbyL()
+UpcTwoPhotonLbyL::UpcTwoPhotonLbyL(bool doMassCut, double lowMCut, double hiMCut)
 {
   mPart = 0.0;
   partPDG = 22;
@@ -39,6 +39,21 @@ UpcTwoPhotonLbyL::UpcTwoPhotonLbyL()
   hCrossSectionZM = (TH2D*)f_zm->Get("hCrossSectionZM");
   hCrossSectionZM->SetDirectory(nullptr);
   f_zm->Close();
+
+  // todo: temporary workaround for lbyl,
+  //  to be removed
+  if (doMassCut) {
+    int lowBin = hCrossSectionM->GetXaxis()->FindBin(lowMCut);
+    int hiBin = hCrossSectionM->GetXaxis()->FindBin(hiMCut);
+    for (int i = 1; i <= hCrossSectionM->GetNbinsX(); i++) {
+      if (i < lowBin || i > hiBin) {
+        hCrossSectionM->SetBinContent(i, 0.);
+        for (int j = 1; j <= hCrossSectionZM->GetNbinsX(); j++) {
+          hCrossSectionZM->SetBinContent(j, i, 0.);
+        }
+      }
+    }
+  }
 }
 
 double UpcTwoPhotonLbyL::calcCrossSectionM(double m)

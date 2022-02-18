@@ -33,7 +33,7 @@
 class UpcTwoPhotonLbyL : public UpcElemProcess
 {
  public:
-  UpcTwoPhotonLbyL();
+  UpcTwoPhotonLbyL(bool doMassCut, double lowMCut, double hiMCut);
 
   ~UpcTwoPhotonLbyL() = default;
 

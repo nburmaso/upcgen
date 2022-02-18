@@ -26,7 +26,7 @@
 
 #include "TFile.h"
 
-UpcTwoPhotonDipion::UpcTwoPhotonDipion()
+UpcTwoPhotonDipion::UpcTwoPhotonDipion(bool doMassCut, double lowMCut, double hiMCut)
 {
   mPart = 0.1349770; // pi0 mass from PDG
   partPDG = 111;
@@ -42,6 +42,21 @@ UpcTwoPhotonDipion::UpcTwoPhotonDipion()
   hCrossSectionZM = (TH2D*)f_zm->Get("hCrossSectionZM");
   hCrossSectionZM->SetDirectory(nullptr);
   f_zm->Close();
+
+  // todo: temporary workaround for pi0pi0,
+  //  to be removed
+  if (doMassCut) {
+    int lowBin = hCrossSectionM->GetXaxis()->FindBin(lowMCut);
+    int hiBin = hCrossSectionM->GetXaxis()->FindBin(hiMCut);
+    for (int i = 1; i <= hCrossSectionM->GetNbinsX(); i++) {
+      if (i < lowBin || i > hiBin) {
+        hCrossSectionM->SetBinContent(i, 0.);
+        for (int j = 1; j <= hCrossSectionZM->GetNbinsX(); j++) {
+          hCrossSectionZM->SetBinContent(j, i, 0.);
+        }
+      }
+    }
+  }
 }
 
 double UpcTwoPhotonDipion::calcCrossSectionM(double m)

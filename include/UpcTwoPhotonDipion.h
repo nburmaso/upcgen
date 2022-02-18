@@ -35,7 +35,7 @@
 class UpcTwoPhotonDipion : public UpcElemProcess
 {
  public:
-  UpcTwoPhotonDipion();
+  UpcTwoPhotonDipion(bool doMassCut, double lowMCut, double hiMCut);
 
   ~UpcTwoPhotonDipion() = default;
 

@@ -118,6 +118,10 @@ class UpcCrossSection
   double ymax{6.};   // max pair rapidity
   int ny{121};       // n bins in Y
 
+  bool doMassCut{false};
+  double lowMCut{0};
+  double hiMCut{9999};
+
   // scaling factor
   double factor{Z * Z * phys_consts::alpha / M_PI / M_PI / phys_consts::hc / phys_consts::hc};
 
