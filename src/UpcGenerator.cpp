@@ -74,12 +74,12 @@ void UpcGenerator::init()
     }
   }
 
-  PLOG_WARNING << "Check inputs:";
-  printParameters();
-
   nucProcessCS->numThreads = numThreads;
   nucProcessCS->init();
   nucProcessCS->setElemProcess(procID);
+
+  PLOG_WARNING << "Check inputs:";
+  printParameters();
 
   // if not dummy, set for dilepton photoproduction
   if (aLep > -9999 && (procID >= 10 && procID <= 12)) {
