@@ -33,7 +33,7 @@ set(CMAKE_CXX_STANDARD 11)
 # set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 # set(CMAKE_CXX_FLAGS_DEBUG "-g")
-# set(CMAKE_CXX_FLAGS "-O0")
+set(CMAKE_CXX_FLAGS "-O2")
 
 option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" ON)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" ON)

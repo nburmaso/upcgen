@@ -47,7 +47,7 @@ void UpcGenerator::init()
     PLOG_WARNING << "For light-by-light scattering grid sizes along Z and M are fixed -- see parameters check";
     nucProcessCS->zmin = -0.99;
     nucProcessCS->zmax = 0.99;
-    nucProcessCS->nz = 197;
+    nucProcessCS->nz = 198;
     nucProcessCS->mmin = 0.05;
     nucProcessCS->mmax = 50.;
     nucProcessCS->nm = 1000;
@@ -525,6 +525,8 @@ void UpcGenerator::generateEvents()
   // generationg events
   // -----------------------------------------------------------------------
 
+  auto* hist = new TH1D("hist", "", 100, -1, 1);
+
 #ifndef USE_HEPMC
   // initialize file output
   PLOG_WARNING << "Using ROOT tree for output!";
@@ -577,6 +579,8 @@ void UpcGenerator::generateEvents()
     } else {
       cost = hCrossSecsZ[mPairBin]->GetRandom();
     }
+
+    hist->Fill(cost);
 
     double theta1 = acos(cost);
     double theta2 = acos(-cost);
@@ -641,6 +645,7 @@ void UpcGenerator::generateEvents()
   if (debug > 0) {
     hNucCSM->Write();
     hNucCSYM->Write();
+    hist->Write();
   }
   mOutFile->Write();
   mOutFile->Close();
