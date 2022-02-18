@@ -525,15 +525,13 @@ void UpcGenerator::generateEvents()
   // generationg events
   // -----------------------------------------------------------------------
 
-  auto* hist = new TH1D("hist", "", 100, -1, 1);
-
 #ifndef USE_HEPMC
   // initialize file output
   PLOG_WARNING << "Using ROOT tree for output!";
   PLOG_INFO << "Events will be written to "
             << "events.root";
-  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
   mOutTree = new TTree("particles", "Generated particles");
+  mOutTree->SetDirectory(nullptr);
   mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
   mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
   mOutTree->Branch("particleID", &particle.particleID, "particleID/I");
@@ -579,8 +577,6 @@ void UpcGenerator::generateEvents()
     } else {
       cost = hCrossSecsZ[mPairBin]->GetRandom();
     }
-
-    hist->Fill(cost);
 
     double theta1 = acos(cost);
     double theta2 = acos(-cost);
@@ -642,10 +638,11 @@ void UpcGenerator::generateEvents()
   }
 
 #ifndef USE_HEPMC
+  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
+  mOutTree->Write();
   if (debug > 0) {
     hNucCSM->Write();
     hNucCSYM->Write();
-    hist->Write();
   }
   mOutFile->Write();
   mOutFile->Close();

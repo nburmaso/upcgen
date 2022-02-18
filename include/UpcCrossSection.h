@@ -135,13 +135,14 @@ class UpcCrossSection
   double vGAA[nb]{};
   double vRho[nb]{};
 
-  // lookup tables
+  // lookup tables and maps for cached functions etc.
   static constexpr double Q2min{1e-9};
   static constexpr double Q2max{100};
   static constexpr int nQ2{10000000};
   static constexpr double dQ2{(Q2max - Q2min) / nQ2};
-  static double* vCachedFormFac; // Q^2-grid for possible form factor values
-  double* vCachedBreakup;        // b-grid for possible breakup probabilities
+  static double* vCachedFormFac;    // Q^2-grid for possible form factor values
+  double* vCachedBreakup;           // b-grid for possible breakup probabilities
+  std::map<int, TH1D*> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
 
   // simulation parameters
   bool isPoint{true}; // flux calculation parameter

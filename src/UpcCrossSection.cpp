@@ -913,42 +913,32 @@ L102:
   return _pPhotonBreakup;
 }
 
-// Function from Starlight
-// (by S.R.Klein, J.Nystrand, J.Seger, Y.Gorbunov, J.Butterworth)
 double UpcCrossSection::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
   double y1 = TMath::ACosH(g1);
   double y2 = -TMath::ACosH(g2);
   double gtot = TMath::CosH((y1 - y2) / 2.);
-
   double ereds = (ePhot / gtot) * (ePhot / gtot);
-  double Cm = TMath::Sqrt(3.) * ePhot / gtot;
-  double arg = Cm * Cm + ereds;
-  double sFFactCM = getCachedFormFac(arg);
-  double Coef = 3. * (sFFactCM * sFFactCM * Cm * Cm * Cm) / (pi2x4 * arg * arg);
-
-  double x = gRandom->Uniform(0, 1);
-  double pp = x * 5. * phys_consts::hc / R;
-  arg = pp * pp + ereds;
-  double sFFactPt1 = getCachedFormFac(arg);
-  double test = (sFFactPt1 * sFFactPt1) * pp * pp * pp / (pi2x4 * arg * arg);
-
-  bool satisfy = false;
-  while (!satisfy) {
-    double u = gRandom->Uniform(0, 1);
-    if (u * Coef < test) {
-      satisfy = true;
-    } else {
-      x = gRandom->Uniform(0, 1);
-      pp = x * 5 * phys_consts::hc / R;
-      arg = pp * pp + ereds;
-      double sFFactPt2 = getCachedFormFac(arg);
-      test = (sFFactPt2 * sFFactPt2) * pp * pp * pp / (pi2x4 * arg * arg);
+  int ePhot_key = ePhot * 1e3;
+  constexpr int nbins = 5000;
+  auto it = photPtDistrMap.find(ePhot_key);
+  TH1D* ptDistr;
+  if (it == photPtDistrMap.end()) {
+    ptDistr = new TH1D(Form("ptDistr%d", ePhot_key), "", nbins, 0., 6. * phys_consts::hc / R);
+    for (int bin = 1; bin <= nbins; bin++) {
+      double pt = 6. * phys_consts::hc / R / nbins * bin;
+      double arg = pt * pt + ereds;
+      double sFFactPt1 = getCachedFormFac(arg);
+      double prob = (sFFactPt1 * sFFactPt1) * pt * pt * pt / (pi2x4 * arg * arg);
+      ptDistr->SetBinContent(bin, prob);
     }
+    photPtDistrMap[ePhot_key] = ptDistr;
+  } else {
+    ptDistr = it->second;
   }
-
-  return pp;
+  double pt = ptDistr->GetRandom();
+  return pt;
 }
 
 void UpcCrossSection::getPairMomentum(double mPair, double yPair, TLorentzVector& pPair)

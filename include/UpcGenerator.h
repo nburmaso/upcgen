@@ -145,7 +145,7 @@ class UpcGenerator
   UpcCrossSection* nucProcessCS;
 
   // helper struct for file output
-  struct {
+  struct outParticle {
     int eventNumber;
     int pdgCode;
     int particleID;
@@ -155,10 +155,11 @@ class UpcGenerator
     double py;
     double pz;
     double e;
-  } particle;
+  };
 
   TFile* mOutFile;
   TTree* mOutTree;
+  outParticle particle{};
 
   void writeEvent(int evt,
                   const vector<int>& pdgs,
