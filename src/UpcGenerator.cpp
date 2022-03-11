@@ -407,6 +407,8 @@ void UpcGenerator::writeEvent(int evt,
 
 void UpcGenerator::generateEvents()
 {
+  gErrorIgnoreLevel = 6001; // fixme: temporary workaround
+
   TH2D* hCrossSectionZM;
   TH2D* hCrossSectionZMPolS;
   TH2D* hCrossSectionZMPolPS;

@@ -58,7 +58,7 @@ void UpcCrossSection::setElemProcess(int procID)
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 11: { // dimuon photoproduction
+    case 11: { // ditau photoproduction
       int pdg = 13;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
