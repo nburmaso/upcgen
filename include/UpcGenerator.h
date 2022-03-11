@@ -142,7 +142,7 @@ class UpcGenerator
   void generateEvents();
 
  private:
-  UpcCrossSection* nucProcessCS;
+  UpcCrossSection* nucProcessCS{nullptr};
 
   // helper struct for file output
   struct outParticle {
@@ -157,8 +157,8 @@ class UpcGenerator
     double e;
   };
 
-  TFile* mOutFile;
-  TTree* mOutTree;
+  TFile* mOutFile{nullptr};
+  TTree* mOutTree{nullptr};
   outParticle particle{};
 
   void writeEvent(int evt,
@@ -171,7 +171,7 @@ class UpcGenerator
   int pythiaVersion{-1}; // not using Pythia at all by default
   bool isPythiaUsed{false};
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
-  UpcPythiaBase* decayer;
+  UpcPythiaBase* decayer{nullptr};
 #endif
   bool doFSR{false};
   bool doDecays{false};

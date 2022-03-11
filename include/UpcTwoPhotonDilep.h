@@ -32,7 +32,7 @@ class UpcTwoPhotonDilep : public UpcElemProcess
  public:
   explicit UpcTwoPhotonDilep(int partPDG);
 
-  ~UpcTwoPhotonDilep() = default;
+  ~UpcTwoPhotonDilep() override = default;
 
   // anomalous magnetic moment
   double aLep{0};

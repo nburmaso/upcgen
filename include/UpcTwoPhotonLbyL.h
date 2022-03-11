@@ -35,12 +35,15 @@ class UpcTwoPhotonLbyL : public UpcElemProcess
  public:
   UpcTwoPhotonLbyL(bool doMassCut, double lowMCut, double hiMCut);
 
-  ~UpcTwoPhotonLbyL() = default;
+  ~UpcTwoPhotonLbyL() override
+  {
+    delete hCrossSectionM;
+    delete hCrossSectionZM;
+  }
 
   // for this process, cross sections are stored in files
-  TH1D* hCrossSectionM;
-
-  TH2D* hCrossSectionZM;
+  TH1D* hCrossSectionM{nullptr};
+  TH2D* hCrossSectionZM{nullptr};
 
   double calcCrossSectionM(double m) override;
 

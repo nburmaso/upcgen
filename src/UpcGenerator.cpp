@@ -116,11 +116,17 @@ void UpcGenerator::init()
   }
 }
 
-UpcGenerator::~UpcGenerator() = default;
+UpcGenerator::~UpcGenerator()
+{
+  delete decayer;
+  delete nucProcessCS;
+  delete mOutTree;
+  delete mOutFile;
+}
 
 void UpcGenerator::initGeneratorFromFile()
 {
-  // todo: use <any> from c++17 for a neat parsing???
+  // todo: use <any> from c++17 for a neat parsing?
   if (!gSystem->AccessPathName("parameters.in")) {
     PLOG_INFO << "Reading parameters from parameters.in ...";
     InputPars parDict;
@@ -409,9 +415,9 @@ void UpcGenerator::generateEvents()
 {
   gErrorIgnoreLevel = 6001; // fixme: temporary workaround
 
-  TH2D* hCrossSectionZM;
-  TH2D* hCrossSectionZMPolS;
-  TH2D* hCrossSectionZMPolPS;
+  TH2D* hCrossSectionZM = nullptr;
+  TH2D* hCrossSectionZMPolS = nullptr;
+  TH2D* hCrossSectionZMPolPS = nullptr;
 
   int nm = nucProcessCS->nm;
   double mmin = nucProcessCS->mmin;
@@ -510,9 +516,9 @@ void UpcGenerator::generateEvents()
   // setting up histograms for sampling
   // -----------------------------------------------------------------------
   auto* hNucCSM = hNucCSYM->ProjectionY();
-  vector<TH1D*> hCrossSecsZ(nm);
-  vector<TH1D*> hCrossSecsZ_S(nm);
-  vector<TH1D*> hCrossSecsZ_PS(nm);
+  vector<TH1D*> hCrossSecsZ(nm, nullptr);
+  vector<TH1D*> hCrossSecsZ_S(nm, nullptr);
+  vector<TH1D*> hCrossSecsZ_PS(nm, nullptr);
   if (!usePolarizedCS) {
     for (int i = 0; i < nm; i++) {
       hCrossSecsZ[i] = hCrossSectionZM->ProjectionX(Form("hCrossSecsZ_%d", i), i, i);
@@ -653,4 +659,17 @@ void UpcGenerator::generateEvents()
 #ifdef USE_HEPMC
   writerHepMC->close();
 #endif
+
+  delete hCrossSectionZM;
+  delete hCrossSectionZMPolS;
+  delete hCrossSectionZMPolPS;
+
+  delete hNucCSM;
+  delete hNucCSYM;
+
+  for (int i = 0; i < nm; i++) {
+    delete hCrossSecsZ[i];
+    delete hCrossSecsZ_S[i];
+    delete hCrossSecsZ_PS[i];
+  }
 }

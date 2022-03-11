@@ -141,7 +141,7 @@ class UpcCrossSection
   static constexpr int nQ2{10000000};
   static constexpr double dQ2{(Q2max - Q2min) / nQ2};
   static double* vCachedFormFac;    // Q^2-grid for possible form factor values
-  double* vCachedBreakup;           // b-grid for possible breakup probabilities
+  double* vCachedBreakup{nullptr};           // b-grid for possible breakup probabilities
   std::map<int, TH1D*> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
 
   // simulation parameters
@@ -162,7 +162,7 @@ class UpcCrossSection
 
   // elementary process setter
   void setElemProcess(int procID);
-  UpcElemProcess* elemProcess;
+  UpcElemProcess* elemProcess{nullptr};
 
   void init();
 

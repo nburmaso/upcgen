@@ -28,16 +28,16 @@ class UpcElemProcess
 {
  public:
   UpcElemProcess() = default;
-  ~UpcElemProcess() = default;
+  virtual ~UpcElemProcess() {}
 
   // mass of a particle in final state
-  double mPart;
+  double mPart{};
 
   // pdg code of a particle
-  int partPDG;
+  int partPDG{};
 
   // final-state is charged or not
-  bool isCharged;
+  bool isCharged{};
 
   // `standard` unpolarized cross sections
   virtual double calcCrossSectionM(double m) = 0;

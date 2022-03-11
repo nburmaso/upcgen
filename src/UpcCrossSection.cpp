@@ -44,7 +44,12 @@ UpcCrossSection::UpcCrossSection()
   vCachedBreakup = new double[nbc];
 }
 
-UpcCrossSection::~UpcCrossSection() = default;
+UpcCrossSection::~UpcCrossSection()
+{
+  delete[] vCachedFormFac;
+  delete[] vCachedBreakup;
+  delete elemProcess;
+}
 
 void UpcCrossSection::setElemProcess(int procID)
 {
@@ -356,6 +361,8 @@ void UpcCrossSection::prepareGAA()
     }
     vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
   }
+
+  delete gTA;
 }
 
 void UpcCrossSection::prepareBreakupProb()
@@ -547,9 +554,9 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   double dy = (ymax - ymin) / (ny - 1);
   double dm = (mmax - mmin) / (nm - 1);
 
-  TH2D* hD2LDMDY;
-  TH2D* hD2LDMDY_s;
-  TH2D* hD2LDMDY_p;
+  TH2D* hD2LDMDY = nullptr;
+  TH2D* hD2LDMDY_s = nullptr;
+  TH2D* hD2LDMDY_p = nullptr;
 
   TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
   auto* f2DLumi = new TFile(fname, "r");
@@ -576,9 +583,9 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   {
     vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
     vector<vector<double>> rat_private(nm, vector<double>(ny, 0));
-    TH2D* hD2LDMDY_private;
-    TH2D* hD2LDMDY_private_s;
-    TH2D* hD2LDMDY_private_p;
+    TH2D* hD2LDMDY_private = nullptr;
+    TH2D* hD2LDMDY_private_s = nullptr;
+    TH2D* hD2LDMDY_private_p = nullptr;
     if (usePolarizedCS) {
       hD2LDMDY_private_s = (TH2D*)hD2LDMDY_s->Clone(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()));
       hD2LDMDY_private_p = (TH2D*)hD2LDMDY_p->Clone(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()));
@@ -621,8 +628,16 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
         }
       }
     }
+    delete hD2LDMDY_private;
+    delete hD2LDMDY_private_s;
+    delete hD2LDMDY_private_p;
   }
   omp_set_num_threads(1);
+
+  delete hD2LDMDY;
+  delete hD2LDMDY_s;
+  delete hD2LDMDY_p;
+
   PLOG_INFO << "Calculating nuclear cross section...Done!";
 
   // filling histograms
