@@ -472,9 +472,9 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     {
       auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
       auto* gGAA = new TGraph(nb, vb, vGAA);
-      TH2D* hD2LDMDY_private;
-      TH2D* hD2LDMDY_private_s;
-      TH2D* hD2LDMDY_private_p;
+      TH2D* hD2LDMDY_private = nullptr;
+      TH2D* hD2LDMDY_private_s = nullptr;
+      TH2D* hD2LDMDY_private_p = nullptr;
       if (usePolarizedCS) {
         hD2LDMDY_private_s = new TH2D(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
         hD2LDMDY_private_p = new TH2D(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
