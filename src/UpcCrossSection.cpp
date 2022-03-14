@@ -46,7 +46,6 @@ UpcCrossSection::UpcCrossSection()
 
 UpcCrossSection::~UpcCrossSection()
 {
-  delete[] vCachedFormFac;
   delete[] vCachedBreakup;
   delete elemProcess;
 }
@@ -63,12 +62,12 @@ void UpcCrossSection::setElemProcess(int procID)
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 11: { // ditau photoproduction
+    case 11: { // dimuon photoproduction
       int pdg = 13;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 12: { // dimuon photoproduction
+    case 12: { // ditau photoproduction
       int pdg = 15;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
