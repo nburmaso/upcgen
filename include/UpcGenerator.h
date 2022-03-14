@@ -61,8 +61,6 @@
 #include "HepMC3/WriterAsciiHepMC2.h"
 #endif
 
-using namespace std;
-
 class UpcGenerator
 {
  public:
@@ -162,10 +160,10 @@ class UpcGenerator
   outParticle particle{};
 
   void writeEvent(int evt,
-                  const vector<int>& pdgs,
-                  const vector<int>& statuses,
-                  const vector<int>& mothers,
-                  const vector<TLorentzVector>& particles);
+                  const std::vector<int>& pdgs,
+                  const std::vector<int>& statuses,
+                  const std::vector<int>& mothers,
+                  const std::vector<TLorentzVector>& particles);
 
   // pythia helper & decayer parameters
   int pythiaVersion{-1}; // not using Pythia at all by default
@@ -186,15 +184,15 @@ class UpcGenerator
 
   // internal methods for event treating
   // ----------------------------------------------------------------------
-  void processInPythia(vector<int>& pdgs,
-                       vector<int>& statuses,
-                       vector<int>& mothers,
-                       vector<TLorentzVector>& particles);
+  void processInPythia(std::vector<int>& pdgs,
+                       std::vector<int>& statuses,
+                       std::vector<int>& mothers,
+                       std::vector<TLorentzVector>& particles);
 
-  void processPions(vector<int>& pdgs,
-                    vector<int>& statuses,
-                    vector<int>& mothers,
-                    vector<TLorentzVector>& particles);
+  void processPions(std::vector<int>& pdgs,
+                    std::vector<int>& statuses,
+                    std::vector<int>& mothers,
+                    std::vector<TLorentzVector>& particles);
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_

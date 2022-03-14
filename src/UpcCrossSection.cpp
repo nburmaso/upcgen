@@ -654,7 +654,7 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
     }
   }
 
-  PLOG_INFO << "Total nuclear cross section = " << cssum * 1e-6 << " mb";
+  PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << cssum * 1e-6 << " mb";
 }
 
 // Function from Starlight
