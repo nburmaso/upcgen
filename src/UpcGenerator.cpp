@@ -118,7 +118,9 @@ void UpcGenerator::init()
 
 UpcGenerator::~UpcGenerator()
 {
+#if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
   delete decayer;
+#endif
   delete nucProcessCS;
   delete mOutTree;
   delete mOutFile;
