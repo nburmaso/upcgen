@@ -449,10 +449,10 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
     auto* f2DLumi = new TFile(fname, "recreate");
     // histograms for unpolarized case
-    TH2D* hD2LDMDY;
+    TH2D* hD2LDMDY = nullptr;
     // histograms for polarized case
-    TH2D* hD2LDMDY_s;
-    TH2D* hD2LDMDY_p;
+    TH2D* hD2LDMDY_s = nullptr;
+    TH2D* hD2LDMDY_p = nullptr;
     if (usePolarizedCS) {
       hD2LDMDY_s = new TH2D("hD2LDMDY_s", ";;", nm, mmin, mmax, ny, ymin, ymax);
       hD2LDMDY_p = new TH2D("hD2LDMDY_p", ";;", nm, mmin, mmax, ny, ymin, ymax);
@@ -512,6 +512,9 @@ void UpcCrossSection::prepareTwoPhotonLumi()
         } else {
           hD2LDMDY->Add(hD2LDMDY_private);
         }
+        delete hD2LDMDY_private;
+        delete hD2LDMDY_private_s;
+        delete hD2LDMDY_private_p;
       }
     }
     omp_set_num_threads(1);
@@ -637,6 +640,8 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   delete hD2LDMDY;
   delete hD2LDMDY_s;
   delete hD2LDMDY_p;
+  f2DLumi->Close();
+  delete f2DLumi;
 
   PLOG_INFO << "Calculating nuclear cross section...Done!";
 
