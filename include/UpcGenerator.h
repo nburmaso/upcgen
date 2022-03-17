@@ -69,7 +69,7 @@ class UpcGenerator
 
   // process-specific parameters
   int procID;
-  double aLep{-9999}; // dummy value
+  double aLep{0};
 
   // simulation parameters
   bool doPtCut{false};

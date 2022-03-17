@@ -82,7 +82,7 @@ void UpcGenerator::init()
   printParameters();
 
   // if not dummy, set for dilepton photoproduction
-  if (aLep > -9999 && (procID >= 10 && procID <= 12)) {
+  if (procID >= 10 && procID <= 12) {
     auto* proc = (UpcTwoPhotonDilep*)nucProcessCS->elemProcess;
     proc->aLep = aLep;
   }
