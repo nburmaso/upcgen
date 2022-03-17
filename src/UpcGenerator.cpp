@@ -74,18 +74,25 @@ void UpcGenerator::init()
     }
   }
 
-  nucProcessCS->numThreads = numThreads;
-  nucProcessCS->init();
   nucProcessCS->setElemProcess(procID);
+
+  // checks for dilepton production
+  if (procID >= 10 && procID <= 12) {
+    auto* proc = (UpcTwoPhotonDilep*)nucProcessCS->elemProcess;
+    proc->aLep = aLep;
+    double mPart = proc->mPart;
+    if (nucProcessCS->mmin < mPart * 2.) {
+      PLOG_WARNING << "MMIN is lower than 2 lepton masses! Setting MMIN to 2 lepton masses...";
+      nucProcessCS->mmin = mPart * 2.;
+    }
+  }
+
+  nucProcessCS->numThreads = numThreads;
 
   PLOG_WARNING << "Check inputs:";
   printParameters();
 
-  // if not dummy, set for dilepton photoproduction
-  if (procID >= 10 && procID <= 12) {
-    auto* proc = (UpcTwoPhotonDilep*)nucProcessCS->elemProcess;
-    proc->aLep = aLep;
-  }
+  nucProcessCS->init();
 
   // initialize the MT64 random number generator
   gRandom = new TRandomMT64();
