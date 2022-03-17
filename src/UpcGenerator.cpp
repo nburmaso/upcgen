@@ -469,51 +469,10 @@ void UpcGenerator::generateEvents()
   }
   nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
 
-  vector<double> cutsZ(hNucCSYM->GetNbinsY());
-  if (doPtCut) {
-    for (int mBin = 1; mBin <= nm; mBin++) {
-      double mass = hNucCSYM->GetYaxis()->GetBinLowEdge(mBin);
-      double sqt = TMath::Sqrt(mass * mass * 0.25 - mPart * mPart);
-      if (sqt <= minPt) {
-        cutsZ[mBin - 1] = 0;
-        for (int yBin = 1; yBin <= ny; yBin++) {
-          hNucCSYM->SetBinContent(yBin, mBin, 0);
-        }
-        continue;
-      }
-      double minZ = TMath::Sqrt(1 - minPt * minPt / (sqt * sqt));
-      cutsZ[mBin - 1] = minZ;
-    }
-  }
-
   vector<int> pdgs;
   vector<int> statuses;
   vector<int> mothers;
   vector<TLorentzVector> particles;
-
-  if (doPtCut) {
-    for (int mBin = 1; mBin <= nm; mBin++) {
-      double zCut = cutsZ[mBin - 1];
-      int zCutBinUp = hCrossSectionZM->GetXaxis()->FindBin(zCut);
-      int zCutBinLow = hCrossSectionZM->GetXaxis()->FindBin(-zCut);
-      for (int zBin = zCutBinUp + 1; zBin <= nz; zBin++) {
-        hCrossSectionZM->SetBinContent(zBin, mBin, 0);
-      }
-      for (int zBin = 1; zBin < zCutBinLow; zBin++) {
-        hCrossSectionZM->SetBinContent(zBin, mBin, 0);
-      }
-      if (usePolarizedCS) {
-        for (int zBin = zCutBinUp + 1; zBin <= nz; zBin++) {
-          hCrossSectionZMPolS->SetBinContent(zBin, mBin, 0);
-          hCrossSectionZMPolPS->SetBinContent(zBin, mBin, 0);
-        }
-        for (int zBin = 1; zBin < zCutBinLow; zBin++) {
-          hCrossSectionZMPolS->SetBinContent(zBin, mBin, 0);
-          hCrossSectionZMPolPS->SetBinContent(zBin, mBin, 0);
-        }
-      }
-    }
-  }
 
   // setting up histograms for sampling
   // -----------------------------------------------------------------------
@@ -610,6 +569,14 @@ void UpcGenerator::generateEvents()
     TVector3 boost = pPair.BoostVector();
     particles[0].Boost(boost);
     particles[1].Boost(boost);
+
+    if (doPtCut) {
+      double pt1 = particles[0].Pt();
+      double pt2 = particles[1].Pt();
+      if (pt1 < minPt || pt2 < minPt) {
+        continue;
+      }
+    }
 
     int sign1, sign2;
     if (isCharged) {
