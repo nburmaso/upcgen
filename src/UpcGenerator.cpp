@@ -37,6 +37,8 @@ UpcGenerator::UpcGenerator()
 
 void UpcGenerator::init()
 {
+  TH1::AddDirectory(false);
+
   // get parameters from file
   initGeneratorFromFile();
 
@@ -630,6 +632,7 @@ void UpcGenerator::generateEvents()
   }
   mOutFile->Write();
   mOutFile->Close();
+  delete mOutFile;
 #endif
 
 #ifdef USE_HEPMC

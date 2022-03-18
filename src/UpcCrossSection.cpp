@@ -941,22 +941,26 @@ double UpcCrossSection::getPhotonPt(double ePhot)
   double ereds = (ePhot / gtot) * (ePhot / gtot);
   int ePhot_key = ePhot * 1e3;
   constexpr int nbins = 5000;
+  double pt = 0;
   auto it = photPtDistrMap.find(ePhot_key);
-  TH1D* ptDistr;
   if (it == photPtDistrMap.end()) {
-    ptDistr = new TH1D(Form("ptDistr%d", ePhot_key), "", nbins, 0., 6. * phys_consts::hc / R);
+    TH1D ptDistr(Form("ptDistr%d", ePhot_key), "", nbins, 0., 6. * phys_consts::hc / R);
+    ptDistr.SetDirectory(nullptr);
     for (int bin = 1; bin <= nbins; bin++) {
       double pt = 6. * phys_consts::hc / R / nbins * bin;
       double arg = pt * pt + ereds;
       double sFFactPt1 = getCachedFormFac(arg);
       double prob = (sFFactPt1 * sFFactPt1) * pt * pt * pt / (pi2x4 * arg * arg);
-      ptDistr->SetBinContent(bin, prob);
+      ptDistr.SetBinContent(bin, prob);
     }
-    photPtDistrMap[ePhot_key] = ptDistr;
+    pt = ptDistr.GetRandom();
+    photPtDistrMap.emplace(std::pair<int, TH1D>(ePhot_key, ptDistr));
   } else {
-    ptDistr = it->second;
+    pt = it->second.GetRandom();
   }
-  double pt = ptDistr->GetRandom();
+  if (photPtDistrMap.size() > 50000) { // clear map if it became too large
+    photPtDistrMap.clear();
+  }
   return pt;
 }
 

@@ -55,6 +55,7 @@
 #include <fstream>
 #include <map>
 #include <random>
+#include <unordered_map>
 
 class UpcCrossSection
 {
@@ -140,9 +141,9 @@ class UpcCrossSection
   static constexpr double Q2max{100};
   static constexpr int nQ2{10000000};
   static constexpr double dQ2{(Q2max - Q2min) / nQ2};
-  static double* vCachedFormFac;    // Q^2-grid for possible form factor values
-  double* vCachedBreakup{nullptr};           // b-grid for possible breakup probabilities
-  std::map<int, TH1D*> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
+  static double* vCachedFormFac;                 // Q^2-grid for possible form factor values
+  double* vCachedBreakup{nullptr};               // b-grid for possible breakup probabilities
+  std::unordered_map<int, TH1D> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
 
   // simulation parameters
   bool isPoint{true}; // flux calculation parameter
