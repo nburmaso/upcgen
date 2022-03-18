@@ -76,7 +76,7 @@ class UpcGenerator
   double minPt{0};
   bool usePolarizedCS{false};
   long int seed{0};
-  int nEvents{1000};
+  long int nEvents{1000};
 
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???

@@ -149,7 +149,7 @@ void UpcGenerator::initGeneratorFromFile()
       istringstream iss(line);
       iss >> parameter >> parValue;
       if (parameter == parDict.inNEvents) {
-        nEvents = stoi(parValue);
+        nEvents = stol(parValue);
       }
       if (parameter == parDict.inCMSqrtS) {
         UpcCrossSection::sqrts = stod(parValue);
@@ -471,7 +471,7 @@ void UpcGenerator::generateEvents()
 
   // calculating nuclear cross section in YM space
   // -----------------------------------------------------------------------
-  auto* hNucCSYM = new TH2D("hNucCSYM", "", ny - 1, ymin, ymax, nm - 1, mmin, mmax);
+  auto* hNucCSYM = new TH2D("hNucCSYM", "", ny, ymin, ymax, nm, mmin, mmax);
   vector<vector<double>> hPolCSRatio;
   if (usePolarizedCS) {
     hPolCSRatio.resize(ny, vector<double>(nm));
@@ -491,12 +491,12 @@ void UpcGenerator::generateEvents()
   vector<TH1D*> hCrossSecsZ_PS(nm, nullptr);
   if (!usePolarizedCS) {
     for (int i = 0; i < nm; i++) {
-      hCrossSecsZ[i] = hCrossSectionZM->ProjectionX(Form("hCrossSecsZ_%d", i), i, i);
+      hCrossSecsZ[i] = hCrossSectionZM->ProjectionX(Form("hCrossSecsZ_%d", i + 1), i + 1, i + 1);
     }
   } else {
     for (int i = 0; i < nm; i++) {
-      hCrossSecsZ_S[i] = hCrossSectionZMPolS->ProjectionX(Form("hCrossSecsZPolS_%d", i), i, i);
-      hCrossSecsZ_PS[i] = hCrossSectionZMPolPS->ProjectionX(Form("hCrossSecsZPolPS_%d", i), i, i);
+      hCrossSecsZ_S[i] = hCrossSectionZMPolS->ProjectionX(Form("hCrossSecsZPolS_%d", i + 1), i + 1, i + 1);
+      hCrossSecsZ_PS[i] = hCrossSectionZMPolPS->ProjectionX(Form("hCrossSecsZPolPS_%d", i + 1), i + 1, i + 1);
     }
   }
 
@@ -529,11 +529,22 @@ void UpcGenerator::generateEvents()
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
-  for (int evt = 0; evt < nEvents; evt++) {
+  long int rejected = 0;
+  long int evt = 0;
+  while (evt < nEvents) {
     if (debug > 1) {
       PLOG_DEBUG << "Event number: " << evt + 1;
-    } else if ((evt + 1) % 10000 == 0) {
-      PLOG_INFO << "Event number: " << evt + 1;
+    }
+
+    if (debug <= 1) {
+      if ((evt + 1) % 10000 == 0) {
+        if (!doPtCut) {
+          PLOG_INFO << "Event number: " << evt + 1;
+        }
+        if (doPtCut) {
+          PLOG_INFO << "Event number: " << evt + 1 << ", rejected: " << rejected;
+        }
+      }
     }
 
     // pick pair m and y from nuclear cross section
@@ -548,30 +559,27 @@ void UpcGenerator::generateEvents()
       double frac = hPolCSRatio[yPairBin][mPairBin];
       bool pickScalar = gRandom->Uniform(0, 1) < frac;
       if (pickScalar) {
-        cost = hCrossSecsZ_S[mPairBin]->GetRandom();
+        cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
       } else {
-        cost = hCrossSecsZ_PS[mPairBin]->GetRandom();
+        cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
       }
     } else {
-      cost = hCrossSecsZ[mPairBin]->GetRandom();
+      cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
     }
 
-    double theta1 = acos(cost);
-    double theta2 = acos(-cost);
-    double phi1 = gRandom->Uniform(0., 2. * M_PI);
-    double phi2 = phi1 > M_PI ? phi1 - M_PI : phi1 + M_PI;
+    double theta = acos(cost);
+    double phi = gRandom->Uniform(0., 2. * M_PI);
 
     TLorentzVector pPair;
     nucProcessCS->getPairMomentum(mPair, yPair, pPair);
     double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
 
-    TVector3 vec1, vec2;
-    vec1.SetMagThetaPhi(pMag, theta1, phi1);
-    vec2.SetMagThetaPhi(pMag, theta2, phi2);
+    TVector3 vec;
+    vec.SetMagThetaPhi(pMag, theta, phi);
 
     TLorentzVector tlVec1, tlVec2;
-    tlVec1.SetVectM(vec1, mPart);
-    tlVec2.SetVectM(vec2, mPart);
+    tlVec1.SetVectM(vec, mPart);
+    tlVec2.SetVectM(-vec, mPart);
     particles.emplace_back(tlVec1);
     particles.emplace_back(tlVec2);
 
@@ -579,10 +587,16 @@ void UpcGenerator::generateEvents()
     particles[0].Boost(boost);
     particles[1].Boost(boost);
 
+    // check pt cut
     if (doPtCut) {
       double pt1 = particles[0].Pt();
       double pt2 = particles[1].Pt();
       if (pt1 < minPt || pt2 < minPt) {
+        rejected++;
+        pdgs.clear();
+        statuses.clear();
+        mothers.clear();
+        particles.clear();
         continue;
       }
     }
@@ -621,6 +635,12 @@ void UpcGenerator::generateEvents()
     statuses.clear();
     mothers.clear();
     particles.clear();
+    evt++;
+  }
+
+  if (doPtCut) {
+    PLOG_INFO << "Pt cut was used";
+    PLOG_INFO << "Pt cut: Number of rejected events = " << rejected;
   }
 
 #ifndef USE_HEPMC
@@ -632,7 +652,6 @@ void UpcGenerator::generateEvents()
   }
   mOutFile->Write();
   mOutFile->Close();
-  delete mOutFile;
 #endif
 
 #ifdef USE_HEPMC
