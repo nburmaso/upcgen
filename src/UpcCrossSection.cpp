@@ -549,7 +549,7 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }
 }
 
-void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
+void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio, double& totCS)
 {
   PLOG_INFO << "Calculating nuclear cross section";
 
@@ -659,6 +659,7 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   }
 
   PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << cssum * 1e-6 << " mb";
+  totCS = cssum * 1e-6;
 }
 
 // Function from Starlight
@@ -941,22 +942,28 @@ double UpcCrossSection::getPhotonPt(double ePhot)
   double ereds = (ePhot / gtot) * (ePhot / gtot);
   int ePhot_key = ePhot * 1e3;
   constexpr int nbins = 5000;
+  double pt = 0;
   auto it = photPtDistrMap.find(ePhot_key);
-  TH1D* ptDistr;
   if (it == photPtDistrMap.end()) {
-    ptDistr = new TH1D(Form("ptDistr%d", ePhot_key), "", nbins, 0., 6. * phys_consts::hc / R);
+    TH1D ptDistr(Form("ptDistr%d", ePhot_key), "", nbins, 0., 6. * phys_consts::hc / R);
+    ptDistr.SetDirectory(nullptr);
     for (int bin = 1; bin <= nbins; bin++) {
       double pt = 6. * phys_consts::hc / R / nbins * bin;
       double arg = pt * pt + ereds;
       double sFFactPt1 = getCachedFormFac(arg);
       double prob = (sFFactPt1 * sFFactPt1) * pt * pt * pt / (pi2x4 * arg * arg);
-      ptDistr->SetBinContent(bin, prob);
+      ptDistr.SetBinContent(bin, prob);
     }
-    photPtDistrMap[ePhot_key] = ptDistr;
+    pt = ptDistr.GetRandom();
+    photPtDistrMap.emplace(std::pair<int, TH1D>(ePhot_key, ptDistr));
   } else {
-    ptDistr = it->second;
+    pt = it->second.GetRandom();
   }
-  double pt = ptDistr->GetRandom();
+  // todo: remove less frequently used elements, not all elements
+  // clear map if it became too large
+  if (photPtDistrMap.size() > 30000) {
+    photPtDistrMap.clear();
+  }
   return pt;
 }
 
