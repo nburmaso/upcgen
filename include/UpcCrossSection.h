@@ -200,7 +200,7 @@ class UpcCrossSection
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity
-  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, std::vector<std::vector<double>>& hPolCSRatio);
+  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, std::vector<std::vector<double>>& hPolCSRatio, double& totCS);
 
   double calcBreakupProb(double b, int mode);
 

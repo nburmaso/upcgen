@@ -549,7 +549,7 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }
 }
 
-void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio)
+void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio, double& totCS)
 {
   PLOG_INFO << "Calculating nuclear cross section";
 
@@ -659,6 +659,7 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   }
 
   PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << cssum * 1e-6 << " mb";
+  totCS = cssum * 1e-6;
 }
 
 // Function from Starlight

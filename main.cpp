@@ -58,8 +58,6 @@ int main(int argc, char** argv)
   PLOG_INFO << "Starting generation process...";
   upcGenerator->generateEvents();
 
-  PLOG_INFO << "Event generation is finished!";
-
   delete upcGenerator;
 
   return 0;

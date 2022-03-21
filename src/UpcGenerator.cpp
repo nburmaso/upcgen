@@ -476,7 +476,8 @@ void UpcGenerator::generateEvents()
   if (usePolarizedCS) {
     hPolCSRatio.resize(ny, vector<double>(nm));
   }
-  nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio);
+  double totCS;
+  nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio, totCS);
 
   vector<int> pdgs;
   vector<int> statuses;
@@ -535,16 +536,8 @@ void UpcGenerator::generateEvents()
     if (debug > 1) {
       PLOG_DEBUG << "Event number: " << evt + 1;
     }
-
-    if (debug <= 1) {
-      if ((evt + 1) % 10000 == 0) {
-        if (!doPtCut) {
-          PLOG_INFO << "Event number: " << evt + 1;
-        }
-        if (doPtCut) {
-          PLOG_INFO << "Event number: " << evt + 1 << ", rejected: " << rejected;
-        }
-      }
+    if (debug <= 1 && ((evt + 1) % 100000 == 0)) {
+      PLOG_INFO << "Event number: " << evt + 1;
     }
 
     // pick pair m and y from nuclear cross section
@@ -638,9 +631,15 @@ void UpcGenerator::generateEvents()
     evt++;
   }
 
-  if (doPtCut) {
+  PLOG_INFO << "Event generation is finished!";
+
+  PLOG_INFO << fixed << setprecision(6) << "Total nuclear cross section: " << totCS << " mb";
+
+  if (doPtCut && nEvents > 0) {
+    double fidCS = totCS * (double)nEvents / (double)(nEvents + rejected);
     PLOG_INFO << "Pt cut was used";
     PLOG_INFO << "Pt cut: Number of rejected events = " << rejected;
+    PLOG_INFO << fixed << setprecision(6) << "Pt cut: Cross section with cut = " << fidCS << " mb";
   }
 
 #ifndef USE_HEPMC
@@ -656,6 +655,7 @@ void UpcGenerator::generateEvents()
 
 #ifdef USE_HEPMC
   writerHepMC->close();
+  delete writerHepMC;
 #endif
 
   delete hCrossSectionZM;
