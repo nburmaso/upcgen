@@ -955,7 +955,7 @@ double UpcCrossSection::getPhotonPt(double ePhot)
       ptDistr.SetBinContent(bin, prob);
     }
     pt = ptDistr.GetRandom();
-    photPtDistrMap.emplace(std::pair<int, TH1D>(ePhot_key, ptDistr));
+    photPtDistrMap.emplace(ePhot_key, ptDistr);
   } else {
     pt = it->second.GetRandom();
   }
