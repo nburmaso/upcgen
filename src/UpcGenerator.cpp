@@ -97,6 +97,7 @@ void UpcGenerator::init()
   nucProcessCS->init();
 
   // initialize the MT64 random number generator
+  delete gRandom;
   gRandom = new TRandomMT64();
   gRandom->SetSeed(seed == 0 ? time(nullptr) : seed);
 
@@ -131,7 +132,6 @@ UpcGenerator::~UpcGenerator()
   delete decayer;
 #endif
   delete nucProcessCS;
-  delete mOutTree;
   delete mOutFile;
 }
 
@@ -506,11 +506,10 @@ void UpcGenerator::generateEvents()
 
 #ifndef USE_HEPMC
   // initialize file output
+  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
   PLOG_WARNING << "Using ROOT tree for output!";
-  PLOG_INFO << "Events will be written to "
-            << "events.root";
+  PLOG_INFO << "Events will be written to events.root";
   mOutTree = new TTree("particles", "Generated particles");
-  mOutTree->SetDirectory(nullptr);
   mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
   mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
   mOutTree->Branch("particleID", &particle.particleID, "particleID/I");
@@ -523,8 +522,7 @@ void UpcGenerator::generateEvents()
   mOutTree->SetAutoSave(0);
 #else
   PLOG_WARNING << "Using HepMC format for output!";
-  PLOG_INFO << "Events will be written to "
-            << "events.hepmc";
+  PLOG_INFO << "Events will be written to events.hepmc";
   writerHepMC = new HepMC3::WriterAscii("events.hepmc");
 #endif
 
@@ -536,8 +534,11 @@ void UpcGenerator::generateEvents()
     if (debug > 1) {
       PLOG_DEBUG << "Event number: " << evt + 1;
     }
-    if (debug <= 1 && ((evt + 1) % 100000 == 0)) {
+    if (debug <= 1 && ((evt + 1) % 10000 == 0)) {
       PLOG_INFO << "Event number: " << evt + 1;
+#ifndef USE_HEPMC
+      mOutTree->FlushBaskets(false);
+#endif
     }
 
     // pick pair m and y from nuclear cross section
@@ -643,7 +644,6 @@ void UpcGenerator::generateEvents()
   }
 
 #ifndef USE_HEPMC
-  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
   mOutTree->Write();
   if (debug > 0) {
     hNucCSM->Write();

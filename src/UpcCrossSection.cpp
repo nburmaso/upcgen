@@ -959,7 +959,9 @@ double UpcCrossSection::getPhotonPt(double ePhot)
   } else {
     pt = it->second.GetRandom();
   }
-  if (photPtDistrMap.size() > 50000) { // clear map if it became too large
+  // todo: remove less frequently used elements, not all elements
+  // clear map if it became too large
+  if (photPtDistrMap.size() > 30000) {
     photPtDistrMap.clear();
   }
   return pt;
