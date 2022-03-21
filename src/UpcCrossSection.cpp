@@ -42,6 +42,7 @@ UpcCrossSection::UpcCrossSection()
 {
   constexpr int nbc = 10000000;
   vCachedBreakup = new double[nbc];
+  gtot = TMath::CosH((TMath::ACosH(g1) + TMath::ACosH(g2)) / 2.);
 }
 
 UpcCrossSection::~UpcCrossSection()
@@ -295,9 +296,9 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
 }
 
 void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
-                                        double zmin, double zmax, int nz,
-                                        double mmin, double mmax, int nm,
-                                        int flag)
+                                         double zmin, double zmax, int nz,
+                                         double mmin, double mmax, int nm,
+                                         int flag)
 {
   double m, z;
   double dm = (mmax - mmin) / nm;
@@ -936,10 +937,7 @@ L102:
 double UpcCrossSection::getPhotonPt(double ePhot)
 {
   constexpr double pi2x4 = 4 * M_PI * M_PI;
-  double y1 = TMath::ACosH(g1);
-  double y2 = -TMath::ACosH(g2);
-  double gtot = TMath::CosH((y1 - y2) / 2.);
-  double ereds = (ePhot / gtot) * (ePhot / gtot);
+  double ereds = (ePhot * ePhot) / (gtot * gtot);
   int ePhot_key = ePhot * 1e3;
   constexpr int nbins = 5000;
   double pt = 0;
@@ -955,14 +953,31 @@ double UpcCrossSection::getPhotonPt(double ePhot)
       ptDistr.SetBinContent(bin, prob);
     }
     pt = ptDistr.GetRandom();
-    photPtDistrMap.emplace(std::pair<int, TH1D>(ePhot_key, ptDistr));
+    photPtDistrMap.emplace(ePhot_key, std::make_pair(1, ptDistr));
   } else {
-    pt = it->second.GetRandom();
+    pt = it->second.second.GetRandom();
+    it->second.first++; // increment frequency
   }
-  // todo: remove less frequently used elements, not all elements
   // clear map if it became too large
-  if (photPtDistrMap.size() > 30000) {
-    photPtDistrMap.clear();
+  int nElem = photPtDistrMap.size();
+  if (nElem > 30000) {
+    // photPtDistrMap.clear();
+    if (avgFreq < 0) {
+      avgFreq = 0;
+      for (const auto& item : photPtDistrMap) {
+        avgFreq += item.second.first;
+      }
+      avgFreq /= nElem;
+    }
+    // remove item if freq < avg
+    // else reset counter for the next size check
+    for (auto& item : photPtDistrMap) {
+      if (item.second.first < avgFreq) {
+        photPtDistrMap.erase(item.first);
+      } else {
+        item.second.first = 0;
+      }
+    }
   }
   return pt;
 }

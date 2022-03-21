@@ -536,10 +536,13 @@ void UpcGenerator::generateEvents()
     }
     if (debug <= 1 && ((evt + 1) % 10000 == 0)) {
       PLOG_INFO << "Event number: " << evt + 1;
-#ifndef USE_HEPMC
-      mOutTree->FlushBaskets(false);
-#endif
     }
+
+#ifndef USE_HEPMC
+    if ((evt + 1) % 100000 == 0) {
+      mOutTree->FlushBaskets(false);
+    }
+#endif
 
     // pick pair m and y from nuclear cross section
     double mPair, yPair;
