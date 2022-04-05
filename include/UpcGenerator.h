@@ -74,6 +74,9 @@ class UpcGenerator
   // simulation parameters
   bool doPtCut{false};
   double minPt{0};
+  bool doEtaCut{false};
+  double minEta{0};
+  double maxEta{0};
   bool usePolarizedCS{false};
   long int seed{0};
   long int nEvents{1000};
@@ -89,8 +92,11 @@ class UpcGenerator
     std::string inProcID{"PROC_ID"};
     std::string inLepA{"LEP_A"};
     std::string inDoPtCut{"DO_PT_CUT"};
-    std::string inNEvents{"NEVENTS"};
     std::string inLowPt{"PT_MIN"};
+    std::string inDoEtaCut{"DO_ETA_CUT"};
+    std::string inLowEta{"ETA_MIN"};
+    std::string inHiEta{"ETA_MAX"};
+    std::string inNEvents{"NEVENTS"};
     std::string inLowZ{"ZMIN"};
     std::string inHiZ{"ZMAX"};
     std::string inLowM{"MMIN"};
