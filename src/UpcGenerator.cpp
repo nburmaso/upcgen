@@ -168,6 +168,15 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inLowPt) {
         minPt = stod(parValue);
       }
+      if (parameter == parDict.inDoEtaCut) {
+        doEtaCut = stoi(parValue);
+      }
+      if (parameter == parDict.inLowEta) {
+        minEta = stod(parValue);
+      }
+      if (parameter == parDict.inHiEta) {
+        maxEta = stod(parValue);
+      }
       if (parameter == parDict.inLowZ) {
         nucProcessCS->zmin = stod(parValue);
       }
@@ -263,6 +272,9 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "NEVENTS " << nEvents;
   PLOG_INFO << "DO_PT_CUT " << doPtCut;
   PLOG_INFO << "PT_MIN " << minPt;
+  PLOG_INFO << "DO_ETA_CUT " << doEtaCut;
+  PLOG_INFO << "ETA_MIN " << minEta;
+  PLOG_INFO << "ETA_MAX " << maxEta;
   PLOG_INFO << "ZMIN " << nucProcessCS->zmin;
   PLOG_INFO << "ZMAX " << nucProcessCS->zmax;
   PLOG_INFO << "MMIN " << nucProcessCS->mmin;
@@ -598,6 +610,20 @@ void UpcGenerator::generateEvents()
       }
     }
 
+    // check eta cuts
+    if (doEtaCut) {
+      double eta1 = particles[0].Eta();
+      double eta2 = particles[1].Eta();
+      if (eta1 < minEta || eta1 > maxEta || eta2 < minEta || eta2 > maxEta) {
+        rejected++;
+        pdgs.clear();
+        statuses.clear();
+        mothers.clear();
+        particles.clear();
+        continue;
+      }
+    }
+
     int sign1, sign2;
     if (isCharged) {
       sign1 = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
@@ -639,11 +665,12 @@ void UpcGenerator::generateEvents()
 
   PLOG_INFO << fixed << setprecision(6) << "Total nuclear cross section: " << totCS << " mb";
 
-  if (doPtCut && nEvents > 0) {
+  bool doAnyCuts = doPtCut || doEtaCut;
+  if (doAnyCuts && nEvents > 0) {
     double fidCS = totCS * (double)nEvents / (double)(nEvents + rejected);
-    PLOG_INFO << "Pt cut was used";
-    PLOG_INFO << "Pt cut: Number of rejected events = " << rejected;
-    PLOG_INFO << fixed << setprecision(6) << "Pt cut: Cross section with cut = " << fidCS << " mb";
+    PLOG_INFO << "Kinematic cuts were used";
+    PLOG_INFO << "Number of rejected events = " << rejected;
+    PLOG_INFO << fixed << setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
   }
 
 #ifndef USE_HEPMC

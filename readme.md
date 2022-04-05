@@ -72,6 +72,9 @@ LEP_A 0            # lepton anomalous magnetic moment -- used in case if dilepto
 NEVENTS 1000       # number of events to be generated
 DO_PT_CUT 0        # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0           # pt cut
+DO_ETA_CUT 0       # enable pseudorapidity cut: 0 -- off, 1 -- on
+ETA_MIN -1         # pseudorapidity cut: min
+ETA_MAX 1          # pseudorapidity cut: max
 ZMIN -1            # min. z = cos(theta) for the elementary cross section
 ZMAX 1             # max. z = cos(theta) for the elementary cross section
 MMIN 3.56          # min. m for the elementary/nuclear cross section
