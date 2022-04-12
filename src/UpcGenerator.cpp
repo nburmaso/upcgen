@@ -265,7 +265,6 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "NUCLEUS_A " << nucProcessCS->A;
   PLOG_INFO << "WS_R " << UpcCrossSection::R;
   PLOG_INFO << "WS_A " << UpcCrossSection::a;
-  PLOG_INFO << "(CALCULATED) WS_RHO0 " << UpcCrossSection::rho0;
   PLOG_INFO << "SQRTS " << UpcCrossSection::sqrts;
   PLOG_INFO << "PROC_ID " << procID;
   PLOG_INFO << "LEP_A " << aLep;

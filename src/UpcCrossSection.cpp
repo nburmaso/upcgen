@@ -961,23 +961,7 @@ double UpcCrossSection::getPhotonPt(double ePhot)
   // clear map if it became too large
   int nElem = photPtDistrMap.size();
   if (nElem > 30000) {
-    // photPtDistrMap.clear();
-    if (avgFreq < 0) {
-      avgFreq = 0;
-      for (const auto& item : photPtDistrMap) {
-        avgFreq += item.second.first;
-      }
-      avgFreq /= nElem;
-    }
-    // remove item if freq < avg
-    // else reset counter for the next size check
-    for (auto& item : photPtDistrMap) {
-      if (item.second.first < avgFreq) {
-        photPtDistrMap.erase(item.first);
-      } else {
-        item.second.first = 0;
-      }
-    }
+    photPtDistrMap.clear();
   }
   return pt;
 }
