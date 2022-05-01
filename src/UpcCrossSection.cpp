@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -54,26 +54,30 @@ UpcCrossSection::~UpcCrossSection()
 void UpcCrossSection::setElemProcess(int procID)
 {
   switch (procID) {
-    case 1: { // light-by-light
+    case 22: { // light-by-light
       elemProcess = new UpcTwoPhotonLbyL(doMassCut, lowMCut, hiMCut);
       break;
     }
-    case 10: { // dielectron photoproduction
+    case 11: { // dielectron photoproduction
       int pdg = 11;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 11: { // dimuon photoproduction
+    case 13: { // dimuon photoproduction
       int pdg = 13;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 12: { // ditau photoproduction
+    case 15: { // ditau photoproduction
       int pdg = 15;
       elemProcess = new UpcTwoPhotonDilep(pdg);
       break;
     }
-    case 20: { // pi0pi0 meson photoproduction
+    case 51: { // spin-0 ALP production
+      elemProcess = new UpcTwoPhotonALP(alpMass, alpWidth); // todo: spin-dependent cross section?
+      break;
+    }
+    case 111: { // pi0pi0 meson photoproduction
       elemProcess = new UpcTwoPhotonDipion(doMassCut, lowMCut, hiMCut);
       break;
     }
@@ -444,8 +448,8 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }
   if (!isFound) {
     PLOG_INFO << "Precalculated 2D luminosity is not found. Starting all over...";
-    double dy = (ymax - ymin) / (ny - 1);
-    double dm = (mmax - mmin) / (nm - 1);
+    double dy = (ymax - ymin) / ny;
+    double dm = (mmax - mmin) / nm;
     TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
     auto* f2DLumi = new TFile(fname, "recreate");
     // histograms for unpolarized case
@@ -554,8 +558,8 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
 {
   PLOG_INFO << "Calculating nuclear cross section";
 
-  double dy = (ymax - ymin) / (ny - 1);
-  double dm = (mmax - mmin) / (nm - 1);
+  double dy = (ymax - ymin) / ny;
+  double dm = (mmax - mmin) / nm;
 
   TH2D* hD2LDMDY = nullptr;
   TH2D* hD2LDMDY_s = nullptr;
@@ -647,20 +651,19 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
 
   // filling histograms
   double cssum = 0;
-  for (int i = 0; i < nm - 1; i++) {
-    for (int j = 0; j < ny - 1; j++) {
-      double cs_ij = (cs[i][j] + cs[i + 1][j] + cs[i][j + 1] + cs[i + 1][j + 1]) / 4.;
-      cssum += cs_ij;
+  for (int i = 0; i < nm; i++) {
+    for (int j = 0; j < ny; j++) {
+      double cs_ij = cs[i][j];
       hCrossSectionYM->SetBinContent(j + 1, i + 1, cs_ij);
       if (usePolarizedCS) {
-        double rat_ij = (cs_rat[i][j] + cs_rat[i + 1][j] + cs_rat[i][j + 1] + cs_rat[i + 1][j + 1]) / 4.;
+        double rat_ij = cs_rat[i][j];
         hPolCSRatio[j][i] = rat_ij;
       }
     }
   }
 
-  PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << cssum * 1e-6 << " mb";
-  totCS = cssum * 1e-6;
+  totCS = hCrossSectionYM->Integral() * 1e-6;
+  PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << totCS << " mb";
 }
 
 // Function from Starlight

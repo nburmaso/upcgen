@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -37,13 +37,19 @@ UpcGenerator::UpcGenerator()
 
 void UpcGenerator::init()
 {
+  if (nucProcessCS == nullptr) {
+    PLOG_FATAL << "UpcCrossSection was not initialized! Exiting...";
+    std::_Exit(-1);
+  }
+
   TH1::AddDirectory(false);
 
   // get parameters from file
   initGeneratorFromFile();
 
   // sanity checks: lbyl
-  if (procID == 1) {
+  if (procID == 22) {
+    isPairProduction = true;
     // for gamma+gamma -> gamma+gamma grid size is set explicitly
     // because elem. cross sections are already stored in files
     PLOG_WARNING << "For light-by-light scattering grid sizes along Z and M are fixed -- see parameters check";
@@ -60,7 +66,8 @@ void UpcGenerator::init()
   }
 
   // sanity checks: pi0pi0
-  if (procID == 20) {
+  if (procID == 111) {
+    isPairProduction = true;
     // for gamma+gamma -> pi0 pi0 grid size is set explicitly
     // because elem. cross sections are already stored in files
     PLOG_WARNING << "For dipion photoproduction grid sizes along Z and M are fixed -- see parameters check";
@@ -76,10 +83,23 @@ void UpcGenerator::init()
     }
   }
 
+  // checks for ALP production
+  if (procID == 51) {
+    isSingleProduction = true;
+    double mass = nucProcessCS->alpMass;
+    double width = nucProcessCS->alpWidth;
+    // gauss peak, +/- 4 sigmas
+    nucProcessCS->mmin = mass - 4. * width;
+    nucProcessCS->mmax = mass + 4. * width;
+    PLOG_WARNING << "For ALP production angular distribution is ignored!";
+    PLOG_WARNING << "ALP will be generated according to chosen ALP_MASS and ALP_WIDTH: check input parameters print-out";
+  }
+
   nucProcessCS->setElemProcess(procID);
 
   // checks for dilepton production
-  if (procID >= 10 && procID <= 12) {
+  if (procID >= 11 && procID <= 15) {
+    isPairProduction = true;
     auto* proc = (UpcTwoPhotonDilep*)nucProcessCS->elemProcess;
     proc->aLep = aLep;
     double mPart = proc->mPart;
@@ -147,6 +167,11 @@ void UpcGenerator::initGeneratorFromFile()
     string parValue;
     while (getline(fInputs, line)) {
       istringstream iss(line);
+      // skip comment lines
+      if (line[0] == '#') {
+        continue;
+      }
+      line.erase(std::find(line.begin(), line.end(), '#'), line.end()); // trim comments
       iss >> parameter >> parValue;
       if (parameter == parDict.inNEvents) {
         nEvents = stol(parValue);
@@ -161,6 +186,12 @@ void UpcGenerator::initGeneratorFromFile()
       }
       if (parameter == parDict.inLepA) {
         aLep = stod(parValue);
+      }
+      if (parameter == parDict.inALPMass) {
+        nucProcessCS->alpMass = stod(parValue);
+      }
+      if (parameter == parDict.inALPWidth) {
+        nucProcessCS->alpWidth = stod(parValue);
       }
       if (parameter == parDict.inDoPtCut) {
         doPtCut = stoi(parValue);
@@ -296,6 +327,58 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
 }
 
+void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz pair-momentum vector of incoming photons
+                                  TVector3& vec,                     // momentum of outgoing particles
+                                  double mPart,                      // outgoing particle mass
+                                  int partPDG,                       // pdg of final-state particles
+                                  bool isCharged,                    // final-state particles are charged or not
+                                  vector<TLorentzVector>& particles, // vector for final-state particles
+                                  vector<int>& pdgs,
+                                  vector<int>& mothers,
+                                  vector<int>& statuses)
+{
+  TLorentzVector tlVec1, tlVec2;
+  tlVec1.SetVectM(vec, mPart);
+  tlVec2.SetVectM(-vec, mPart);
+  particles.emplace_back(tlVec1);
+  particles.emplace_back(tlVec2);
+
+  TVector3 boost = pPair.BoostVector();
+  particles[0].Boost(boost);
+  particles[1].Boost(boost);
+
+  int sign1, sign2;
+  if (isCharged) {
+    sign1 = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
+    sign2 = -sign1;
+  } else {
+    sign1 = 1;
+    sign2 = 1;
+  }
+
+  pdgs.emplace_back(sign1 * partPDG);
+  pdgs.emplace_back(sign2 * partPDG);
+  mothers.emplace_back(-1);
+  mothers.emplace_back(-1);
+  statuses.emplace_back(23);
+  statuses.emplace_back(23);
+}
+
+void UpcGenerator::singleProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
+                                    int partPDG,                            // pdg of final-state particle
+                                    std::vector<TLorentzVector>& particles, // vector for final-state particles
+                                    std::vector<int>& pdgs,
+                                    std::vector<int>& mothers,
+                                    std::vector<int>& statuses)
+{
+  particles.emplace_back(pPair);
+  // TVector3 boost = pPair.BoostVector();
+  // particles[0].Boost(boost);
+  pdgs.emplace_back(partPDG);
+  mothers.emplace_back(-1);
+  statuses.emplace_back(23);
+}
+
 void UpcGenerator::processInPythia(vector<int>& pdgs,
                                    vector<int>& statuses,
                                    vector<int>& mothers,
@@ -329,65 +412,67 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
 #endif
 }
 
-void UpcGenerator::processPions(vector<int>& pdgs,
-                                vector<int>& statuses,
-                                vector<int>& mothers,
-                                vector<TLorentzVector>& particles)
+// todo: for now valid only for neutral-charged decay products
+void UpcGenerator::twoPartDecayUniform(vector<int>& pdgs, // output vectors with pdg codes, status codes, mother IDs and 4-momenta
+                                       vector<int>& statuses,
+                                       vector<int>& mothers,
+                                       vector<TLorentzVector>& particles,
+                                       int id,           // index of particle to be decayed
+                                       double decayMass, // mass of decay products
+                                       int decayProdPDG) // pdg of decay products
 {
   const int status = 33; // code from pythia 8: outgoing particles from subsequent subprocesses
-  vector<TLorentzVector> photons(4);
-
-  // first pion
-  double mPhot1 = 0.;
-  double ePhot1 = particles[0].Mag() / 2.;
-  double pPhot1 = sqrt(ePhot1 * ePhot1 - mPhot1 * mPhot1);
+  vector<TLorentzVector> decays(2);
+  double mDecay = decayMass;
+  double ePhot1 = particles[id].Mag() / 2.;
+  double pPhot1 = sqrt(ePhot1 * ePhot1 - mDecay * mDecay);
   double phi1 = gRandom->Uniform(0., 2. * M_PI);
   double cost1 = gRandom->Uniform(-1., 1.);
   double theta1 = acos(cost1);
   TVector3 vPhot1;
   vPhot1.SetMagThetaPhi(pPhot1, theta1, phi1);
-  photons[0].SetVectM(-vPhot1, mPhot1);
-  photons[1].SetVectM(vPhot1, mPhot1);
-  TVector3 boost1 = particles[0].BoostVector();
-  TVector3 zAxis1 = particles[0].Vect().Unit();
-  photons[0].RotateUz(zAxis1);
-  photons[1].RotateUz(zAxis1);
-  photons[0].Boost(boost1);
-  photons[1].Boost(boost1);
-  pdgs.emplace_back(22);
+  decays[0].SetVectM(-vPhot1, mDecay);
+  decays[1].SetVectM(vPhot1, mDecay);
+  TVector3 boost1 = particles[id].BoostVector();
+  TVector3 zAxis1 = particles[id].Vect().Unit();
+  decays[0].RotateUz(zAxis1);
+  decays[1].RotateUz(zAxis1);
+  decays[0].Boost(boost1);
+  decays[1].Boost(boost1);
+  pdgs.emplace_back(decayProdPDG);
   statuses.emplace_back(status);
   mothers.emplace_back(0);
-  particles.emplace_back(photons[0]);
-  pdgs.emplace_back(22);
+  particles.emplace_back(decays[0]);
+  pdgs.emplace_back(decayProdPDG);
   statuses.emplace_back(status);
   mothers.emplace_back(0);
-  particles.emplace_back(photons[1]);
+  particles.emplace_back(decays[1]);
+}
 
-  // second pion
-  double mPhot2 = 0.;
-  double ePhot2 = particles[1].Mag() / 2.;
-  double pPhot2 = sqrt(ePhot2 * ePhot2 - mPhot2 * mPhot2);
-  double phi2 = gRandom->Uniform(0., 2. * M_PI);
-  double cost2 = gRandom->Uniform(-1., 1.);
-  double theta2 = acos(cost2);
-  TVector3 vPhot2;
-  vPhot2.SetMagThetaPhi(pPhot2, theta2, phi2);
-  photons[2].SetVectM(-vPhot2, mPhot2);
-  photons[3].SetVectM(vPhot2, mPhot2);
-  TVector3 boost2 = particles[1].BoostVector();
-  TVector3 zAxis2 = particles[1].Vect().Unit();
-  photons[2].RotateUz(zAxis2);
-  photons[3].RotateUz(zAxis2);
-  photons[2].Boost(boost2);
-  photons[3].Boost(boost2);
-  pdgs.emplace_back(22);
-  statuses.emplace_back(status);
-  mothers.emplace_back(1);
-  particles.emplace_back(photons[2]);
-  pdgs.emplace_back(22);
-  statuses.emplace_back(status);
-  mothers.emplace_back(1);
-  particles.emplace_back(photons[3]);
+bool UpcGenerator::checkKinCuts(std::vector<TLorentzVector>& particles)
+{
+  bool pass = true;
+
+  for (const auto& tlvec : particles) {
+    // check pt cut
+    if (doPtCut) {
+      double pt = tlvec.Pt();
+      if (pt < minPt) {
+        pass = false;
+        break;
+      }
+    }
+    // check eta cuts
+    if (doEtaCut) {
+      double eta = tlvec.Eta();
+      if (eta < minEta || eta > maxEta) {
+        pass = false;
+        break;
+      }
+    }
+  }
+
+  return pass;
 }
 
 void UpcGenerator::writeEvent(int evt,
@@ -512,6 +597,12 @@ void UpcGenerator::generateEvents()
     }
   }
 
+  // hack for ALP: cos(theta) is uniformly distributed
+  bool ignoreCSZ = false;
+  if (procID == 51) {
+    ignoreCSZ = true;
+  }
+
   // generationg events
   // -----------------------------------------------------------------------
 
@@ -563,16 +654,20 @@ void UpcGenerator::generateEvents()
 
     // pick z = cos(theta) for corresponding m from elem. cross section
     double cost;
-    if (usePolarizedCS) {
-      double frac = hPolCSRatio[yPairBin][mPairBin];
-      bool pickScalar = gRandom->Uniform(0, 1) < frac;
-      if (pickScalar) {
-        cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
+    if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
+      if (usePolarizedCS) {
+        double frac = hPolCSRatio[yPairBin][mPairBin];
+        bool pickScalar = gRandom->Uniform(0, 1) < frac;
+        if (pickScalar) {
+          cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
+        } else {
+          cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
+        }
       } else {
-        cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
+        cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
       }
     } else {
-      cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
+      cost = gRandom->Uniform(-1., 1.);
     }
 
     double theta = acos(cost);
@@ -585,70 +680,40 @@ void UpcGenerator::generateEvents()
     TVector3 vec;
     vec.SetMagThetaPhi(pMag, theta, phi);
 
-    TLorentzVector tlVec1, tlVec2;
-    tlVec1.SetVectM(vec, mPart);
-    tlVec2.SetVectM(-vec, mPart);
-    particles.emplace_back(tlVec1);
-    particles.emplace_back(tlVec2);
-
-    TVector3 boost = pPair.BoostVector();
-    particles[0].Boost(boost);
-    particles[1].Boost(boost);
-
-    // check pt cut
-    if (doPtCut) {
-      double pt1 = particles[0].Pt();
-      double pt2 = particles[1].Pt();
-      if (pt1 < minPt || pt2 < minPt) {
-        rejected++;
-        pdgs.clear();
-        statuses.clear();
-        mothers.clear();
-        particles.clear();
-        continue;
-      }
+    if (isPairProduction) {
+      pairProduction(pPair, vec, mPart, partPDG, isCharged, particles, pdgs, mothers, statuses);
     }
 
-    // check eta cuts
-    if (doEtaCut) {
-      double eta1 = particles[0].Eta();
-      double eta2 = particles[1].Eta();
-      if (eta1 < minEta || eta1 > maxEta || eta2 < minEta || eta2 > maxEta) {
-        rejected++;
-        pdgs.clear();
-        statuses.clear();
-        mothers.clear();
-        particles.clear();
-        continue;
-      }
+    if (isSingleProduction) {
+      singleProduction(pPair, partPDG, particles, pdgs, mothers, statuses);
     }
 
-    int sign1, sign2;
-    if (isCharged) {
-      sign1 = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
-      sign2 = -sign1;
-    } else {
-      sign1 = 1;
-      sign2 = 1;
+    // check kinematic cuts
+    if (!checkKinCuts(particles)) {
+      rejected++;
+      pdgs.clear();
+      statuses.clear();
+      mothers.clear();
+      particles.clear();
+      continue;
     }
-
-    pdgs.emplace_back(sign1 * partPDG);
-    pdgs.emplace_back(sign2 * partPDG);
-    mothers.emplace_back(-1);
-    mothers.emplace_back(-1);
-    statuses.emplace_back(23);
-    statuses.emplace_back(23);
 
     // lepton decays for taus
     // todo: at the moment "fsr" and "decays" flags
     //       are only really meaningful for pythia8
-    if ((doFSR || doDecays) && isPythiaUsed && (procID >= 10 && procID <= 12)) {
+    if ((doFSR || doDecays) && isPythiaUsed && (procID >= 11 && procID <= 15)) {
       processInPythia(pdgs, statuses, mothers, particles);
     }
 
     // uniform pion decays into photon pairs
-    if (procID == 20) {
-      processPions(pdgs, statuses, mothers, particles);
+    if (procID == 111) {
+      twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
+      twoPartDecayUniform(pdgs, statuses, mothers, particles, 1, 0., 22);
+    }
+
+    // uniform ALP decay into two photons
+    if (procID == 51) {
+      twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
     }
 
     writeEvent(evt, pdgs, statuses, mothers, particles);
@@ -673,7 +738,6 @@ void UpcGenerator::generateEvents()
   }
 
 #ifndef USE_HEPMC
-  mOutTree->Write();
   if (debug > 0) {
     hNucCSM->Write();
     hNucCSYM->Write();

@@ -19,31 +19,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-// A simple interface to Pythia6
+#include "UpcTwoPhotonALP.h"
+#include "UpcPhysConstants.h"
 
-#include "UpcPythia6Helper.h"
+#include <cmath>
 
-#ifdef USE_PYTHIA6
-
-#include "TPythia6.h"
-#include "TLorentzVector.h"
-#include "TClonesArray.h"
-
-void UpcPythia6Helper::init()
+// cross section in narrow resonance approximation
+double UpcTwoPhotonALP::calcCrossSectionM(double m)
 {
+  double cs = 4. * M_PI * M_PI * width / (mPart * mPart);
+  cs *= phys_consts::hc * phys_consts::hc* 1e7 * phys_consts::alpha * phys_consts::alpha;
+  return cs;
 }
-
-void UpcPythia6Helper::process(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<TLorentzVector>& particles)
-{
-  for (int i = 0; i < particles.size(); i++) {
-    TPythia6::Instance()->Py1ent(0, pdgs[i], particles[i].Energy(), particles[i].Theta(), particles[i].Phi());
-    TPythia6::Instance()->GetPrimaries();
-  }
-}
-
-int UpcPythia6Helper::import(TClonesArray* particles)
-{
-  return TPythia6::Instance()->ImportParticles(particles, "All");
-}
-
-#endif

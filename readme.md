@@ -67,8 +67,10 @@ NUCLEUS_A 208      # atomic mass of the incoming nuclei
 WS_R 6.68          # Woods-Saxon parameters: R
 WS_A 0.447         #                         a
 SQRTS 5020         # sqrt(s) in the CM frame
-PROC_ID 12         # process ID -- see list of available processes below
+PROC_ID 15         # process ID -- see list of available processes below
 LEP_A 0            # lepton anomalous magnetic moment -- used in case if dilepton photoproduction is chosen
+ALP_MASS 1.        # mass of axion-like particle
+ALP_WIDTH 0.01     # (Gauss) width of axion-like particle peak
 NEVENTS 1000       # number of events to be generated
 DO_PT_CUT 0        # enable pt cut: 0 -- off, 1 -- on
 PT_MIN 0           # pt cut
@@ -101,11 +103,12 @@ SEED 0             # Seed for random numbers generator. '0' -> random seed
 
 | ID | Process |
 |----|---------|
-|`1`| [TEST FEATURE] Light-by-light scattering (1-loop level) ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\gamma\gamma) |
-|`10`| Dielectron photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;e^{&plus;}e^{-}) |
-|`11`| Dimuon photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\mu^{&plus;}\mu^{-}) |
-|`12`| Ditau photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\tau^{&plus;}\tau^{-}) |
-|`20`| [TEST FEATURE] Dipion photoproduction ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\pi^{0}\pi^{0}) |
+|`11`| Dielectron production ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;e^{&plus;}e^{-}) |
+|`13`| Dimuon production ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\mu^{&plus;}\mu^{-}) |
+|`15`| Ditau production ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\tau^{&plus;}\tau^{-}) |
+|`22`| Light-by-light scattering (1-loop level) ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\gamma\gamma) |
+|`51`| Axion-like particle production ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;a&space;\to&space;\gamma\gamma) |
+|`111`| Dipion production ![](https://latex.codecogs.com/svg.image?\gamma\gamma&space;\to&space;\pi^{0}\pi^{0}) |
 
 ### Tips and notes
 
