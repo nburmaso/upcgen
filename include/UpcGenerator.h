@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -84,19 +84,21 @@ class UpcGenerator
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???
   struct InputPars {
+    // parameters of incoming nuclei
     std::string inNucZ{"NUCLEUS_Z"};
     std::string inNucA{"NUCLEUS_A"};
     std::string inWSRadius{"WS_R"};
     std::string inWSA{"WS_A"};
     std::string inCMSqrtS{"SQRTS"};
     std::string inProcID{"PROC_ID"};
-    std::string inLepA{"LEP_A"};
+    std::string inNEvents{"NEVENTS"};
+    // kinematic cuts for final-state particles (decay products not included)
     std::string inDoPtCut{"DO_PT_CUT"};
     std::string inLowPt{"PT_MIN"};
     std::string inDoEtaCut{"DO_ETA_CUT"};
     std::string inLowEta{"ETA_MIN"};
     std::string inHiEta{"ETA_MAX"};
-    std::string inNEvents{"NEVENTS"};
+    // grid sizes and binnings
     std::string inLowZ{"ZMIN"};
     std::string inHiZ{"ZMAX"};
     std::string inLowM{"MMIN"};
@@ -106,6 +108,7 @@ class UpcGenerator
     std::string inBinsZ{"BINS_Z"};
     std::string inBinsM{"BINS_M"};
     std::string inBinsY{"BINS_Y"};
+    // switches and flags
     std::string inFluxPoint{"FLUX_POINT"};
     std::string inBreakupMode{"BREAKUP_MODE"};
     std::string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
@@ -114,10 +117,15 @@ class UpcGenerator
     std::string inPythia8FSR{"PYTHIA8_FSR"};
     std::string inPythia8Decays{"PYTHIA8_DECAYS"};
     std::string inSeed{"SEED"};
+    // mass cuts: hack for pre-calculated cross sections (lbyl and pi0 pair production)
     // fixme : to be removed
     std::string inDoMCut{"DO_M_CUT"};
     std::string inLowMCut{"LOW_M_CUT"};
     std::string inHighMCut{"HIGH_M_CUT"};
+    // process-specific parameters
+    std::string inLepA{"LEP_A"};         // anomalous magnetic moment
+    std::string inALPMass{"ALP_MASS"};   // mass of axion-like particle
+    std::string inALPWidth{"ALP_WIDTH"}; // width of axion-like particle
   };
 
   // debug level
@@ -190,15 +198,40 @@ class UpcGenerator
 
   // internal methods for event treating
   // ----------------------------------------------------------------------
+  bool isPairProduction{false};
+  void pairProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
+                      TVector3& vec,                          // momentum of outgoing particles
+                      double mPart,                           // outgoing particle mass
+                      int partPDG,                            // pdg of final-state particles
+                      bool isCharged,                         // final-state particles are charged or not
+                      std::vector<TLorentzVector>& particles, // vector for final-state particles
+                      std::vector<int>& pdgs,
+                      std::vector<int>& mothers,
+                      std::vector<int>& statuses);
+
+  bool isSingleProduction{false};
+  void singleProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
+                        int partPDG,                            // pdg of final-state particle
+                        std::vector<TLorentzVector>& particles, // vector for final-state particles
+                        std::vector<int>& pdgs,
+                        std::vector<int>& mothers,
+                        std::vector<int>& statuses);
+
   void processInPythia(std::vector<int>& pdgs,
                        std::vector<int>& statuses,
                        std::vector<int>& mothers,
                        std::vector<TLorentzVector>& particles);
 
-  void processPions(std::vector<int>& pdgs,
-                    std::vector<int>& statuses,
-                    std::vector<int>& mothers,
-                    std::vector<TLorentzVector>& particles);
+  void twoPartDecayUniform(std::vector<int>& pdgs,
+                           std::vector<int>& statuses,
+                           std::vector<int>& mothers,
+                           std::vector<TLorentzVector>& particles,
+                           int id,
+                           double decayMass,
+                           int decayProdPDG);
+
+  // check kinematic cuts for particles in 'particles' vector
+  bool checkKinCuts(std::vector<TLorentzVector>& particles);
 };
 
 #endif // UPCGENERATOR__UPCGENERATOR_H_

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -26,6 +26,7 @@
 
 #include "UpcPhysConstants.h"
 #include "UpcElemProcess.h"
+#include "UpcTwoPhotonALP.h"
 #include "UpcTwoPhotonDilep.h"
 #include "UpcTwoPhotonDipion.h"
 #include "UpcTwoPhotonLbyL.h"
@@ -169,6 +170,10 @@ class UpcCrossSection
   // elementary process setter
   void setElemProcess(int procID);
   UpcElemProcess* elemProcess{nullptr};
+
+  // process-specific parameters (with some default values)
+  double alpMass{1.}; // 1 GeV
+  double alpWidth{0.010}; // 10 MeV
 
   void init();
 

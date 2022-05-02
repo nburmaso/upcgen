@@ -19,35 +19,39 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-/// a class implementing cross sections for dilepton photoproduction
-/// gamma+gamma -> l+l-
-
-#ifndef UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_
-#define UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_
+#ifndef UPCGENERATOR_INCLUDE_UPCTWOPHOTONALP_H_
+#define UPCGENERATOR_INCLUDE_UPCTWOPHOTONALP_H_
 
 #include "UpcElemProcess.h"
 
-class UpcTwoPhotonDilep : public UpcElemProcess
+class UpcTwoPhotonALP : public UpcElemProcess
 {
  public:
-  explicit UpcTwoPhotonDilep(int partPDG);
+  UpcTwoPhotonALP(double mass, double width, int spin = 0) : width{width}, spin{spin}
+  {
+    partPDG = 51; // code for spin-0 axion-like particle according to PDG MC numbering
+    mPart = mass;
+    isCharged = false;
+  }
 
-  ~UpcTwoPhotonDilep() override = default;
+  ~UpcTwoPhotonALP() override = default;
 
-  // anomalous magnetic moment
-  double aLep{0};
+  double width{0.001};
+
+  int spin{0};
 
   double calcCrossSectionM(double m) override;
 
-  double calcCrossSectionZM(double z, double m) override;
+  double calcCrossSectionZM(double z, double m) override { return 0; };
 
-  double calcCrossSectionMPolS(double m) override;
+  // polarized cross sections are not available for this process
+  double calcCrossSectionMPolS(double m) override { return 0; };
 
-  double calcCrossSectionZMPolS(double z, double m) override;
+  double calcCrossSectionZMPolS(double z, double m) override { return 0; };
 
-  double calcCrossSectionMPolPS(double m) override;
+  double calcCrossSectionMPolPS(double m) override { return 0; };
 
-  double calcCrossSectionZMPolPS(double z, double m) override;
+  double calcCrossSectionZMPolPS(double z, double m) override { return 0; };
 };
 
-#endif // UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_
+#endif // UPCGENERATOR_INCLUDE_UPCTWOPHOTONALP_H_
