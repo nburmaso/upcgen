@@ -61,8 +61,6 @@ processed and verbose information about produced particles. In the most verbose 
 intermediate calculation results, so it is recommended to use it very carefully (and also to look in the code, if
 possible).
 
-The default number of threads is 1.
-
 Generated events will be stored to `events.root`. If the generator is built with HepMC flag,
 events will be written to `events.hepmc2`
 
