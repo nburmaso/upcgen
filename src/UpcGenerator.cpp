@@ -136,8 +136,8 @@ void UpcGenerator::init()
 #ifdef USE_PYTHIA6
   if (pythiaVersion == 6) {
     isPythiaUsed = true;
-    decayer->setSeed(seed);
     decayer = new UpcPythia6Helper();
+    decayer->setSeed(seed);
   }
 #endif
 

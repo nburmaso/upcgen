@@ -20,33 +20,75 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "UpcGenerator.h"
+
 #include <plog/Log.h>
 #include <plog/Init.h>
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 
+#include <algorithm>
+
+class InputParser
+{
+ public:
+  InputParser(int& argc, char** argv)
+  {
+    for (int i = 1; i < argc; ++i)
+      this->tokens.emplace_back(argv[i]);
+  }
+
+  const std::string& getCmdOption(const std::string& option) const
+  {
+    std::vector<std::string>::const_iterator itr;
+    itr = std::find(this->tokens.begin(), this->tokens.end(), option);
+    if (itr != this->tokens.end() && ++itr != this->tokens.end()) {
+      return *itr;
+    }
+    static const std::string empty_string("");
+    return empty_string;
+  }
+
+  bool cmdOptionExists(const std::string& option) const
+  {
+    return std::find(this->tokens.begin(), this->tokens.end(), option) != this->tokens.end();
+  }
+
+ private:
+  std::vector<std::string> tokens;
+};
+
 int main(int argc, char** argv)
 {
+  InputParser input(argc, argv);
+
   // logging levels:
   //  0 -> no debug logs
   //  1 -> basic debug logs
   //  2 -> verbose logs with intermediate calculation results
+  int debugLevel = 0;
+  int numThreads = 1;
 
   // initialize logger
   static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
   plog::init(plog::verbose, &consoleAppender);
 
-  PLOG_FATAL_IF(argc > 3) << "Wrong number of parameters! Usage: generate debug_level [optional]number_of_threads";
-  if (argc > 3) {
-    return -1;
+  if (input.cmdOptionExists("-h")) {
+    printf("Available options:\n"
+           "-h        -- help message\n"
+           "-debug    -- set debug level: 0=no debug messages (default),\n"
+           "                              1=save calculated cross sections into 'events.root' (for ROOT output only),\n"
+           "                              2=print out intermediate calculation results and events info (warning, lots of messages)\n"
+           "-nthreads -- set number of threads for cross section and luminosity calculation (default is 1)\n");
+    std::_Exit(0);
   }
 
-  // input
-  int debugLevel = std::stoi(argv[1]);
-  PLOG_INFO << "Debug level: " << debugLevel;
-  int numThreads = 1;
-  if (argc == 3) {
-    numThreads = std::stoi(argv[2]);
+  const auto debugLevelOpt = input.getCmdOption("-debug");
+  if (!debugLevelOpt.empty()) {
+    debugLevel = std::stoi(debugLevelOpt);
+  }
+  const auto numThreadsOpt = input.getCmdOption("-nthreads");
+  if (!numThreadsOpt.empty()) {
+    numThreads = std::stoi(numThreadsOpt);
   }
 
   PLOG_INFO << "Initializing the generator...";
