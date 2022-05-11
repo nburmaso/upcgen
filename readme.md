@@ -43,10 +43,20 @@ make
 To run the generator use
 
 ```shell
-./generate debug_level [optionally]number_of_threads
+./generate
 ```
 
-here, `debug_level` is `0`, `1`, or `2`. In debug mode, the generator will also print number of the event being
+Available options are:
+* `-debug`    -- set debug level: 0=no debug messages (default),
+                                  1=save calculated cross sections into 'events.root' (for ROOT output only),
+                                  2=print out intermediate calculation results and events info (warning, lots of messages)
+* `-nthreads` -- set number of threads for cross section and luminosity calculation (default is 1)
+
+For example: `./generate -debug 1 -nthreads 10`
+
+To see available options, use `-h`: `./generate -h`
+
+In debug mode, the generator will also print number of the event being
 processed and verbose information about produced particles. In the most verbose mode (`2`) the program will also print
 intermediate calculation results, so it is recommended to use it very carefully (and also to look in the code, if
 possible).
