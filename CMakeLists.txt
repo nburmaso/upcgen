@@ -27,13 +27,18 @@ cmake_minimum_required(VERSION 2.8)
 
 project(UpcGenerator)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
 # debug build
 # set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 # set(CMAKE_CXX_FLAGS_DEBUG "-g")
+
+# release build
 set(CMAKE_CXX_FLAGS "-O2")
+
+# Google sanitizers
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak -fsanitize-recover=address -g -Wall -O0")
 
 option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" ON)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" ON)
@@ -50,36 +55,43 @@ endif ()
 
 find_package(ROOT REQUIRED)
 include(${ROOT_USE_FILE})
-include_directories(${ROOT_INCLUDE_DIRS}
-        $ENV{PYTHIA8}/include)
-
-include_directories(${PROJECT_SOURCE_DIR}/include
-        ${ROOT_INCLUDE_DIRS})
+include_directories(${ROOT_INCLUDE_DIRS})
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-add_executable(generate main.cpp ${sources} ${headers})
+add_executable(upcgen main.cpp ${sources} ${headers})
 
-target_link_libraries(generate
-        ${ROOT_LIBRARIES}
-        $ENV{ROOTSYS}/lib/libEG.so)
+target_link_libraries(upcgen ${ROOT_LIBRARIES}
+                             $ENV{ROOTSYS}/lib/libEG.so)
 
+add_definitions(-DCROSS_SEC_DIR=\"${CMAKE_SOURCE_DIR}/cross_sections\")
+
+# note: root with pythia6 support is required for this option
 if (BUILD_WITH_PYTHIA6)
     add_definitions(-DUSE_PYTHIA6)
-    target_link_libraries(generate $ENV{ROOTSYS}/lib/libEGPythia6.so)
+    set(optLibs ${optLibs} $ENV{ROOTSYS}/lib/libEGPythia6.so)
 endif ()
 
 if (BUILD_WITH_PYTHIA8)
-    add_definitions(-DUSE_PYTHIA8)
-    target_link_libraries(generate
-            $ENV{PYTHIA8}/lib/libpythia8.so
-            $ENV{ROOTSYS}/lib/libEGPythia8.so)
+    find_package(Pythia8 REQUIRED)
+    if(PYTHIA8_FOUND)
+        add_definitions(-DUSE_PYTHIA8)
+        set(optLibs ${optLibs} ${PYTHIA8_LIBRARY})
+        include_directories(${PYTHIA8_INCLUDE_DIR})
+    endif()
 endif()
 
 if (BUILD_WITH_HEPMC)
-    add_definitions(-DUSE_HEPMC)
-    find_package(HepMC3 PATHS $ENV{HEPMC_ROOT}/share/* REQUIRED)
-    include_directories(${HEPMC3_INCLUDE_DIR})
-    target_link_libraries(generate ${HEPMC3_LIBRARIES})
+    find_package(HepMC3 PATHS $ENV{HEPMC3_ROOT}/share/* REQUIRED)
+    if(HEPMC3_FOUND)
+        add_definitions(-DUSE_HEPMC)
+        include_directories(${HEPMC3_INCLUDE_DIR})
+        set(optLibs ${optLibs} ${HEPMC3_LIBRARY})
+    endif()
 endif()
+
+set(Upcgenlib "Upcgenlib")
+add_library(${Upcgenlib} STATIC ${sources})
+target_link_libraries(upcgen ${Upcgenlib} ${optLibs})
