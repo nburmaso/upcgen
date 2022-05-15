@@ -61,11 +61,6 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
-add_executable(upcgen main.cpp ${sources} ${headers})
-
-target_link_libraries(upcgen ${ROOT_LIBRARIES}
-                             $ENV{ROOTSYS}/lib/libEG.so)
-
 add_definitions(-DCROSS_SEC_DIR=\"${CMAKE_SOURCE_DIR}/cross_sections\")
 
 # note: root with pythia6 support is required for this option
@@ -75,23 +70,20 @@ if (BUILD_WITH_PYTHIA6)
 endif ()
 
 if (BUILD_WITH_PYTHIA8)
+    add_definitions(-DUSE_PYTHIA8)
     find_package(Pythia8 REQUIRED)
-    if(PYTHIA8_FOUND)
-        add_definitions(-DUSE_PYTHIA8)
-        set(optLibs ${optLibs} ${PYTHIA8_LIBRARY})
-        include_directories(${PYTHIA8_INCLUDE_DIR})
-    endif()
+    set(optLibs ${optLibs} ${PYTHIA8_LIBRARY})
+    include_directories(${PYTHIA8_INCLUDE_DIR})
 endif()
 
 if (BUILD_WITH_HEPMC)
-    find_package(HepMC3 PATHS $ENV{HEPMC3_ROOT}/share/* REQUIRED)
-    if(HEPMC3_FOUND)
-        add_definitions(-DUSE_HEPMC)
-        include_directories(${HEPMC3_INCLUDE_DIR})
-        set(optLibs ${optLibs} ${HEPMC3_LIBRARY})
-    endif()
+    add_definitions(-DUSE_HEPMC)
+    find_package(HepMC3 REQUIRED)
+    set(optLibs ${optLibs} ${HEPMC3_LIBRARIES})
+    include_directories(${HEPMC3_INCLUDE_DIR})
 endif()
 
 set(Upcgenlib "Upcgenlib")
 add_library(${Upcgenlib} STATIC ${sources})
-target_link_libraries(upcgen ${Upcgenlib} ${optLibs})
+add_executable(upcgen main.cpp)
+target_link_libraries(upcgen ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)
