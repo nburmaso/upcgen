@@ -1,3 +1,5 @@
+[![cpc](https://img.shields.io/badge/j.%20Computer%20Physics%20Communication-2022%2F108388-blue)](https://inspirehep.net/literature/1972911)
+
 ### General information
 
 This is a simple event generator dedicated to dilepton production process in ultra-peripheral collisions.
