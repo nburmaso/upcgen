@@ -26,6 +26,12 @@
 
 #include "TFile.h"
 
+#include <string>
+
+#ifndef CROSS_SEC_DIR
+#define CROSS_SEC_DIR "undefined"
+#endif
+
 UpcTwoPhotonDipion::UpcTwoPhotonDipion(bool doMassCut, double lowMCut, double hiMCut)
 {
   mPart = 0.1349770; // pi0 mass from PDG
@@ -33,12 +39,13 @@ UpcTwoPhotonDipion::UpcTwoPhotonDipion(bool doMassCut, double lowMCut, double hi
   isCharged = false;
 
   // load cross sections from files
-  auto* f_m = new TFile("../cross_sections/pi0pi0/cross_section_m.root");
+  std::string csDir = CROSS_SEC_DIR;
+  auto* f_m = new TFile((csDir + "/pi0pi0/cross_section_m.root").c_str());
   hCrossSectionM = (TH1D*)f_m->Get("hCrossSectionM");
   hCrossSectionM->SetDirectory(nullptr);
   f_m->Close();
 
-  auto* f_zm = new TFile("../cross_sections/pi0pi0/cross_section_zm.root");
+  auto* f_zm = new TFile((csDir + "/pi0pi0/cross_section_zm.root").c_str());
   hCrossSectionZM = (TH2D*)f_zm->Get("hCrossSectionZM");
   hCrossSectionZM->SetDirectory(nullptr);
   f_zm->Close();

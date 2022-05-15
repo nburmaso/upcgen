@@ -5,13 +5,13 @@ This is a simple event generator dedicated to dilepton production process in ult
 ### Requirements
 
 * Pythia8 event generator (for decays). See [Pythia website](https://pythia.org/) for installation instructions. It is
-also possible to use Pythia6. Note that in both cases one needs to build ROOT with Pythia support. Note that Pythia is
-only used for tau decays and completely optional
+also possible to use Pythia6. Note that in the latter case one needs to build ROOT with Pythia6 support. Note that Pythia is
+only used for tau decays and FSR simulations and is completely optional.
 * ROOT (for calculations and Lorentz vectors). See [ROOT website](https://root.cern.ch/).
 * CMAKE 2.8 (or newer) & compiler with support of C++11
-* HepMC: It is possible to use HepMC output format. Source code and installation instructions 
-can be obtained from [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
-* Optionally: a compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
+* HepMC3: It is possible to use HepMC output format. Source code and installation instructions 
+can be obtained from the [HepMC repository](https://gitlab.cern.ch/hepmc/HepMC3).
+* A compiler supporting OpenMP 4.5+ (some pragmas may be different for different versions).
 
 ### Other 3rd party libraries
 
@@ -27,8 +27,8 @@ This generator utilizes simple [plog](https://github.com/SergiusTheBest/plog) li
 * Optionally: build the generator with Pythia8 using cmake flag `BUILD_WITH_PYTHIA8=ON`
 * Optionally: build the generator with OpenMP support for parallel computation of two-photon luminosity
   (the most CPU-consuming operation) using cmake flag `BUILD_WITH_OPENMP=ON`
-* Optionally: install HepMC library following instructions from the GitLab repository,
-setup environment with `export HEPMC_ROOT=/path/to/hepmc/install/dir` and build the generator 
+* Optionally: install HepMC3 library following instructions from the GitLab repository,
+setup environment with `export HEPMC3_ROOT=/path/to/hepmc/install/dir` and build the generator 
 with HepMC support using `BUILD_WITH_HEPMC=ON`
 * For details, see `CMakeLists.txt`
 * Build the project:
@@ -43,7 +43,7 @@ make
 To run the generator use
 
 ```shell
-./generate
+./upcgen
 ```
 
 Available options are:
@@ -52,9 +52,9 @@ Available options are:
                                   2=print out intermediate calculation results and events info (warning, lots of messages)
 * `-nthreads` -- set number of threads for cross section and luminosity calculation (default is 1)
 
-For example: `./generate -debug 1 -nthreads 10`
+For example: `./upcgen -debug 1 -nthreads 10`
 
-To see available options, use `-h`: `./generate -h`
+To see available options, use `-h`: `./upcgen -h`
 
 In debug mode, the generator will also print number of the event being
 processed and verbose information about produced particles. In the most verbose mode (`2`) the program will also print

@@ -31,8 +31,9 @@
 // can be used only if built with Pythia8
 #ifdef USE_PYTHIA8
 
+#include "TClonesArray.h"
 #include "TLorentzVector.h"
-#include "TPythia8.h"
+#include "TParticle.h"
 
 UpcPythia8Helper::UpcPythia8Helper() : mPythia8(new Pythia8::Pythia())
 {
@@ -73,7 +74,6 @@ void UpcPythia8Helper::process(std::vector<int>& pdgs,
   if (mDoDecays) {
     mPythia8->moreDecays();
   }
-  // mPythia8->event.list();
 }
 
 int UpcPythia8Helper::import(TClonesArray* particles)
