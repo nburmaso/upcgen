@@ -220,9 +220,9 @@ class UpcGenerator
     }
 
     // writing basic event info with default HepMC units
-    void writeEventInfo(int eventID, int nParticles, int nVertices = 0)
+    void writeEventInfo(int eventID, int nParticles, int nVertices = 1)
     {
-      outfile << "E " << nVertices << " " << nParticles << "\n"
+      outfile << "E " << eventID << " " << nVertices << " " << nParticles << "\n"
               << "U GEV MM"
               << "\n";
     }
