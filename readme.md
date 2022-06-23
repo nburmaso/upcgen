@@ -29,9 +29,6 @@ This generator utilizes simple [plog](https://github.com/SergiusTheBest/plog) li
 * Optionally: build the generator with Pythia8 using cmake flag `BUILD_WITH_PYTHIA8=ON`
 * Optionally: build the generator with OpenMP support for parallel computation of two-photon luminosity
   (the most CPU-consuming operation) using cmake flag `BUILD_WITH_OPENMP=ON`
-* Optionally: install HepMC3 library following instructions from the GitLab repository,
-setup environment with `export HEPMC3_ROOT=/path/to/hepmc/install/dir` and build the generator 
-with HepMC support using `BUILD_WITH_HEPMC=ON`
 * For details, see `CMakeLists.txt`
 * Build the project:
 ```shell
@@ -107,6 +104,8 @@ PYTHIA_VERSION 8   # Pythia version: 6, 8 or -1. -1 means that Pythia will not b
 PYTHIA8_FSR 0      # For Pythia8 only: simulate final state radiation (EM showers)
 PYTHIA8_DECAYS 0   # For Pythia8 only: switch to turn on/off lepton decays
 SEED 0             # Seed for random numbers generator. '0' -> random seed
+USE_ROOT_OUTPUT 1  # Use ROOT trees as output format
+USE_HEPMC_OUTPUT 0 # Use HepMC3 output format
 ```
 
 ### List of available processes

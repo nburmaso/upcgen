@@ -52,15 +52,6 @@
 
 #include <fstream>
 
-#ifdef USE_HEPMC
-#include "HepMC3/GenEvent.h"
-#include "HepMC3/GenVertex.h"
-#include "HepMC3/GenParticle.h"
-#include "HepMC3/FourVector.h"
-#include "HepMC3/WriterAscii.h"
-#include "HepMC3/WriterAsciiHepMC2.h"
-#endif
-
 class UpcGenerator
 {
  public:
@@ -117,6 +108,8 @@ class UpcGenerator
     std::string inPythia8FSR{"PYTHIA8_FSR"};
     std::string inPythia8Decays{"PYTHIA8_DECAYS"};
     std::string inSeed{"SEED"};
+    std::string inROOTOut{"USE_ROOT_OUTPUT"};
+    std::string inHepMCOut{"USE_HEPMC_OUTPUT"};
     // mass cuts: hack for pre-calculated cross sections (lbyl and pi0 pair production)
     // fixme : to be removed
     std::string inDoMCut{"DO_M_CUT"};
@@ -156,7 +149,10 @@ class UpcGenerator
  private:
   UpcCrossSection* nucProcessCS{nullptr};
 
-  // helper struct for file output
+  bool useROOTOut{true};
+  bool useHepMCOut{false};
+
+  // helper struct for ROOT file output
   struct outParticle {
     int eventNumber;
     int pdgCode;
@@ -188,10 +184,61 @@ class UpcGenerator
   bool doFSR{false};
   bool doDecays{false};
 
-#ifdef USE_HEPMC
-  // helper for HepMC output format
-  HepMC3::WriterAscii* writerHepMC;
-#endif
+  // a very simple HepMC writer
+  // writing only particles, omitting any vertex information
+  class WriterHepMC
+  {
+   public:
+    WriterHepMC(const std::string& fname)
+    {
+      openFile(fname);
+    }
+
+    ~WriterHepMC()
+    {
+      closeFile();
+    }
+
+    std::ofstream outfile;
+
+    // open output file and print preamble
+    void openFile(const std::string& fname)
+    {
+      outfile.open(fname);
+      outfile << "HepMC::Version 3.02.04"
+              << "\n"
+              << "HepMC::Asciiv3-START_EVENT_LISTING"
+              << "\n";
+    }
+
+    // write end-of-listing message and close output file
+    void closeFile()
+    {
+      outfile << "HepMC::Asciiv3-END_EVENT_LISTING"
+              << "\n";
+      outfile.close();
+    }
+
+    // writing basic event info with default HepMC units
+    void writeEventInfo(int eventID, int nParticles, int nVertices = 0)
+    {
+      outfile << "E " << nVertices << " " << nParticles << "\n"
+              << "U GEV MM"
+              << "\n";
+    }
+
+    void writeParticleInfo(int id, int motherID, int pdg,
+                           double px, double py, double pz, double e, double m,
+                           int status)
+    {
+      outfile << std::setprecision(9)
+              << "P " << id << " " << motherID << " " << pdg << " "
+              << px << " " << py << " " << pz << " " << e << " " << m << " "
+              << status << "\n";
+    }
+  };
+
+  WriterHepMC* writerHepMC;
 
   // number of worker threads for OpenMP
   int numThreads{1};
