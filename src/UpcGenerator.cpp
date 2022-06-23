@@ -272,6 +272,12 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inSeed) {
         seed = stol(parValue);
       }
+      if (parameter == parDict.inROOTOut) {
+        useROOTOut = stoi(parValue);
+      }
+      if (parameter == parDict.inHepMCOut) {
+        useHepMCOut = stoi(parValue);
+      }
       if (parameter == parDict.inDoMCut) {
         nucProcessCS->doMassCut = stoi(parValue);
       }
@@ -281,6 +287,11 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inHighMCut) {
         nucProcessCS->hiMCut = stod(parValue);
       }
+    }
+    // do a sanity check for output formats
+    if (!useROOTOut && !useHepMCOut) {
+      PLOG_FATAL << "Output format not set! Choose ROOT or/and HepMC via flags USE_ROOT_OUTPUT and USE_HEPMC_OUTPUT!";
+      std::_Exit(-1);
     }
     fInputs.close();
   } else {
@@ -441,11 +452,11 @@ void UpcGenerator::twoPartDecayUniform(vector<int>& pdgs, // output vectors with
   decays[1].Boost(boost1);
   pdgs.emplace_back(decayProdPDG);
   statuses.emplace_back(status);
-  mothers.emplace_back(0);
+  mothers.emplace_back(id);
   particles.emplace_back(decays[0]);
   pdgs.emplace_back(decayProdPDG);
   statuses.emplace_back(status);
-  mothers.emplace_back(0);
+  mothers.emplace_back(id);
   particles.emplace_back(decays[1]);
 }
 
@@ -481,41 +492,30 @@ void UpcGenerator::writeEvent(int evt,
                               const vector<int>& mothers,
                               const vector<TLorentzVector>& particles)
 {
-#ifndef USE_HEPMC
-  for (int i = 0; i < particles.size(); i++) {
-    particle.eventNumber = evt;
-    particle.pdgCode = pdgs[i];
-    particle.particleID = i;
-    particle.statusID = statuses[i];
-    particle.motherID = i <= 1 ? -1 : mothers[i]; // first two particles are primary
-    particle.px = particles[i].Px();
-    particle.py = particles[i].Py();
-    particle.pz = particles[i].Pz();
-    particle.e = particles[i].E();
-    mOutTree->Fill();
+  if (useROOTOut) {
+    for (int i = 0; i < particles.size(); i++) {
+      particle.eventNumber = evt;
+      particle.pdgCode = pdgs[i];
+      particle.particleID = i;
+      particle.statusID = statuses[i];
+      particle.motherID = mothers[i];
+      particle.px = particles[i].Px();
+      particle.py = particles[i].Py();
+      particle.pz = particles[i].Pz();
+      particle.e = particles[i].E();
+      mOutTree->Fill();
+    }
   }
-#endif
 
-#ifdef USE_HEPMC
-  // todo: add incoming photons to vertices
-  HepMC3::GenEvent eventHepMC;
-  eventHepMC.set_event_number(evt);
-  HepMC3::GenVertexPtr vertex = std::make_shared<HepMC3::GenVertex>();
-  for (int i = 0; i < particles.size(); i++) {
-    HepMC3::FourVector p;
-    p.setPx(particles[i].Px());
-    p.setPy(particles[i].Py());
-    p.setPz(particles[i].Pz());
-    p.setE(particles[i].E());
-    int status = i <= 1 ? 1 : 2;
-    HepMC3::GenParticlePtr part = std::make_shared<HepMC3::GenParticle>(p, pdgs[i], status);
-    vertex->add_particle_out(part);
+  if (useHepMCOut) {
+    writerHepMC->writeEventInfo(evt, particles.size());
+    for (int i = 0; i < particles.size(); i++) {
+      // adding 1 to IDs to follow HepMC standard
+      writerHepMC->writeParticleInfo(i + 1, mothers[i] + 1, pdgs[i],
+                                     particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
+                                     statuses[i]);
+    }
   }
-  // dummy in-particle for correct output
-  vertex->add_particle_in(std::make_shared<HepMC3::GenParticle>());
-  eventHepMC.add_vertex(vertex);
-  writerHepMC->write_event(eventHepMC);
-#endif
 }
 
 void UpcGenerator::generateEvents()
@@ -606,27 +606,27 @@ void UpcGenerator::generateEvents()
   // generationg events
   // -----------------------------------------------------------------------
 
-#ifndef USE_HEPMC
   // initialize file output
-  mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
-  PLOG_WARNING << "Using ROOT tree for output!";
-  PLOG_INFO << "Events will be written to events.root";
-  mOutTree = new TTree("particles", "Generated particles");
-  mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
-  mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
-  mOutTree->Branch("particleID", &particle.particleID, "particleID/I");
-  mOutTree->Branch("statusID", &particle.statusID, "statusID/I");
-  mOutTree->Branch("motherID", &particle.motherID, "motherID/I");
-  mOutTree->Branch("px", &particle.px, "px/D");
-  mOutTree->Branch("py", &particle.py, "py/D");
-  mOutTree->Branch("pz", &particle.pz, "pz/D");
-  mOutTree->Branch("e", &particle.e, "e/D");
-  mOutTree->SetAutoSave(0);
-#else
-  PLOG_WARNING << "Using HepMC format for output!";
-  PLOG_INFO << "Events will be written to events.hepmc";
-  writerHepMC = new HepMC3::WriterAscii("events.hepmc");
-#endif
+  if (useROOTOut) {
+    mOutFile = new TFile("events.root", "recreate", "", 4 * 100 + 9); // using LZ4 with level 5 compression
+    PLOG_WARNING << "Using ROOT tree for output!";
+    PLOG_INFO << "Events will be written to events.root";
+    mOutTree = new TTree("particles", "Generated particles");
+    mOutTree->Branch("eventNumber", &particle.eventNumber, "eventNumber/I");
+    mOutTree->Branch("pdgCode", &particle.pdgCode, "pdgCode/I");
+    mOutTree->Branch("particleID", &particle.particleID, "particleID/I");
+    mOutTree->Branch("statusID", &particle.statusID, "statusID/I");
+    mOutTree->Branch("motherID", &particle.motherID, "motherID/I");
+    mOutTree->Branch("px", &particle.px, "px/D");
+    mOutTree->Branch("py", &particle.py, "py/D");
+    mOutTree->Branch("pz", &particle.pz, "pz/D");
+    mOutTree->Branch("e", &particle.e, "e/D");
+    mOutTree->SetAutoSave(0);
+  }
+
+  if (useHepMCOut) {
+    writerHepMC = new WriterHepMC("events.hepmc");
+  }
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
@@ -639,12 +639,6 @@ void UpcGenerator::generateEvents()
     if (debug <= 1 && ((evt + 1) % 10000 == 0)) {
       PLOG_INFO << "Event number: " << evt + 1;
     }
-
-#ifndef USE_HEPMC
-    if ((evt + 1) % 100000 == 0) {
-      mOutTree->FlushBaskets(false);
-    }
-#endif
 
     // pick pair m and y from nuclear cross section
     double mPair, yPair;
@@ -737,19 +731,18 @@ void UpcGenerator::generateEvents()
     PLOG_INFO << fixed << setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
   }
 
-#ifndef USE_HEPMC
-  if (debug > 0) {
-    hNucCSM->Write();
-    hNucCSYM->Write();
+  if (useROOTOut) {
+    if (debug > 0) {
+      hNucCSM->Write();
+      hNucCSYM->Write();
+    }
+    mOutFile->Write();
+    mOutFile->Close();
   }
-  mOutFile->Write();
-  mOutFile->Close();
-#endif
 
-#ifdef USE_HEPMC
-  writerHepMC->close();
-  delete writerHepMC;
-#endif
+  if (useHepMCOut) {
+    delete writerHepMC;
+  }
 
   delete hCrossSectionZM;
   delete hCrossSectionZMPolS;
