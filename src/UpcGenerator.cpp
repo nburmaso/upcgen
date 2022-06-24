@@ -403,7 +403,6 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
   // todo: not very optimal, to be cleaned up
   pdgs.clear();
   statuses.clear();
-  mothers.clear();
   particles.clear();
   for (int ip = 0; ip < processedParts.GetEntriesFast(); ip++) {
     auto* part = (TParticle*)processedParts.At(ip);
@@ -417,7 +416,8 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
     part->Momentum(tlVector);
     pdgs.emplace_back(pdg);
     statuses.emplace_back(status);
-    mothers.emplace_back(mother);
+    if (ip + 1 > mothers.size())
+      mothers.emplace_back(mother);
     particles.emplace_back(tlVector);
   }
 #endif
@@ -510,10 +510,9 @@ void UpcGenerator::writeEvent(int evt,
   if (useHepMCOut) {
     writerHepMC->writeEventInfo(evt, particles.size());
     for (int i = 0; i < particles.size(); i++) {
-      // adding 1 to IDs to follow HepMC standard
       writerHepMC->writeParticleInfo(i + 1, mothers[i] + 1, pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
-                                     statuses[i]);
+                                     mothers[i] < 0 ? 1 : 2);
     }
   }
 }

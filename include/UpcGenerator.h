@@ -220,7 +220,7 @@ class UpcGenerator
     }
 
     // writing basic event info with default HepMC units
-    void writeEventInfo(int eventID, int nParticles, int nVertices = 1)
+    void writeEventInfo(int eventID, int nParticles, int nVertices = 0)
     {
       outfile << "E " << eventID << " " << nVertices << " " << nParticles << "\n"
               << "U GEV MM"
@@ -231,7 +231,7 @@ class UpcGenerator
                            double px, double py, double pz, double e, double m,
                            int status)
     {
-      outfile << std::setprecision(9)
+      outfile << std::scientific
               << "P " << id << " " << motherID << " " << pdg << " "
               << px << " " << py << " " << pz << " " << e << " " << m << " "
               << status << "\n";
