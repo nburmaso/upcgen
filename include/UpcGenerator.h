@@ -68,6 +68,8 @@ class UpcGenerator
   bool doEtaCut{false};
   double minEta{0};
   double maxEta{0};
+  double minEtaSec{-999};
+  double maxEtaSec{-999};
   bool usePolarizedCS{false};
   long int seed{0};
   long int nEvents{1000};
@@ -87,8 +89,13 @@ class UpcGenerator
     std::string inDoPtCut{"DO_PT_CUT"};
     std::string inLowPt{"PT_MIN"};
     std::string inDoEtaCut{"DO_ETA_CUT"};
+    // in case of pair production:
+    // first and second particles
+    // assuming a general cut for both particles if eta_max_second < 0
     std::string inLowEta{"ETA_MIN"};
     std::string inHiEta{"ETA_MAX"};
+    std::string inLowEtaSec{"ETA_MIN_SEC"};
+    std::string inHiEtaSec{"ETA_MAX_SEC"};
     // grid sizes and binnings
     std::string inLowZ{"ZMIN"};
     std::string inHiZ{"ZMAX"};

@@ -208,6 +208,12 @@ void UpcGenerator::initGeneratorFromFile()
       if (parameter == parDict.inHiEta) {
         maxEta = stod(parValue);
       }
+      if (parameter == parDict.inLowEtaSec) {
+        minEtaSec = stod(parValue);
+      }
+      if (parameter == parDict.inHiEtaSec) {
+        maxEtaSec = stod(parValue);
+      }
       if (parameter == parDict.inLowZ) {
         nucProcessCS->zmin = stod(parValue);
       }
@@ -316,6 +322,8 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "DO_ETA_CUT " << doEtaCut;
   PLOG_INFO << "ETA_MIN " << minEta;
   PLOG_INFO << "ETA_MAX " << maxEta;
+  PLOG_INFO << "ETA_MIN_SEC " << minEtaSec;
+  PLOG_INFO << "ETA_MAX_SEC " << maxEtaSec;
   PLOG_INFO << "ZMIN " << nucProcessCS->zmin;
   PLOG_INFO << "ZMAX " << nucProcessCS->zmax;
   PLOG_INFO << "MMIN " << nucProcessCS->mmin;
@@ -473,13 +481,27 @@ bool UpcGenerator::checkKinCuts(std::vector<TLorentzVector>& particles)
         break;
       }
     }
-    // check eta cuts
-    if (doEtaCut) {
+    // check general eta cuts
+    if (doEtaCut && maxEtaSec < -998. && maxEtaSec < -998.) {
       double eta = tlvec.Eta();
       if (eta < minEta || eta > maxEta) {
         pass = false;
         break;
       }
+    }
+  }
+
+  // special cuts for pair production
+  // semiforward etas
+  if (maxEtaSec > -999.) {
+    double eta1 = particles[0].Eta();
+    double eta2 = particles[1].Eta();
+    bool checkEta1 = eta1 < maxEta && eta1 > minEta;
+    bool checkEtaSec1 = eta1 < maxEtaSec && eta1 > minEtaSec;
+    bool checkEta2 = eta2 < maxEta && eta2 > minEta;
+    bool checkEtaSec2 = eta2 < maxEtaSec && eta2 > minEtaSec;
+    if (!(checkEta1 && checkEtaSec2 || checkEtaSec1 && checkEta2)) {
+      pass = false;
     }
   }
 
