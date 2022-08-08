@@ -84,22 +84,20 @@ int UpcPythia8Helper::import(TClonesArray* particles)
   TClonesArray& clonesParticles = *particles;
   clonesParticles.Clear();
   int nparts = 0;
-  int ioff = 0;
-  if (mPythia8->event[0].id() == 90) {
-    ioff = -1;
-  }
 
   for (const auto& part : mPythia8->event) {
     if (part.id() == 90) {
       continue;
     }
+    int mother1 = part.status() == -23 ? 0 : part.mother1() + 1;
+    int mother2 = part.status() == -23 ? 0 : part.mother2() + 1;
     new (clonesParticles[nparts]) TParticle(
       part.id(),
       part.status(),
-      part.mother1() + ioff,
-      part.mother2() + ioff,
-      part.daughter1() + ioff,
-      part.daughter2() + ioff,
+      mother1,
+      mother2,
+      part.daughter1(),
+      part.daughter2(),
       part.px(),
       part.py(),
       part.pz(),

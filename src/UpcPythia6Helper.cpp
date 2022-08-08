@@ -48,13 +48,17 @@ void UpcPythia6Helper::process(std::vector<int>& pdgs, std::vector<int>& statuse
 int UpcPythia6Helper::import(TClonesArray* particles)
 {
   int nParts = 0;
+  int shift = 0;
   TClonesArray& clonesParticles = *particles;
   for (int i = 0; i < mPartHolder.size(); i++) {
     for (int j = 0; j < mPartHolder[i].GetEntriesFast(); j++) {
       auto* part = (TParticle*)mPartHolder[i].At(j);
+      int mother = part->GetFirstMother() == 0 ? 0 : part->GetFirstMother() + shift;
+      part->SetFirstMother(mother);
       new (clonesParticles[nParts]) TParticle(*part);
       nParts++;
     }
+    shift = nParts;
   }
   mPartHolder.clear();
   return nParts;

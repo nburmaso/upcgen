@@ -377,8 +377,8 @@ void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz 
 
   pdgs.emplace_back(sign1 * partPDG);
   pdgs.emplace_back(sign2 * partPDG);
-  mothers.emplace_back(-1);
-  mothers.emplace_back(-1);
+  mothers.emplace_back(0);
+  mothers.emplace_back(0);
   statuses.emplace_back(23);
   statuses.emplace_back(23);
 }
@@ -394,7 +394,7 @@ void UpcGenerator::singleProduction(TLorentzVector& pPair,                  // i
   // TVector3 boost = pPair.BoostVector();
   // particles[0].Boost(boost);
   pdgs.emplace_back(partPDG);
-  mothers.emplace_back(-1);
+  mothers.emplace_back(0);
   statuses.emplace_back(23);
 }
 
@@ -412,6 +412,7 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
   pdgs.clear();
   statuses.clear();
   particles.clear();
+  mothers.clear();
   for (int ip = 0; ip < processedParts.GetEntriesFast(); ip++) {
     auto* part = (TParticle*)processedParts.At(ip);
     if (debug > 1) {
@@ -424,8 +425,7 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
     part->Momentum(tlVector);
     pdgs.emplace_back(pdg);
     statuses.emplace_back(status);
-    if (ip + 1 > mothers.size())
-      mothers.emplace_back(mother);
+    mothers.emplace_back(mother);
     particles.emplace_back(tlVector);
   }
 #endif
@@ -518,7 +518,7 @@ void UpcGenerator::writeEvent(int evt,
     for (int i = 0; i < particles.size(); i++) {
       particle.eventNumber = evt;
       particle.pdgCode = pdgs[i];
-      particle.particleID = i;
+      particle.particleID = i + 1;
       particle.statusID = statuses[i];
       particle.motherID = mothers[i];
       particle.px = particles[i].Px();
@@ -532,9 +532,9 @@ void UpcGenerator::writeEvent(int evt,
   if (useHepMCOut) {
     writerHepMC->writeEventInfo(evt, particles.size());
     for (int i = 0; i < particles.size(); i++) {
-      writerHepMC->writeParticleInfo(i + 1, mothers[i] + 1, pdgs[i],
+      writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
-                                     mothers[i] < 0 ? 1 : 2);
+                                     mothers[i] == 0 ? 1 : 2);
     }
   }
 }
