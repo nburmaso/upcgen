@@ -526,7 +526,7 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     auto* fFluxFormInt = new TF1(Form("fFluxFormInt", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
     auto* gGAA = new TGraph(nb, vb, vGAA);
     for (im = 0; im < nm; im++) {
-      double M = mmin + dm * im;
+      double m = mmin + dm * im;
       for (iy = 0; iy < ny; iy++) {
         double y = ymin + dy * iy;
         if (usePolarizedCS) {

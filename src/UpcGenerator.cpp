@@ -534,7 +534,7 @@ void UpcGenerator::writeEvent(int evt,
     for (int i = 0; i < particles.size(); i++) {
       writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
-                                     mothers[i] == 0 ? 1 : 2);
+                                     statuses[i]);
     }
   }
 }
