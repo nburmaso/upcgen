@@ -651,6 +651,20 @@ void UpcGenerator::generateEvents()
 
   PLOG_INFO << "Generating " << nEvents << " events...";
 
+  bool filterTauDecays = true;
+  const int nbins = 4;
+  double pt_bins_ledges[nbins + 1] = {0., 1., 2., 5., 10.};
+  TH1D* hElectronPt_var = new TH1D("hElectronPt_var", ";#it{p}_{T}, GeV/c;", nbins, pt_bins_ledges);
+  TH1D* hMuonPt_var = new TH1D("hMuonPt_var", ";#it{p}_{T}, GeV/c;", nbins, pt_bins_ledges);
+
+  TH1D* hElectronPt = new TH1D("hElectronPt", ";#it{p}_{T}, GeV/c;", 100, 0, 10);
+  TH1D* hElectronEta = new TH1D("hElectronEta", ";#eta;", 120, -6, 6);
+  TH1D* hElectronPhi = new TH1D("hElectronPhi", ";#phi;", 100, -3.14, 3.14);
+
+  TH1D* hMuonPt = new TH1D("hMuonPt", ";#it{p}_{T}, GeV/c;", 100, 0, 10);
+  TH1D* hMuonEta = new TH1D("hMuonEta", ";#eta;", 120, -6, 6);
+  TH1D* hMuonPhi = new TH1D("hMuonPhi", ";#phi;", 100, -3.14, 3.14);
+
   long int rejected = 0;
   long int evt = 0;
   while (evt < nEvents) {
@@ -731,6 +745,100 @@ void UpcGenerator::generateEvents()
       twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
     }
 
+    if (procID == 15) {
+      const double etaMin_barrel = -0.8;
+      const double etaMax_barrel = 0.8;
+      const double ptMin_barrel = 0.3;
+
+      const double etaMin_fwd = -4.;
+      const double etaMax_fwd = -2.5;
+      const double ptMin_fwd = 0.0;
+
+      bool isMuAccepted1 = false;
+      bool isElAccepted1 = false;
+      bool isMuAccepted2 = false;
+      bool isElAccepted2 = false;
+      bool isEventAccepted1 = false;
+      bool isEventAccepted2 = false;
+      int accEl1, accEl2;
+      int accMu1, accMu2;
+      int nCharged[2] = {0, 0};
+
+      for (int ip = 0; ip < particles.size(); ip++) {
+        auto& part = particles[ip];
+        int pdg = pdgs[ip];
+        int status = statuses[ip];
+
+        if (status != 1)
+          continue;
+
+        // todo: add K+ 321 ?
+        if (pdg == 13 || pdg == 11 || pdg == -211)
+          nCharged[0]++; // tau-, pdg=15
+
+        if (pdg == -13 || pdg == -11 || pdg == 211)
+          nCharged[1]++; // tau+, pdg=-15
+
+        if (!isMuAccepted1) {
+          isMuAccepted1 = pdg == +13 && part.Eta() > etaMin_fwd &&
+                          part.Eta() < etaMax_fwd && part.Pt() > ptMin_fwd;
+          accMu1 = ip;
+        }
+        if (!isMuAccepted2) {
+          isMuAccepted2 = pdg == -13 && part.Eta() > etaMin_fwd &&
+                          part.Eta() < etaMax_fwd && part.Pt() > ptMin_fwd;
+          accMu2 = ip;
+        }
+        if (!isElAccepted1) {
+          isElAccepted1 = pdg == +11 && part.Eta() > etaMin_barrel &&
+                          part.Eta() < etaMax_barrel &&
+                          part.Pt() > ptMin_barrel;
+          accEl1 = ip;
+        }
+        if (!isElAccepted2) {
+          isElAccepted2 = pdg == -11 && part.Eta() > etaMin_barrel &&
+                          part.Eta() < etaMax_barrel &&
+                          part.Pt() > ptMin_barrel;
+          accEl2 = ip;
+        }
+      }
+
+      if (isEventAccepted1 && nCharged[0] == 1 && nCharged[1] == 1) {
+        hElectronPt->Fill(particles[accEl1].Pt());
+        hElectronPt_var->Fill(particles[accEl1].Pt());
+        hElectronEta->Fill(particles[accEl1].Eta());
+        hElectronPhi->Fill(particles[accEl1].Phi());
+        hMuonPt->Fill(particles[accMu2].Pt());
+        hMuonPt_var->Fill(particles[accMu2].Pt());
+        hMuonEta->Fill(particles[accMu2].Eta());
+        hMuonPhi->Fill(particles[accMu2].Phi());
+      }
+      if (isEventAccepted2 && nCharged[0] == 1 && nCharged[1] == 1) {
+        hElectronPt->Fill(particles[accEl2].Pt());
+        hElectronPt_var->Fill(particles[accEl2].Pt());
+        hElectronEta->Fill(particles[accEl2].Eta());
+        hElectronPhi->Fill(particles[accEl2].Phi());
+        hMuonPt->Fill(particles[accMu1].Pt());
+        hMuonPt_var->Fill(particles[accMu1].Pt());
+        hMuonEta->Fill(particles[accMu1].Eta());
+        hMuonPhi->Fill(particles[accMu1].Phi());
+      }
+
+      isEventAccepted1 = isElAccepted1 && isMuAccepted2;
+      isEventAccepted2 = isElAccepted2 && isMuAccepted1;
+
+      bool isAccepted = (isEventAccepted1 || isEventAccepted2) && nCharged[0] == 1 && nCharged[1] == 1;
+
+      if (!isAccepted) {
+        rejected++;
+        pdgs.clear();
+        statuses.clear();
+        mothers.clear();
+        particles.clear();
+        continue;
+      }
+    }
+
     writeEvent(evt, pdgs, statuses, mothers, particles);
 
     pdgs.clear();
@@ -744,12 +852,12 @@ void UpcGenerator::generateEvents()
 
   PLOG_INFO << fixed << setprecision(6) << "Total nuclear cross section: " << totCS << " mb";
 
-  bool doAnyCuts = doPtCut || doEtaCut;
+  bool doAnyCuts = doPtCut || doEtaCut || filterTauDecays;
   if (doAnyCuts && nEvents > 0) {
     double fidCS = totCS * (double)nEvents / (double)(nEvents + rejected);
     PLOG_INFO << "Kinematic cuts were used";
     PLOG_INFO << "Number of rejected events = " << rejected;
-    PLOG_INFO << fixed << setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
+    PLOG_INFO << fixed << setprecision(9) << "Cross section with cuts = " << fidCS << " mb";
   }
 
   if (useROOTOut) {
@@ -757,6 +865,14 @@ void UpcGenerator::generateEvents()
       hNucCSM->Write();
       hNucCSYM->Write();
     }
+    hElectronPt_var->Write();
+    hMuonPt_var->Write();
+    hElectronPt->Write();
+    hElectronEta->Write();
+    hElectronPhi->Write();
+    hMuonPt->Write();
+    hMuonEta->Write();
+    hMuonPhi->Write();
     mOutFile->Write();
     mOutFile->Close();
   }
