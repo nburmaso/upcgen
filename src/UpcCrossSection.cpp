@@ -581,8 +581,8 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   int im, iy, ib;
   int progress = 0;
   int total = nm * ny;
-  double cs[nm][ny];
-  double cs_rat[nm][ny];
+  std::vector<std::vector<double>> cs(nm, std::vector<double>(ny, 0));
+  std::vector<std::vector<double>> cs_rat(nm, std::vector<double>(ny, 0));
   omp_set_num_threads(numThreads);
 #pragma omp parallel default(none)                                                   \
   shared(cs, cs_rat, hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy, ib) \
