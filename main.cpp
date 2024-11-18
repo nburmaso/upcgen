@@ -61,12 +61,14 @@ int main(int argc, char** argv)
 {
   InputParser input(argc, argv);
 
+  // define default values of command line parameters
   // logging levels:
   //  0 -> no debug logs
   //  1 -> basic debug logs
   //  2 -> verbose logs with intermediate calculation results
   int debugLevel = 0;
   int numThreads = 1;
+  std::string parFileName("parameters.in");
 
   // initialize logger
   static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
@@ -78,7 +80,8 @@ int main(int argc, char** argv)
            "-debug    -- set debug level: 0=no debug messages (default),\n"
            "                              1=save calculated cross sections into 'events.root' (for ROOT output only),\n"
            "                              2=print out intermediate calculation results and events info (warning, lots of messages)\n"
-           "-nthreads -- set number of threads for cross section and luminosity calculation (default is 1)\n");
+           "-nthreads -- set number of threads for cross section and luminosity calculation (default is 1)\n"
+           "-parfile -- name of input parameter file\n");
     std::_Exit(0);
   }
 
@@ -90,11 +93,19 @@ int main(int argc, char** argv)
   if (!numThreadsOpt.empty()) {
     numThreads = std::stoi(numThreadsOpt);
   }
+  const auto parFileNameOpt = input.getCmdOption("-parfile");
+  if (!parFileNameOpt.empty()) {
+    parFileName = std::string(parFileNameOpt);
+  }
 
-  PLOG_INFO << "Initializing the generator...";
+  PLOG_INFO << "Configuring the generator...";
   auto* upcGenerator = new UpcGenerator();
   upcGenerator->setDebugLevel(debugLevel);
   upcGenerator->setNumThreads(numThreads);
+  upcGenerator->setParFile(parFileName);
+  upcGenerator->configGeneratorFromFile();
+
+  PLOG_INFO << "Initializing the generator...";
   upcGenerator->init();
 
   PLOG_INFO << "Starting generation process...";
