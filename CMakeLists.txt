@@ -40,7 +40,7 @@ set(CMAKE_CXX_FLAGS "-O2 -fpic")
 # Google sanitizers
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak -fsanitize-recover=address -g -Wall -O0")
 
-option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
+option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" ON)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" ON)
 option(BUILD_WITH_OPENMP "Build with OpenMP support" ON)
 
