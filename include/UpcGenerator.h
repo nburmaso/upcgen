@@ -195,7 +195,7 @@ class UpcGenerator
 
   // helper struct for ROOT file output
   struct outParticle {
-    int eventNumber;
+    long int eventNumber;
     int pdgCode;
     int particleID;
     int statusID;
@@ -211,7 +211,7 @@ class UpcGenerator
   outParticle particle{};
   std::vector<TParticle> genParticles;
 
-  void writeEvent(int evt,
+  void writeEvent(long int evt,
                   const std::vector<int>& pdgs,
                   const std::vector<int>& statuses,
                   const std::vector<int>& mothers,

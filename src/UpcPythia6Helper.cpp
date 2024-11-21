@@ -45,6 +45,9 @@ void UpcPythia6Helper::process(std::vector<int>& pdgs, std::vector<int>& statuse
   }
 }
 
+// status codes:
+// https://www.pythia.org/download/pythia6/pythia6200.pdf
+// https://pythia.org/download/pdf/worksheet8153.pdf
 int UpcPythia6Helper::import(TClonesArray* particles)
 {
   int nParts = 0;
@@ -53,7 +56,21 @@ int UpcPythia6Helper::import(TClonesArray* particles)
   for (int i = 0; i < mPartHolder.size(); i++) {
     for (int j = 0; j < mPartHolder[i].GetEntriesFast(); j++) {
       auto* part = (TParticle*)mPartHolder[i].At(j);
-      int mother = part->GetFirstMother() == 0 ? 0 : part->GetFirstMother() + shift;
+      bool isPrimary = part->GetFirstMother() == 0;
+      bool isFinal = part->GetFirstDaughter() == 0;
+      int statusP6 = part->GetStatusCode();
+      int statusP8 = -1;
+      if (statusP6 == 11 && isPrimary) { // primary, decayed
+        statusP8 = -23;
+      }
+      if (statusP6 == 11 && !isFinal && !isPrimary) { // secondary, decayed
+        statusP8 = -91;
+      }
+      if (statusP6 == 1 && isFinal && !isPrimary) { // secondary, "final state"
+        statusP8 = 91;
+      }
+      part->SetStatusCode(statusP8);
+      int mother = part->GetFirstMother() == 0 ? -1 : part->GetFirstMother() + shift - 1;
       part->SetFirstMother(mother);
       new (clonesParticles[nParts]) TParticle(*part);
       nParts++;

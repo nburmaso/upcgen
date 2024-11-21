@@ -442,7 +442,7 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
     }
     int pdg = part->GetPdgCode();
     int status = part->GetStatusCode();
-    int mother = part->GetFirstMother();
+    int mother = abs(status) == 23 ? 0 : part->GetFirstMother() + 1;
     int fDaughter = part->GetFirstDaughter();
     int lDaughter = part->GetLastDaughter();
     part->Momentum(tlVector);
@@ -518,7 +518,7 @@ bool UpcGenerator::checkKinCuts(std::vector<TLorentzVector>& particles)
   return pass;
 }
 
-void UpcGenerator::writeEvent(int evt,
+void UpcGenerator::writeEvent(long int evt,
                               const vector<int>& pdgs,
                               const vector<int>& statuses,
                               const vector<int>& mothers,
@@ -541,7 +541,7 @@ void UpcGenerator::writeEvent(int evt,
 
   if (useHepMCOut) {
     writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), 1);
-    for (int i = 0; i < particles.size(); i++) {
+    for (int i = 0; i < particles.size(); ++i) {
       writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
                                      statuses[i]);
@@ -702,13 +702,13 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
 
   // uniform pion decays into photon pairs
   if (procID == 111) {
-    twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
     twoPartDecayUniform(pdgs, statuses, mothers, particles, 1, 0., 22);
+    twoPartDecayUniform(pdgs, statuses, mothers, particles, 2, 0., 22);
   }
 
   // uniform ALP decay into two photons
   if (procID == 51) {
-    twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
+    twoPartDecayUniform(pdgs, statuses, mothers, particles, 1, 0., 22);
   }
 
   // fill genParticles
