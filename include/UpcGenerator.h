@@ -134,6 +134,9 @@ class UpcGenerator
   // perform initial calculations
   void init();
 
+  // set the directory where the lumi file is expected to be
+  void setLumiFileDirectory(std::string directory) { nucProcessCS->setLumiFileDirectory(directory); };
+
   // debug level:
   //  0  -- no debug output
   //  >0 -- enable debug info

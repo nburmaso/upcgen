@@ -437,14 +437,14 @@ double UpcCrossSection::getCachedFormFac(double Q2)
 
 void UpcCrossSection::prepareTwoPhotonLumi()
 {
-  // wait here if another generator is working on this
-  std::string fnlock{".lumiIsCalculated"};
+  // wait here if an other generator is working on this
+  TString fnlock{lumiFileDirectory+"/.lumiIsCalculated"};
   if (usePolarizedCS) {
     fnlock += "Pol";
   }
   bool itIsMyTurn{false};
   while (!itIsMyTurn) {
-    auto fd = open(fnlock.c_str(), O_CREAT | O_EXCL, 0644);
+    auto fd = open(fnlock.Data(), O_CREAT | O_EXCL, 0644);
     if (fd > 0) {
       itIsMyTurn = true;
     } else {
@@ -453,11 +453,14 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }
   
   bool isFound = false;
-  if (!gSystem->AccessPathName("twoPhotonLumi.root") && !usePolarizedCS) {
+  TString fname{lumiFileDirectory+"/twoPhotonLumi"};
+  fname += usePolarizedCS ? "Pol.root" : ".root";
+  
+  if (!gSystem->AccessPathName(fname.Data()) && !usePolarizedCS) {
     PLOG_INFO << "Found pre-calculated unpolarized 2D luminosity";
     isFound = true;
   }
-  if (!gSystem->AccessPathName("twoPhotonLumiPol.root") && usePolarizedCS) {
+  if (!gSystem->AccessPathName(fname.Data()) && usePolarizedCS) {
     PLOG_INFO << "Found pre-calculated polarized 2D luminosity";
     isFound = true;
   }
@@ -465,7 +468,6 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     PLOG_INFO << "Precalculated 2D luminosity is not found. Starting all over...";
     double dy = (ymax - ymin) / ny;
     double dm = (mmax - mmin) / nm;
-    TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
     auto* f2DLumi = new TFile(fname, "recreate");
     // histograms for unpolarized case
     TH2D* hD2LDMDY = nullptr;
@@ -569,7 +571,7 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }
   
   // remove lock file
-  if (remove(fnlock.c_str()) != 0) {
+  if (remove(fnlock.Data()) != 0) {
     PLOG_WARNING << "Lock file " << fnlock << " was not properly removed!";
   }  
 }
@@ -585,7 +587,8 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   TH2D* hD2LDMDY_s = nullptr;
   TH2D* hD2LDMDY_p = nullptr;
 
-  TString fname = usePolarizedCS ? "twoPhotonLumiPol.root" : "twoPhotonLumi.root";
+  TString fname{lumiFileDirectory+"/twoPhotonLumi"};
+  fname += usePolarizedCS ? "Pol.root" : ".root";
   auto* f2DLumi = new TFile(fname, "r");
 
   if (usePolarizedCS) {
