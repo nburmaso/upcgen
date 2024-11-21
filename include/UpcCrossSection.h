@@ -106,6 +106,8 @@ class UpcCrossSection
                             0.9739065285171717};
 
   // photon luminosity calculation parameters
+  TString lumiFileDirectory{"."};
+  void setLumiFileDirectory(TString directory) { lumiFileDirectory = directory; };
   const int nb1{120};
   const int nb2{120};
 
