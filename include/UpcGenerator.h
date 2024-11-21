@@ -169,7 +169,7 @@ class UpcGenerator
   TTree* mOutTree{nullptr};
   outParticle particle{};
 
-  void writeEvent(int evt,
+  bool writeEvent(long int evt,
                   const std::vector<int>& pdgs,
                   const std::vector<int>& statuses,
                   const std::vector<int>& mothers,
@@ -220,9 +220,9 @@ class UpcGenerator
     }
 
     // writing basic event info with default HepMC units
-    void writeEventInfo(int eventID, int nParticles, int nVertices = 0)
+    void writeEventInfo(long int eventID, int nParticles, int nVertices = 0)
     {
-      outfile << "E " << nVertices << " " << nParticles << "\n"
+      outfile << "E " << eventID << " " << nVertices << " " << nParticles << "\n"
               << "U GEV MM"
               << "\n";
     }

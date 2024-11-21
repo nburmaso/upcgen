@@ -963,7 +963,7 @@ double UpcCrossSection::getPhotonPt(double ePhot)
   }
   // clear map if it became too large
   int nElem = photPtDistrMap.size();
-  if (nElem > 30000) {
+  if (nElem > 1000000) {
     photPtDistrMap.clear();
   }
   return pt;

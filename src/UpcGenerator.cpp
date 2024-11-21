@@ -486,7 +486,14 @@ bool UpcGenerator::checkKinCuts(std::vector<TLorentzVector>& particles)
   return pass;
 }
 
-void UpcGenerator::writeEvent(int evt,
+// const double rapMin = -4.1;
+// const double rapMax = -2.4;
+// const double rapMin = -4.0;
+// const double rapMax = -2.5;
+// const double rapMin = -100.0;
+// const double rapMax =  100.0;
+
+bool UpcGenerator::writeEvent(long int evt,
                               const vector<int>& pdgs,
                               const vector<int>& statuses,
                               const vector<int>& mothers,
@@ -494,7 +501,7 @@ void UpcGenerator::writeEvent(int evt,
 {
   if (useROOTOut) {
     for (int i = 0; i < particles.size(); i++) {
-      particle.eventNumber = evt;
+      particle.eventNumber = static_cast<int>(evt);
       particle.pdgCode = pdgs[i];
       particle.particleID = i;
       particle.statusID = statuses[i];
@@ -508,14 +515,34 @@ void UpcGenerator::writeEvent(int evt,
   }
 
   if (useHepMCOut) {
-    writerHepMC->writeEventInfo(evt, particles.size());
+    TLorentzVector p[2];
+    int pdsSel[2];
+    int j = 0;
     for (int i = 0; i < particles.size(); i++) {
-      // adding 1 to IDs to follow HepMC standard
-      writerHepMC->writeParticleInfo(i + 1, mothers[i] + 1, pdgs[i],
-                                     particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
-                                     statuses[i]);
+      if (std::abs(pdgs[i]) != 13 || statuses[i] < 0)
+        continue;
+      p[j] = particles[i];
+      pdsSel[j] = pdgs[i];
+      j++;
     }
+    if (j > 2)
+      return false;
+    TLorentzVector pp = p[0] + p[1];
+    bool isEventAccepted = p[0].Eta() < maxEta && p[0].Eta() > minEta &&
+                           p[1].Eta() < maxEta && p[1].Eta() > minEta;
+    if (!isEventAccepted) {
+      return false;
+    }
+    writerHepMC->writeEventInfo(evt, 2);
+    writerHepMC->writeParticleInfo(1, 0, pdsSel[0],
+                                   p[0].Px(), p[0].Py(), p[0].Pz(), p[0].E(), p[0].M(),
+                                   1);
+    writerHepMC->writeParticleInfo(2, 0, pdsSel[1],
+                                   p[1].Px(), p[1].Py(), p[1].Pz(), p[1].E(), p[1].M(),
+                                   1);
   }
+
+  return true;
 }
 
 void UpcGenerator::generateEvents()
@@ -682,15 +709,15 @@ void UpcGenerator::generateEvents()
       singleProduction(pPair, partPDG, particles, pdgs, mothers, statuses);
     }
 
-    // check kinematic cuts
-    if (!checkKinCuts(particles)) {
-      rejected++;
-      pdgs.clear();
-      statuses.clear();
-      mothers.clear();
-      particles.clear();
-      continue;
-    }
+    //    // check kinematic cuts
+    //    if (!checkKinCuts(particles)) {
+    //      rejected++;
+    //      pdgs.clear();
+    //      statuses.clear();
+    //      mothers.clear();
+    //      particles.clear();
+    //      continue;
+    //    }
 
     // lepton decays for taus
     // todo: at the moment "fsr" and "decays" flags
@@ -710,7 +737,14 @@ void UpcGenerator::generateEvents()
       twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
     }
 
-    writeEvent(evt, pdgs, statuses, mothers, particles);
+    if (!writeEvent(evt, pdgs, statuses, mothers, particles)) {
+      rejected++;
+      pdgs.clear();
+      statuses.clear();
+      mothers.clear();
+      particles.clear();
+      continue;
+    }
 
     pdgs.clear();
     statuses.clear();
@@ -723,10 +757,10 @@ void UpcGenerator::generateEvents()
 
   PLOG_INFO << fixed << setprecision(6) << "Total nuclear cross section: " << totCS << " mb";
 
-  bool doAnyCuts = doPtCut || doEtaCut;
+  bool doAnyCuts = true; // doPtCut || doEtaCut;
   if (doAnyCuts && nEvents > 0) {
     double fidCS = totCS * (double)nEvents / (double)(nEvents + rejected);
-    PLOG_INFO << "Kinematic cuts were used";
+    PLOG_INFO << Form("Custom Kinematic cuts were used: %.2f < eta_mu < %.2f", minEta, maxEta);
     PLOG_INFO << "Number of rejected events = " << rejected;
     PLOG_INFO << fixed << setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
   }
