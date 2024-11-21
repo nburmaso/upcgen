@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -137,9 +137,8 @@ void UpcGenerator::init()
   nucProcessCS->init();
 
   // initialize the MT64 random number generator
-  if (!gRandom) {
-    gRandom = new TRandomMT64();
-  }
+  delete gRandom;
+  gRandom = new TRandomMT64();
   gRandom->SetSeed(seed == 0 ? time(nullptr) : seed);
 
   // initialize pythia for decays
@@ -397,8 +396,8 @@ void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz 
 
   pdgs.emplace_back(sign1 * partPDG);
   pdgs.emplace_back(sign2 * partPDG);
-  mothers.emplace_back(-1);
-  mothers.emplace_back(-1);
+  mothers.emplace_back(0);
+  mothers.emplace_back(0);
   statuses.emplace_back(23);
   statuses.emplace_back(23);
 }
@@ -414,7 +413,7 @@ void UpcGenerator::singleProduction(TLorentzVector& pPair,                  // i
   // TVector3 boost = pPair.BoostVector();
   // particles[0].Boost(boost);
   pdgs.emplace_back(partPDG);
-  mothers.emplace_back(-1);
+  mothers.emplace_back(0);
   statuses.emplace_back(23);
 }
 
@@ -529,7 +528,7 @@ void UpcGenerator::writeEvent(int evt,
     for (int i = 0; i < particles.size(); i++) {
       particle.eventNumber = evt;
       particle.pdgCode = pdgs[i];
-      particle.particleID = i;
+      particle.particleID = i + 1;
       particle.statusID = statuses[i];
       particle.motherID = mothers[i];
       particle.px = particles[i].Px();
@@ -541,10 +540,9 @@ void UpcGenerator::writeEvent(int evt,
   }
 
   if (useHepMCOut) {
-    writerHepMC->writeEventInfo(evt, particles.size());
+    writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), 1);
     for (int i = 0; i < particles.size(); i++) {
-      // adding 1 to IDs to follow HepMC standard
-      writerHepMC->writeParticleInfo(i + 1, mothers[i] + 1, pdgs[i],
+      writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
                                      statuses[i]);
     }

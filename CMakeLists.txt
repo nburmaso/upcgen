@@ -1,5 +1,5 @@
 ##########################################################################
-# Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
+# Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
 #
 # E-mail of the corresponding author: nazar.burmasov@cern.ch
 #
@@ -30,12 +30,12 @@ project(UpcGenerator)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
 # debug build
-# set(CMAKE_BUILD_TYPE Debug)
-# set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-# set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # release build
-set(CMAKE_CXX_FLAGS "-O2 -fpic")
+#set(CMAKE_CXX_FLAGS "-O2 -fpic")
 
 # Google sanitizers
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak -fsanitize-recover=address -g -Wall -O0")

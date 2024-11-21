@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -437,7 +437,7 @@ double UpcCrossSection::getCachedFormFac(double Q2)
 
 void UpcCrossSection::prepareTwoPhotonLumi()
 {
-  // wait here if an other generator is working on this
+  // wait here if another generator is working on this
   std::string fnlock{".lumiIsCalculated"};
   if (usePolarizedCS) {
     fnlock += "Pol";

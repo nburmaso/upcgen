@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -42,6 +42,8 @@ class UpcPythia6Helper : public UpcPythiaBase
   void process(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<TLorentzVector>& particles) override;
 
   int import(TClonesArray* particles) override;
+
+  std::vector<TClonesArray> mPartHolder;
 };
 
 #endif

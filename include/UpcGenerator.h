@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2022, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -153,9 +153,9 @@ class UpcGenerator
     seed = seedIn;
     
     // initialize the MT64 random number generator
-    if (!gRandom) {
-      gRandom = new TRandomMT64();
-    } 
+    delete gRandom;
+    gRandom = new TRandomMT64();
+
     PLOG_INFO << "<seed> = " << seed;
     gRandom->SetSeed(seed == 0 ? time(nullptr) : seed);
   };
@@ -262,9 +262,9 @@ class UpcGenerator
     }
 
     // writing basic event info with default HepMC units
-    void writeEventInfo(int eventID, int nParticles, int nVertices = 0)
+    void writeEventInfo(long int eventID, int nParticles, int nVertices = 0)
     {
-      outfile << "E " << nVertices << " " << nParticles << "\n"
+      outfile << "E " << eventID << " " << nVertices << " " << nParticles << "\n"
               << "U GEV MM"
               << "\n";
     }
