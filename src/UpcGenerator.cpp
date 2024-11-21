@@ -33,11 +33,11 @@ int UpcGenerator::debug = 0;
 UpcGenerator::UpcGenerator()
 {
   nucProcessCS = new UpcCrossSection();
-  
+
   // reset nuclear cross section
   totCS = 0.0;
   fidCS = 0.0;
-   
+
   // set defaults for the collisions system
   setCollisionSystem(5020., 82, 208);
 }
@@ -314,7 +314,7 @@ void UpcGenerator::configGeneratorFromFile()
       }
       line.erase(std::find(line.begin(), line.end(), '#'), line.end()); // trim comments
       iss >> parameter >> parValue;
-      
+
       setParameterValue(parameter, parValue);
     }
     // do a sanity check for output formats
@@ -550,7 +550,7 @@ void UpcGenerator::writeEvent(int evt,
 }
 
 void UpcGenerator::computeNuclXsection()
-{  
+{
   gErrorIgnoreLevel = 6001; // fixme: temporary workaround
 
   TH2D* hCrossSectionZM = nullptr;
@@ -626,16 +626,16 @@ void UpcGenerator::computeNuclXsection()
 }
 
 long int UpcGenerator::generateEvent(vector<int>& pdgs,
-                                 vector<int>& statuses,
-                                 vector<int>& mothers,
-                                 vector<TLorentzVector>& particles)
+                                     vector<int>& statuses,
+                                     vector<int>& mothers,
+                                     vector<TLorentzVector>& particles)
 {
   // clear the particle vectors
   pdgs.clear();
   statuses.clear();
   mothers.clear();
   particles.clear();
-  
+
   // mass of a particle in final state
   double mPart = nucProcessCS->elemProcess->mPart;
   int partPDG = nucProcessCS->elemProcess->partPDG;
@@ -682,7 +682,7 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
   if (isSingleProduction) {
     singleProduction(pPair, partPDG, particles, pdgs, mothers, statuses);
   }
-  
+
   // check kinematic cuts
   if (!checkKinCuts(particles)) {
     pdgs.clear();
@@ -710,25 +710,25 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
   if (procID == 51) {
     twoPartDecayUniform(pdgs, statuses, mothers, particles, 0, 0., 22);
   }
-  
+
   // fill genParticles
   vector<int> ds{-1, -1};
   genParticles.clear();
-  for (int ii=0; ii<particles.size(); ii++) {
+  for (int ii = 0; ii < particles.size(); ++ii) {
     ds = vector<int>{-1, -1};
     if (daughters.size() > ii) {
       ds[0] = daughters[ii][0];
       ds[1] = daughters[ii][1];
     }
-    
+
     TParticle tpart = TParticle(
       pdgs[ii], statuses[ii], mothers[ii], mothers[ii], ds[0], ds[1],
       particles[ii].Px(), particles[ii].Py(),
       particles[ii].Pz(), particles[ii].E(), 0.0, 0.0, 0.0, 0.0);
-      // particle.Print();
-      genParticles.push_back(tpart);
+    // particle.Print();
+    genParticles.push_back(tpart);
   }
-  
+
   return 1;
 }
 
@@ -772,7 +772,7 @@ void UpcGenerator::generateEvents()
     if (debug <= 1 && ((evt + 1) % 10000 == 0)) {
       PLOG_INFO << "Event number: " << evt + 1;
     }
-    
+
     // generate an event
     if (generateEvent(pdgs, statuses, mothers, particles) == 1) {
       writeEvent(evt, pdgs, statuses, mothers, particles);
@@ -807,7 +807,7 @@ void UpcGenerator::generateEvents()
     }
     mOutFile->Write();
     mOutFile->Close();
-    
+
     delete mOutTree;
     delete mOutFile;
   }
