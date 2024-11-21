@@ -437,6 +437,21 @@ double UpcCrossSection::getCachedFormFac(double Q2)
 
 void UpcCrossSection::prepareTwoPhotonLumi()
 {
+  // wait here if an other generator is working on this
+  std::string fnlock{".lumiIsCalculated"};
+  if (usePolarizedCS) {
+    fnlock += "Pol";
+  }
+  bool itIsMyTurn{false};
+  while (!itIsMyTurn) {
+    auto fd = open(fnlock.c_str(), O_CREAT | O_EXCL, 0644);
+    if (fd > 0) {
+      itIsMyTurn = true;
+    } else {
+      sleep(1);
+    }
+  }
+  
   bool isFound = false;
   if (!gSystem->AccessPathName("twoPhotonLumi.root") && !usePolarizedCS) {
     PLOG_INFO << "Found pre-calculated unpolarized 2D luminosity";
@@ -552,11 +567,16 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     f2DLumi->Close();
     PLOG_INFO << "Two-photon luminosity was written to " << fname;
   }
+  
+  // remove lock file
+  if (remove(fnlock.c_str()) != 0) {
+    PLOG_WARNING << "Lock file " << fnlock << " was not properly removed!";
+  }  
 }
 
 void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio, double& totCS)
 {
-  PLOG_INFO << "Calculating nuclear cross section";
+  PLOG_INFO << "Calculating nuclear cross section...";
 
   double dy = (ymax - ymin) / ny;
   double dm = (mmax - mmin) / nm;
@@ -576,7 +596,6 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
   }
 
   // calculating nuclear cross section
-  PLOG_INFO << "Calculating nuclear cross section...";
   ROOT::EnableThreadSafety();
   int im, iy, ib;
   int progress = 0;

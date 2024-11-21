@@ -35,7 +35,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 # set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # release build
-set(CMAKE_CXX_FLAGS "-O2")
+set(CMAKE_CXX_FLAGS "-O2 -fpic")
 
 # Google sanitizers
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=leak -fsanitize-recover=address -g -Wall -O0")
@@ -75,7 +75,16 @@ if (BUILD_WITH_PYTHIA8)
     include_directories(${PYTHIA8_INCLUDE_DIR})
 endif()
 
+# static and ...
 set(Upcgenlib "Upcgenlib")
 add_library(${Upcgenlib} STATIC ${sources})
+
+# ... shared library
+set(UpcgenlibShared "UpcgenlibShared")
+add_library(${UpcgenlibShared} SHARED ${sources})
+target_link_libraries(${UpcgenlibShared} ${optLibs} ${ROOT_LIBRARIES})
+set_target_properties(${UpcgenlibShared} PROPERTIES OUTPUT_NAME "Upcgenlib")
+
+# executable
 add_executable(upcgen main.cpp)
 target_link_libraries(upcgen ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)

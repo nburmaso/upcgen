@@ -74,57 +74,64 @@ class UpcGenerator
 
   // parameters dictionary
   // todo: use <any> from c++17 for a neat parsing???
-  struct InputPars {
+  static const int nParameters = 37;
+  const std::string parsNames[nParameters]
+  {
     // parameters of incoming nuclei
-    std::string inNucZ{"NUCLEUS_Z"};
-    std::string inNucA{"NUCLEUS_A"};
-    std::string inWSRadius{"WS_R"};
-    std::string inWSA{"WS_A"};
-    std::string inCMSqrtS{"SQRTS"};
-    std::string inProcID{"PROC_ID"};
-    std::string inNEvents{"NEVENTS"};
+    "NUCLEUS_Z",
+    "NUCLEUS_A",
+    "WS_R",
+    "WS_A",
+    "SQRTS",
+    "PROC_ID",
+    "NEVENTS",
     // kinematic cuts for final-state particles (decay products not included)
-    std::string inDoPtCut{"DO_PT_CUT"};
-    std::string inLowPt{"PT_MIN"};
-    std::string inDoEtaCut{"DO_ETA_CUT"};
-    std::string inLowEta{"ETA_MIN"};
-    std::string inHiEta{"ETA_MAX"};
+    "DO_PT_CUT",
+    "PT_MIN",
+    "DO_ETA_CUT",
+    "ETA_MIN",
+    "ETA_MAX",
     // grid sizes and binnings
-    std::string inLowZ{"ZMIN"};
-    std::string inHiZ{"ZMAX"};
-    std::string inLowM{"MMIN"};
-    std::string inHiM{"MMAX"};
-    std::string inLowY{"YMIN"};
-    std::string inHiY{"YMAX"};
-    std::string inBinsZ{"BINS_Z"};
-    std::string inBinsM{"BINS_M"};
-    std::string inBinsY{"BINS_Y"};
+    "ZMIN",
+    "ZMAX",
+    "MMIN",
+    "MMAX",
+    "YMIN",
+    "YMAX",
+    "BINS_Z",
+    "BINS_M",
+    "BINS_Y",
     // switches and flags
-    std::string inFluxPoint{"FLUX_POINT"};
-    std::string inBreakupMode{"BREAKUP_MODE"};
-    std::string inNonzeroGamPt{"NON_ZERO_GAM_PT"};
-    std::string inPolarized{"USE_POLARIZED_CS"};
-    std::string inPythiaVer{"PYTHIA_VERSION"};
-    std::string inPythia8FSR{"PYTHIA8_FSR"};
-    std::string inPythia8Decays{"PYTHIA8_DECAYS"};
-    std::string inSeed{"SEED"};
-    std::string inROOTOut{"USE_ROOT_OUTPUT"};
-    std::string inHepMCOut{"USE_HEPMC_OUTPUT"};
+    "FLUX_POINT",
+    "BREAKUP_MODE",
+    "NON_ZERO_GAM_PT",
+    "USE_POLARIZED_CS",
+    "PYTHIA_VERSION",
+    "PYTHIA8_FSR",
+    "PYTHIA8_DECAYS",
+    "SEED",
+    "USE_ROOT_OUTPUT",
+    "USE_HEPMC_OUTPUT",
     // mass cuts: hack for pre-calculated cross sections (lbyl and pi0 pair production)
     // fixme : to be removed
-    std::string inDoMCut{"DO_M_CUT"};
-    std::string inLowMCut{"LOW_M_CUT"};
-    std::string inHighMCut{"HIGH_M_CUT"};
+    "DO_M_CUT",
+    "LOW_M_CUT",
+    "HIGH_M_CUT",
     // process-specific parameters
-    std::string inLepA{"LEP_A"};         // anomalous magnetic moment
-    std::string inALPMass{"ALP_MASS"};   // mass of axion-like particle
-    std::string inALPWidth{"ALP_WIDTH"}; // width of axion-like particle
+    "LEP_A",
+    "ALP_MASS",
+    "ALP_WIDTH"
   };
+
+  void setParameterValue(std::string parameter, std::string parValue);
 
   // debug level
   static int debug;
 
-  // parse inputs, set flags, prepare caches...
+  // set configuration parameters
+  void configGeneratorFromFile();
+
+  // perform initial calculations
   void init();
 
   // debug level:
@@ -134,23 +141,57 @@ class UpcGenerator
 
   // number of threads for two-photon luminosity calculation
   void setNumThreads(int n) { numThreads = n; }
+  
+  void setParFile(std::string parfilename) { parFileName = parfilename; }
 
   // ----------------------------------------------------------------------
+  // set beam parameters
+  void setCollisionSystem(float sqrts, int nucl_z, int nucl_a);
 
-  // file parser
-  void initGeneratorFromFile();
+  // set seed for random generator
+  void setSeed(int seedIn) {
+    seed = seedIn;
+    
+    // initialize the MT64 random number generator
+    if (!gRandom) {
+      gRandom = new TRandomMT64();
+    } 
+    PLOG_INFO << "<seed> = " << seed;
+    gRandom->SetSeed(seed == 0 ? time(nullptr) : seed);
+  };
 
   // print parameters
   void printParameters();
 
-  // the main method
+  // compute nuclear cross section
+  void computeNuclXsection();
+  double totNuclX() { return totCS; }
+  double fidNuclX() { return fidCS; }
+
+  // event generation
+  long int generateEvent(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<int>& mothers, std::vector<TLorentzVector>& particles);
+  const std::vector<TParticle>& getParticles() const { return genParticles; };
+
+  // the main method in an event loop
   void generateEvents();
 
  private:
   UpcCrossSection* nucProcessCS{nullptr};
 
+  std::string parFileName{"parameters.in"};
+
   bool useROOTOut{true};
   bool useHepMCOut{false};
+
+  // global variables needed for event generation
+  double totCS;
+  double fidCS;
+  bool ignoreCSZ;
+  TH2D* hNucCSYM;
+  std::vector<std::vector<double>> hPolCSRatio;
+  std::vector<TH1D*> hCrossSecsZ;
+  std::vector<TH1D*> hCrossSecsZ_S;
+  std::vector<TH1D*> hCrossSecsZ_PS;
 
   // helper struct for ROOT file output
   struct outParticle {
@@ -168,6 +209,7 @@ class UpcGenerator
   TFile* mOutFile{nullptr};
   TTree* mOutTree{nullptr};
   outParticle particle{};
+  std::vector<TParticle> genParticles;
 
   void writeEvent(int evt,
                   const std::vector<int>& pdgs,
@@ -267,6 +309,7 @@ class UpcGenerator
   void processInPythia(std::vector<int>& pdgs,
                        std::vector<int>& statuses,
                        std::vector<int>& mothers,
+                       std::vector<std::vector<int>>& daughters,
                        std::vector<TLorentzVector>& particles);
 
   void twoPartDecayUniform(std::vector<int>& pdgs,
