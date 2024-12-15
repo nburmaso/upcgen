@@ -540,7 +540,17 @@ void UpcGenerator::writeEvent(long int evt,
   }
 
   if (useHepMCOut) {
-    writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), 1);
+    // compute number of vertices
+    int nVertices = -1;
+    int lastMotherId = -1;
+    for (auto mother : mothers) {
+      if (mother != lastMotherId) {
+        nVertices++;
+        lastMotherId = mother;
+      }
+    }
+    writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), nVertices);
+
     for (int i = 0; i < particles.size(); ++i) {
       writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
                                      particles[i].Px(), particles[i].Py(), particles[i].Pz(), particles[i].E(), particles[i].M(),
