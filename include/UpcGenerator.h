@@ -191,6 +191,7 @@ class UpcGenerator
   double fidCS;
   bool ignoreCSZ;
   TH2D* hNucCSYM;
+  TH1D* hNucCSY;
   std::vector<std::vector<double>> hPolCSRatio;
   std::vector<TH1D*> hCrossSecsZ;
   std::vector<TH1D*> hCrossSecsZ_S;
@@ -290,6 +291,8 @@ class UpcGenerator
 
   // internal methods for event treating
   // ----------------------------------------------------------------------
+  bool isVMProduction{false};
+
   bool isPairProduction{false};
   void pairProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
                       TVector3& vec,                          // momentum of outgoing particles

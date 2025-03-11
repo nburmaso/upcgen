@@ -81,6 +81,10 @@ void UpcCrossSection::setElemProcess(int procID)
       elemProcess = new UpcTwoPhotonDipion(doMassCut, lowMCut, hiMCut);
       break;
     }
+    case 443: { // VM meson photoproduction
+      elemProcess = new UpcPhotoNuclearVM(443);
+      break;
+    }
     default: {
       PLOG_FATAL << "Unknown process ID! Check manual and enter a correct ID! Exiting...";
       std::_Exit(-1);
@@ -237,6 +241,38 @@ double UpcCrossSection::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, co
   }
   double lumi = 2 * M_PI * M_PI * M * sum;
   return lumi;
+}
+
+// 0706.3356 eq. 24
+double UpcCrossSection::calcPhotonFlux(double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
+{
+  // double differential luminosity
+  double k = M / 2. * exp(Y);
+
+  double bmin = isPoint ? 1 * R : 0.05 * R;
+  double bmax = TMath::Max(5. * g1 * phys_consts::hc / k, 5 * R);
+  double log_delta_b = (log(bmax) - log(bmin)) / nb1;
+
+  double sum = 0;
+  for (int i = 0; i < nb1; i++) {
+    double bl = bmin * exp(i * log_delta_b);
+    double bh = bmin * exp((i + 1) * log_delta_b);
+    double b = (bh + bl) / 2.;
+    double sum_phi = 0.;
+    for (int j = 0; j < ngi10; j++) {
+      if (abscissas10[j] < 0) {
+        continue;
+      }
+      double phi = M_PI * abscissas10[j];
+      double bphi = b * cos(phi);
+      double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(bphi);
+      double gaa = bphi < 20. ? gGAA->Eval(bphi) : 1;
+      sum_phi += breakup * gaa * weights10[j];
+    }
+    sum += fluxForm(b, k, fFluxForm) * sum_phi * b * (bh - bl);
+  }
+  double flux = 2. * M_PI * sum;
+  return flux;
 }
 
 void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
@@ -686,6 +722,29 @@ void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector
 
   totCS = hCrossSectionYM->Integral() * 1e-6;
   PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << totCS << " mb";
+}
+
+void UpcCrossSection::calcNucCrossSectionY(TH1D* hCrossSectionY)
+{
+  PLOG_INFO << "Calculating nuclear cross section...";
+
+  double dy = (ymax - ymin) / ny;
+
+  // todo: save/read to/from file
+  // TString fname{lumiFileDirectory+"/photonFlux.root"};
+  // auto* fFlux = new TFile(fname, "r");
+  // auto* hPhotonFlux = (TH1D*) fFlux->Get("hPhotonFlux");
+
+  auto* fFluxFormInt = new TF1("fFluxFormInt_csy", fluxFormInt, 0, 10, 3);
+  auto* gGAA = new TGraph(nb, vb, vGAA);
+
+  for (int iy = 0; iy < ny; iy++) {
+    double y = ymin + dy * iy;
+    // double flux = hPhotonFlux->GetBinContent(iy + 1);
+    double flux = calcPhotonFlux(elemProcess->mPart, y, fFluxFormInt, gGAA);
+    double cs = elemProcess->calcCrossSectionY(y);
+    hCrossSectionY->SetBinContent(iy + 1, flux * cs);
+  }
 }
 
 // Function from Starlight

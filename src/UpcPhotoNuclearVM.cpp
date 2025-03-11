@@ -19,40 +19,21 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-/// base (abstract) class for elementary processes
+#include "UpcPhotoNuclearVM.h"
+#include "UpcPhysConstants.h"
 
-#pragma once
-
-class UpcElemProcess
+UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG)
 {
- public:
-  UpcElemProcess() = default;
-  virtual ~UpcElemProcess() {}
+  this->partPDG = partPDG;
+  // populating lepton mass map
+  // data from PDG
+  if (partPDG == 443) { // jpsi
+    mPart = 3096.9;
+    isCharged = false;
+  }
+}
 
-  // mass of a particle in final state
-  double mPart{};
-
-  // pdg code of a particle
-  int partPDG{};
-
-  // final-state is charged or not
-  bool isCharged{};
-
-  // `standard` unpolarized cross sections
-  virtual double calcCrossSectionM(double m) { return 0.; }
-
-  virtual double calcCrossSectionY(double m) { return 0.; }
-
-  virtual double calcCrossSectionZM(double z, double m) = 0;
-
-  // polarized cross sections
-  // scalar part
-  virtual double calcCrossSectionMPolS(double m) = 0;
-
-  virtual double calcCrossSectionZMPolS(double z, double m) = 0;
-
-  // pseudoscalar part
-  virtual double calcCrossSectionMPolPS(double m) = 0;
-
-  virtual double calcCrossSectionZMPolPS(double z, double m) = 0;
-};
+double UpcPhotoNuclearVM::calcCrossSectionY(double y)
+{
+  return 3.14;
+}

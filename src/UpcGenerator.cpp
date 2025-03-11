@@ -114,6 +114,10 @@ void UpcGenerator::init()
     PLOG_WARNING << "ALP will be generated according to chosen ALP_MASS and ALP_WIDTH: check input parameters print-out";
   }
 
+  if (procID == 443) {
+    isVMProduction = true;
+  }
+
   nucProcessCS->setElemProcess(procID);
 
   // checks for dilepton production
@@ -609,6 +613,10 @@ void UpcGenerator::computeNuclXsection()
   }
   nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio, totCS);
 
+  // calculating nuclear cross section in Y space
+  hNucCSY = new TH1D("hNucCSY", "", ny, ymin, ymax);
+  nucProcessCS->calcNucCrossSectionY(hNucCSY);
+
   // setting up histograms for sampling
   // -----------------------------------------------------------------------
   hCrossSecsZ.resize(nm, nullptr);
@@ -652,45 +660,59 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
   int partPDG = nucProcessCS->elemProcess->partPDG;
   bool isCharged = nucProcessCS->elemProcess->isCharged;
 
-  // pick pair m and y from nuclear cross section
-  double mPair, yPair;
-  hNucCSYM->GetRandom2(yPair, mPair);
-  int yPairBin = hNucCSYM->GetXaxis()->FindBin(yPair);
-  int mPairBin = hNucCSYM->GetYaxis()->FindBin(mPair);
+  if (!isVMProduction) {
+    // pick pair m and y from nuclear cross section
+    double mPair, yPair;
+    hNucCSYM->GetRandom2(yPair, mPair);
+    int yPairBin = hNucCSYM->GetXaxis()->FindBin(yPair);
+    int mPairBin = hNucCSYM->GetYaxis()->FindBin(mPair);
 
-  // pick z = cos(theta) for corresponding m from elem. cross section
-  double cost;
-  if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
-    if (usePolarizedCS) {
-      double frac = hPolCSRatio[yPairBin][mPairBin];
-      bool pickScalar = gRandom->Uniform(0, 1) < frac;
-      if (pickScalar) {
-        cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
+    // pick z = cos(theta) for corresponding m from elem. cross section
+    double cost;
+    if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
+      if (usePolarizedCS) {
+        double frac = hPolCSRatio[yPairBin][mPairBin];
+        bool pickScalar = gRandom->Uniform(0, 1) < frac;
+        if (pickScalar) {
+          cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
+        } else {
+          cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
+        }
       } else {
-        cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
+        cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
       }
     } else {
-      cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
+      cost = gRandom->Uniform(-1., 1.);
     }
-  } else {
-    cost = gRandom->Uniform(-1., 1.);
+
+    double theta = acos(cost);
+    double phi = gRandom->Uniform(0., 2. * M_PI);
+
+    TLorentzVector pPair;
+    nucProcessCS->getPairMomentum(mPair, yPair, pPair);
+    double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
+
+    TVector3 vec;
+    vec.SetMagThetaPhi(pMag, theta, phi);
+
+    if (isPairProduction) {
+      pairProduction(pPair, vec, mPart, partPDG, isCharged, particles, pdgs, mothers, statuses);
+    }
+
+    if (isSingleProduction) {
+      singleProduction(pPair, partPDG, particles, pdgs, mothers, statuses);
+    }
   }
 
-  double theta = acos(cost);
-  double phi = gRandom->Uniform(0., 2. * M_PI);
-
-  TLorentzVector pPair;
-  nucProcessCS->getPairMomentum(mPair, yPair, pPair);
-  double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
-
-  TVector3 vec;
-  vec.SetMagThetaPhi(pMag, theta, phi);
-
-  if (isPairProduction) {
-    pairProduction(pPair, vec, mPart, partPDG, isCharged, particles, pdgs, mothers, statuses);
-  }
-
-  if (isSingleProduction) {
+  if (isVMProduction) {
+    double m = mPart;
+    double y = hNucCSY->GetRandom();
+    double phi = gRandom->Uniform(0., 2. * M_PI);
+    TLorentzVector pPair;
+    nucProcessCS->getPairMomentum(m, y, pPair);
+    double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
+    TVector3 vec;
+    vec.SetMagThetaPhi(0,0,0);
     singleProduction(pPair, partPDG, particles, pdgs, mothers, statuses);
   }
 

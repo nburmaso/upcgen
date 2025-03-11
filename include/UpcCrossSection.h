@@ -30,6 +30,7 @@
 #include "UpcTwoPhotonDilep.h"
 #include "UpcTwoPhotonDipion.h"
 #include "UpcTwoPhotonLbyL.h"
+#include "UpcPhotoNuclearVM.h"
 
 #include "TClonesArray.h"
 #include "TF1.h"
@@ -201,6 +202,8 @@ class UpcCrossSection
   // two-photon luminosity
   double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
+  double calcPhotonFlux(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+
   // two-photon luminosity for scalar part
   void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
 
@@ -213,6 +216,8 @@ class UpcCrossSection
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity
   void calcNucCrossSectionYM(TH2D* hCrossSectionYM, std::vector<std::vector<double>>& hPolCSRatio, double& totCS);
+
+  void calcNucCrossSectionY(TH1D* hCrossSectionY);
 
   double calcBreakupProb(double b, int mode);
 

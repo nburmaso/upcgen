@@ -19,40 +19,28 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-/// base (abstract) class for elementary processes
+/// a class implementing photonuclear cross sections
 
 #pragma once
 
-class UpcElemProcess
+#include "UpcElemProcess.h"
+
+class UpcPhotoNuclearVM : public UpcElemProcess
 {
  public:
-  UpcElemProcess() = default;
-  virtual ~UpcElemProcess() {}
+  explicit UpcPhotoNuclearVM(int partPDG);
 
-  // mass of a particle in final state
-  double mPart{};
+  ~UpcPhotoNuclearVM() override = default;
 
-  // pdg code of a particle
-  int partPDG{};
+  double calcCrossSectionY(double m) override;
 
-  // final-state is charged or not
-  bool isCharged{};
+  double calcCrossSectionZM(double z, double m) override { return 0.; }
 
-  // `standard` unpolarized cross sections
-  virtual double calcCrossSectionM(double m) { return 0.; }
+  double calcCrossSectionMPolS(double m) override { return 0.; }
 
-  virtual double calcCrossSectionY(double m) { return 0.; }
+  double calcCrossSectionZMPolS(double z, double m) override { return 0.; }
 
-  virtual double calcCrossSectionZM(double z, double m) = 0;
+  double calcCrossSectionMPolPS(double m) override { return 0.; }
 
-  // polarized cross sections
-  // scalar part
-  virtual double calcCrossSectionMPolS(double m) = 0;
-
-  virtual double calcCrossSectionZMPolS(double z, double m) = 0;
-
-  // pseudoscalar part
-  virtual double calcCrossSectionMPolPS(double m) = 0;
-
-  virtual double calcCrossSectionZMPolPS(double z, double m) = 0;
+  double calcCrossSectionZMPolPS(double z, double m) override { return 0.; }
 };
