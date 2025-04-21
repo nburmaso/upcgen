@@ -258,20 +258,11 @@ double UpcCrossSection::calcPhotonFlux(double M, double Y, TF1* fFluxForm, const
     double bl = bmin * exp(i * log_delta_b);
     double bh = bmin * exp((i + 1) * log_delta_b);
     double b = (bh + bl) / 2.;
-    double sum_phi = 0.;
-    for (int j = 0; j < ngi10; j++) {
-      if (abscissas10[j] < 0) {
-        continue;
-      }
-      double phi = M_PI * abscissas10[j];
-      double bphi = b * cos(phi);
-      double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(bphi);
-      double gaa = bphi < 20. ? gGAA->Eval(bphi) : 1;
-      sum_phi += breakup * gaa * weights10[j];
-    }
-    sum += fluxForm(b, k, fFluxForm) * sum_phi * b * (bh - bl);
+    double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
+    double gaa = b < 20. ? gGAA->Eval(b) : 1;
+    sum += breakup * gaa * fluxForm(b, k, fFluxForm) * b * (bh - bl);
   }
-  double flux = 2. * M_PI * sum;
+  double flux = 2. * M_PI * k * sum;
   return flux;
 }
 
@@ -741,9 +732,16 @@ void UpcCrossSection::calcNucCrossSectionY(TH1D* hCrossSectionY)
   for (int iy = 0; iy < ny; iy++) {
     double y = ymin + dy * iy;
     // double flux = hPhotonFlux->GetBinContent(iy + 1);
-    double flux = calcPhotonFlux(elemProcess->mPart, y, fFluxFormInt, gGAA);
-    double cs = elemProcess->calcCrossSectionY(y);
-    hCrossSectionY->SetBinContent(iy + 1, flux * cs);
+    double flux1 = calcPhotonFlux(elemProcess->mPart, y, fFluxFormInt, gGAA);
+    double cs1 = elemProcess->calcCrossSectionY(y);
+    double tmin1 = 1; // - x^2 mN^2;
+    double integralOverSquaredFormFactor1 = 1; // function of tmin1 (see eq. page 37)
+
+    double flux2 = calcPhotonFlux(elemProcess->mPart, -y, fFluxFormInt, gGAA);
+    double cs2 = elemProcess->calcCrossSectionY(-y);
+    double tmin2 = 1;
+    double integralOverSquaredFormFactor2 = 1; // function of tmin2
+    hCrossSectionY->SetBinContent(iy + 1, flux1 * cs1 + flux2 * cs2);
   }
 }
 

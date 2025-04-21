@@ -28,12 +28,24 @@ UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG)
   // populating lepton mass map
   // data from PDG
   if (partPDG == 443) { // jpsi
-    mPart = 3096.9;
+    mPart = 3.0969;
     isCharged = false;
   }
 }
 
-double UpcPhotoNuclearVM::calcCrossSectionY(double y)
+double UpcPhotoNuclearVM::calcCrossSectionY(double y, int shadowing_option)
 {
-  return 3.14;
+  // gamma-p cross section for J/psi, psi(2S) and Upsilon (dsigma/dt|t=0)
+  double csGammaP = 3.14;
+  // scale
+  double mu2 = 1; // 3, 4, 22.4;
+  // shadowing factor
+  double m2 = mPart*mPart;
+  double sqrts = 1;
+  double Wgp2 = sqrts*mPart*exp(-y);
+  double x = m2/Wgp2;
+  double R = 1; // (x, mu2);
+  
+
+  return csGammaP*R*R;
 }
