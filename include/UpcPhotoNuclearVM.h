@@ -30,7 +30,7 @@ class UpcCrossSection;
 class UpcPhotoNuclearVM : public UpcElemProcess
 {
  public:
-  explicit UpcPhotoNuclearVM(int partPDG, int shadowingOpt, double sqrts);
+  explicit UpcPhotoNuclearVM(int partPDG, int shadowingOpt);
 
   ~UpcPhotoNuclearVM() override;
 
@@ -48,8 +48,10 @@ class UpcPhotoNuclearVM : public UpcElemProcess
 
  private:
 
-  int fShadowing{0};
-  TF1* fFdsdt0{nullptr};
-  TF1* fFormFac{nullptr};
-  double fSqrts{5020.};
+  int fShadowing{0}; // gluon shadowing calculation: 0 = IA, 1 = LTA, 2 = EPS09
+  double fMu2{1.}; // resolution scale (GeV^2)
+  TF1* fFormFactorSq{nullptr}; // squared form factor of a nuclei
+  TF1* fDsDt0{nullptr}; // cross section for photonuclear VM production off proton
+
+  double getRgEps09(int order, int pset, double x, double Q2);
 };

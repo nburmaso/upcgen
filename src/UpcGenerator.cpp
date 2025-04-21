@@ -370,6 +370,7 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "DO_M_CUT " << nucProcessCS->doMassCut;
   PLOG_INFO << "LOW_M_CUT " << nucProcessCS->lowMCut;
   PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
+  PLOG_INFO << "SHADOWING " << nucProcessCS->shadowingOption;
 }
 
 void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz pair-momentum vector of incoming photons

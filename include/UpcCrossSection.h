@@ -73,7 +73,7 @@ class UpcCrossSection
 
   // parameters of the nucleus
   static int Z;
-  int A{208};
+  static int A;
 
   // beam parameters
   static double sqrts;
