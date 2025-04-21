@@ -25,12 +25,14 @@
 
 #include "UpcElemProcess.h"
 
+class UpcCrossSection;
+
 class UpcPhotoNuclearVM : public UpcElemProcess
 {
  public:
-  explicit UpcPhotoNuclearVM(int partPDG);
+  explicit UpcPhotoNuclearVM(int partPDG, int shadowingOpt, double sqrts);
 
-  ~UpcPhotoNuclearVM() override = default;
+  ~UpcPhotoNuclearVM() override;
 
   double calcCrossSectionY(double m) override;
 
@@ -43,4 +45,11 @@ class UpcPhotoNuclearVM : public UpcElemProcess
   double calcCrossSectionMPolPS(double m) override { return 0.; }
 
   double calcCrossSectionZMPolPS(double z, double m) override { return 0.; }
+
+ private:
+
+  int fShadowing{0};
+  TF1* fFdsdt0{nullptr};
+  TF1* fFormFac{nullptr};
+  double fSqrts{5020.};
 };

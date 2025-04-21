@@ -19,33 +19,71 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-#include "UpcPhotoNuclearVM.h"
-#include "UpcPhysConstants.h"
+#include <cmath>
 
-UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG)
+#include "TF1.h"
+
+#include "UpcCrossSection.h"
+#include "UpcPhysConstants.h"
+#include "UpcPhotoNuclearVM.h"
+
+double formFactor(double* xx, double*)
+{
+  double x = xx[0];
+  double ff = UpcCrossSection::calcFormFac(x);
+  return ff * ff;
+}
+
+UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG, int shadowingOpt, double sqrts)
 {
   this->partPDG = partPDG;
-  // populating lepton mass map
-  // data from PDG
+  fShadowing = shadowingOpt;
+  fSqrts = sqrts;
+  isCharged = false;
+  fFormFac = new TF1("ff", formFactor, 1e-12, 100, 1);
   if (partPDG == 443) { // jpsi
     mPart = 3.0969;
-    isCharged = false;
+    fFdsdt0 = new TF1("dsdtJpsi","x>0.9383+3.0969 ? (342*(1-(0.9383+3.0969)^2/x^2)^1.5*(x^2/10000)^0.40) : 0 ",0,300);
+  } else if (partPDG == 100443) { // psi(2s)
+    mPart = 3.6861;
+    fFdsdt0 = new TF1("dsdtJpsi","x>0.9383+3.0969 ? (342*(1-(0.9383+3.0969)^2/x^2)^1.5*(x^2/10000)^0.40) : 0 ",0,300);
+  } else if (partPDG == 553) { // upsilon(1s)
+    mPart = 9.3987;
+    fFdsdt0 = new TF1("dsdtUpsilon","x>0.9383+9.4603 ? (0.902*(1-(0.9383+9.4603)^2/x^2)^1.5*(x^2/10000)^0.447) : 0 ",0,1000);
+  } else {
+    throw std::invalid_argument("Unsupported particle");
   }
 }
 
-double UpcPhotoNuclearVM::calcCrossSectionY(double y, int shadowing_option)
+UpcPhotoNuclearVM::~UpcPhotoNuclearVM()
 {
-  // gamma-p cross section for J/psi, psi(2S) and Upsilon (dsigma/dt|t=0)
-  double csGammaP = 3.14;
-  // scale
-  double mu2 = 1; // 3, 4, 22.4;
-  // shadowing factor
-  double m2 = mPart*mPart;
-  double sqrts = 1;
-  double Wgp2 = sqrts*mPart*exp(-y);
-  double x = m2/Wgp2;
-  double R = 1; // (x, mu2);
-  
+  delete fFdsdt0;
+  delete fFormFac;
+}
 
-  return csGammaP*R*R;
+double UpcPhotoNuclearVM::calcCrossSectionY(double y)
+{
+  double mhc2 = mPart;
+  double w = mhc2 / 2. * std::exp(y);
+  double W = std::sqrt(w * fSqrts);
+  double csGammaP = fFdsdt0->Eval(W);
+
+  double m2 = mhc2 * mhc2;
+  double Wgp2 = W * W;
+  double x = m2 / Wgp2;
+
+  double tmin = x * x / Wgp2;
+//  printf("x=%.9f, wgp2=%.9f, tmin=%.9f\n", x, Wgp2, tmin);
+  double PhiA = fFormFac->Integral(tmin, 100.);
+
+  // shadowing factor
+  double mu2 = 1; // 3, 4, 22.4;
+  double R = 1; // (x, mu2); // IA
+  if (fShadowing == 1) {
+    // LTA
+  }
+  if (fShadowing == 2) {
+    // EPS09
+  }
+  return csGammaP * R * R * PhiA * 1e-6;
 }

@@ -289,6 +289,9 @@ void UpcGenerator::setParameterValue(std::string parameter, std::string parValue
   if (parameter == "HIGH_M_CUT") {
     nucProcessCS->hiMCut = stod(parValue);
   }
+  if (parameter == "SHADOWING") {
+    nucProcessCS->shadowingOption = stoi(parValue);
+  }
 }
 
 void UpcGenerator::setCollisionSystem(float sqrts, int nucl_z, int nucl_a)

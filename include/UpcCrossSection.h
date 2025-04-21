@@ -152,7 +152,6 @@ class UpcCrossSection
   static double* vCachedFormFac;                                // Q^2-grid for possible form factor values
   double* vCachedBreakup{nullptr};                              // b-grid for possible breakup probabilities
   std::unordered_map<int, std::pair<int, TH1D>> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
-  double avgFreq{-1};                                           // calculate average frequency only once
 
   // simulation parameters
   bool isPoint{true}; // flux calculation parameter
@@ -163,6 +162,7 @@ class UpcCrossSection
   // 3 -- 0N0N
   // 4 -- 0NXN (+ XN0N)
   int breakupMode{1};
+  int shadowingOption{0};
 
   // debug level
   static int debug;

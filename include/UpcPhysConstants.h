@@ -27,6 +27,7 @@ namespace phys_consts
 const double alpha{1.0 / 137.035999074}; // fine structure constant
 const double hc{0.1973269718};           // scaling factor
 const double mProt{0.9382720813};        // proton mass
+const double mN{0.939565346};            // neutron mass
 } // namespace constants
 
 #endif // UPCGENERATOR_INCLUDE_UPCPHYSCONSTANTS_H_

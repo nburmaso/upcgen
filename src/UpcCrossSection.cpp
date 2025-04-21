@@ -82,7 +82,7 @@ void UpcCrossSection::setElemProcess(int procID)
       break;
     }
     case 443: { // VM meson photoproduction
-      elemProcess = new UpcPhotoNuclearVM(443);
+      elemProcess = new UpcPhotoNuclearVM(443, shadowingOption, sqrts);
       break;
     }
     default: {
@@ -731,18 +731,22 @@ void UpcCrossSection::calcNucCrossSectionY(TH1D* hCrossSectionY)
 
   for (int iy = 0; iy < ny; iy++) {
     double y = ymin + dy * iy;
-    // double flux = hPhotonFlux->GetBinContent(iy + 1);
     double flux1 = calcPhotonFlux(elemProcess->mPart, y, fFluxFormInt, gGAA);
     double cs1 = elemProcess->calcCrossSectionY(y);
-    double tmin1 = 1; // - x^2 mN^2;
-    double integralOverSquaredFormFactor1 = 1; // function of tmin1 (see eq. page 37)
+//    double tmin1 = 1; // - x^2 mN^2;
+//    double integralOverSquaredFormFactor1 = 1; // function of tmin1 (see eq. page 37)
 
     double flux2 = calcPhotonFlux(elemProcess->mPart, -y, fFluxFormInt, gGAA);
     double cs2 = elemProcess->calcCrossSectionY(-y);
-    double tmin2 = 1;
-    double integralOverSquaredFormFactor2 = 1; // function of tmin2
-    hCrossSectionY->SetBinContent(iy + 1, flux1 * cs1 + flux2 * cs2);
+//    double tmin2 = 1;
+//    double integralOverSquaredFormFactor2 = 1; // function of tmin2
+
+    double cs = flux1 * cs1 + flux2 * cs2;
+//    printf("%.3f %.3f %.3f %.3f %.3f %.3f\n", y, flux1, flux2, cs1, cs2, cs);
+    printf("%.3f %.3f\n", y, cs);
+    hCrossSectionY->SetBinContent(iy + 1, cs);
   }
+  std::exit(0);
 }
 
 // Function from Starlight
