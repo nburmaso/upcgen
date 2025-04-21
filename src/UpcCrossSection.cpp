@@ -258,20 +258,11 @@ double UpcCrossSection::calcPhotonFlux(double M, double Y, TF1* fFluxForm, const
     double bl = bmin * exp(i * log_delta_b);
     double bh = bmin * exp((i + 1) * log_delta_b);
     double b = (bh + bl) / 2.;
-    double sum_phi = 0.;
-    for (int j = 0; j < ngi10; j++) {
-      if (abscissas10[j] < 0) {
-        continue;
-      }
-      double phi = M_PI * abscissas10[j];
-      double bphi = b * cos(phi);
-      double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(bphi);
-      double gaa = bphi < 20. ? gGAA->Eval(bphi) : 1;
-      sum_phi += breakup * gaa * weights10[j];
-    }
-    sum += fluxForm(b, k, fFluxForm) * sum_phi * b * (bh - bl);
+    double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
+    double gaa = b < 20. ? gGAA->Eval(b) : 1;
+    sum += breakup * gaa * fluxForm(b, k, fFluxForm) * b * (bh - bl);
   }
-  double flux = 2. * M_PI * sum;
+  double flux = 2. * M_PI * k * sum;
   return flux;
 }
 

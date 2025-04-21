@@ -28,7 +28,7 @@ UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG)
   // populating lepton mass map
   // data from PDG
   if (partPDG == 443) { // jpsi
-    mPart = 3096.9;
+    mPart = 3.0969;
     isCharged = false;
   }
 }
