@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -22,8 +22,7 @@
 /// a class implementing cross sections for light-by-light
 /// gamma+gamma -> gamma gamma
 
-#ifndef UPCGENERATOR_INCLUDE_UPCTWOPHOTONLBYL_H_
-#define UPCGENERATOR_INCLUDE_UPCTWOPHOTONLBYL_H_
+#pragma once
 
 #include "UpcElemProcess.h"
 
@@ -58,5 +57,3 @@ class UpcTwoPhotonLbyL : public UpcElemProcess
 
   double calcCrossSectionZMPolPS(double z, double m) override { return 0; };
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCTWOPHOTONLBYL_H_

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -21,15 +21,16 @@
 
 /// helper class for calculations
 
-#ifndef UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_
-#define UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_
+#pragma once
 
-#include "UpcPhysConstants.h"
-#include "UpcElemProcess.h"
-#include "UpcTwoPhotonALP.h"
-#include "UpcTwoPhotonDilep.h"
-#include "UpcTwoPhotonDipion.h"
-#include "UpcTwoPhotonLbyL.h"
+#include <cmath>
+#include <fstream>
+#include <map>
+#include <random>
+#include <unordered_map>
+
+#include <gsl/gsl_integration.h>
+#include <gsl/gsl_spline.h>
 
 #include "TClonesArray.h"
 #include "TF1.h"
@@ -53,10 +54,13 @@
 #include "plog/Initializers/RollingFileInitializer.h"
 #include "plog/Log.h"
 
-#include <fstream>
-#include <map>
-#include <random>
-#include <unordered_map>
+#include "UpcElemProcess.h"
+#include "UpcPhysConstants.h"
+#include "UpcTwoPhotonALP.h"
+#include "UpcTwoPhotonDilep.h"
+#include "UpcTwoPhotonDipion.h"
+#include "UpcTwoPhotonLbyL.h"
+#include "UpcPhotoNuclearVM.h"
 
 class UpcCrossSection
 {
@@ -66,18 +70,19 @@ class UpcCrossSection
   ~UpcCrossSection();
 
   // Woods-Saxon parameters
-  static double rho0; // fm-3
-  static double R;    // fm
-  static double a;    // fm
+  inline static double rho0{0.}; // fm^-3
+  inline static double R{6.68};  // fm
+  inline static double a{0.447}; // fm
 
   // parameters of the nucleus
-  static int Z;
-  int A{208};
+  inline static int Z{82};
+  inline static int A{208};
+  inline static double mNucl{(Z * phys_consts::mProt + (A - Z) * phys_consts::mNeut) / A};
 
   // beam parameters
-  static double sqrts;
-  static double g1;
-  static double g2;
+  inline static double sqrts{5020.};
+  inline static double g1{sqrts / (2. * phys_consts::mProt)};
+  inline static double g2{sqrts / (2. * phys_consts::mProt)};
 
   // Gaussian integration n = 10
   // since cos is symmetric around 0 we only need 5
@@ -132,26 +137,13 @@ class UpcCrossSection
   // helper containers for calculations
   // ----------------------------------------------------------------------
   static const int nb{200};
-  double vb[nb]{};
-  double vs[nb]{};
-  double TA[nb]{};
-  double rho[nb][nb]{};
-  double vGAA[nb]{};
-  double vRho[nb]{};
 
   // 'constant' for photon pt calculation
   // initialized once in the constructor
   double gtot;
 
-  // lookup tables and maps for cached functions etc.
-  static constexpr double Q2min{1e-9};
-  static constexpr double Q2max{100};
-  static constexpr int nQ2{10000000};
-  static constexpr double dQ2{(Q2max - Q2min) / nQ2};
-  static double* vCachedFormFac;                                // Q^2-grid for possible form factor values
-  double* vCachedBreakup{nullptr};                              // b-grid for possible breakup probabilities
-  std::unordered_map<int, std::pair<int, TH1D>> photPtDistrMap; // map with photon pt distributions in dependence of e_photon
-  double avgFreq{-1};                                           // calculate average frequency only once
+  // map with photon pt distributions as function of e_photon
+  std::unordered_map<int, std::pair<int, TH1D>> photPtDistrMap;
 
   // simulation parameters
   bool isPoint{true}; // flux calculation parameter
@@ -162,9 +154,11 @@ class UpcCrossSection
   // 3 -- 0N0N
   // 4 -- 0NXN (+ XN0N)
   int breakupMode{1};
+  int shadowingOption{0};
+  int dghtPDG{};
 
   // debug level
-  static int debug;
+  inline static int debug{0};
 
   // openmp: n threads
   int numThreads{1};
@@ -192,51 +186,55 @@ class UpcCrossSection
   // photon fluxes
   double fluxPoint(double b, double k);
 
-  static double fluxFormInt(double* x, double* par);
-
   static double calcFormFac(double Q2);
 
-  double fluxForm(double b, double k, TF1* fFluxForm);
+  double fluxForm(double b, double k);
 
   // two-photon luminosity
-  double calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+  double calcTwoPhotonLumi(double M, double Y);
 
   // two-photon luminosity for scalar part
-  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA);
+  void calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y);
+
+  double calcPhotonFlux(double M, double Y);
 
   // histogram filler for MZ-cross section
-  void fillCrossSectionZM(TH2D* hCrossSectionZM,
+  void fillCrossSectionZM(std::vector<std::vector<double>>& crossSectionZM,
                           double mmin, double mmax, int nm,
                           double zmin, double zmax, int nz,
                           int flag);
 
   // function to calculate nuclear cross section
   // using 2D elementary cross section and two-photon luminosity
-  void calcNucCrossSectionYM(TH2D* hCrossSectionYM, std::vector<std::vector<double>>& hPolCSRatio, double& totCS);
+  void calcNucCrossSectionYM(std::vector<std::vector<double>>& crossSectionYM,
+                             std::vector<std::vector<double>>& polCSRatio,
+                             double& totCS);
+
+  void calcNucCrossSectionY(std::vector<std::vector<double>>& crossSectionY,
+                            std::vector<std::vector<double>>& csYRatio,
+                            double& totCS);
 
   double calcBreakupProb(double b, int mode);
 
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
   double getPhotonPt(double ePhot);
+  double getPomPt(double ePom);
   void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
+  void getMomentumVM(double m, double y, int target, TLorentzVector& pPair);
 
   // various cachers-getters for lookup tables
   // ----------------------------------------------------------------------
 
-  // prepare G_AA
+  // G_AA helpers
   void prepareGAA();
 
-  // prepare nuclear breakup probability
+  // nuclear breakup probability helpers
   void prepareBreakupProb();
-  double getCachedBreakupProb(double b);
 
-  // prepare form factor
+  // form factor helpers and some workarounds
   void prepareFormFac();
-  static double getCachedFormFac(double Q2);
 
   // prepare two photon luminosity, cache to file
   void prepareTwoPhotonLumi();
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCCROSSSECTION_H_

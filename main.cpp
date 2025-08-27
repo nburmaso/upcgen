@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -110,7 +110,6 @@ int main(int argc, char** argv)
 
   PLOG_INFO << "Starting generation process...";
   upcGenerator->generateEvents();
-
   delete upcGenerator;
 
   return 0;

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -21,12 +21,12 @@
 
 // main class of the generator
 
-#ifndef UPCGENERATOR__UPCGENERATOR_H_
-#define UPCGENERATOR__UPCGENERATOR_H_
+#pragma once
 
 #include "UpcCrossSection.h"
 #include "UpcPythia8Helper.h"
 #include "UpcPythia6Helper.h"
+#include "UpcSampler.h"
 
 #include "TClonesArray.h"
 #include "TF1.h"
@@ -72,58 +72,7 @@ class UpcGenerator
   long int seed{0};
   long int nEvents{1000};
 
-  // parameters dictionary
-  // todo: use <any> from c++17 for a neat parsing???
-  static const int nParameters = 37;
-  const std::string parsNames[nParameters]
-  {
-    // parameters of incoming nuclei
-    "NUCLEUS_Z",
-    "NUCLEUS_A",
-    "WS_R",
-    "WS_A",
-    "SQRTS",
-    "PROC_ID",
-    "NEVENTS",
-    // kinematic cuts for final-state particles (decay products not included)
-    "DO_PT_CUT",
-    "PT_MIN",
-    "DO_ETA_CUT",
-    "ETA_MIN",
-    "ETA_MAX",
-    // grid sizes and binnings
-    "ZMIN",
-    "ZMAX",
-    "MMIN",
-    "MMAX",
-    "YMIN",
-    "YMAX",
-    "BINS_Z",
-    "BINS_M",
-    "BINS_Y",
-    // switches and flags
-    "FLUX_POINT",
-    "BREAKUP_MODE",
-    "NON_ZERO_GAM_PT",
-    "USE_POLARIZED_CS",
-    "PYTHIA_VERSION",
-    "PYTHIA8_FSR",
-    "PYTHIA8_DECAYS",
-    "SEED",
-    "USE_ROOT_OUTPUT",
-    "USE_HEPMC_OUTPUT",
-    // mass cuts: hack for pre-calculated cross sections (lbyl and pi0 pair production)
-    // fixme : to be removed
-    "DO_M_CUT",
-    "LOW_M_CUT",
-    "HIGH_M_CUT",
-    // process-specific parameters
-    "LEP_A",
-    "ALP_MASS",
-    "ALP_WIDTH"
-  };
-
-  void setParameterValue(std::string parameter, std::string parValue);
+  void setParameterValue(const std::string& parameter, const std::string& parValue);
 
   // debug level
   static int debug;
@@ -190,11 +139,6 @@ class UpcGenerator
   double totCS;
   double fidCS;
   bool ignoreCSZ;
-  TH2D* hNucCSYM;
-  std::vector<std::vector<double>> hPolCSRatio;
-  std::vector<TH1D*> hCrossSecsZ;
-  std::vector<TH1D*> hCrossSecsZ_S;
-  std::vector<TH1D*> hCrossSecsZ_PS;
 
   // helper struct for ROOT file output
   struct outParticle {
@@ -213,6 +157,20 @@ class UpcGenerator
   TTree* mOutTree{nullptr};
   outParticle particle{};
   std::vector<TParticle> genParticles;
+
+  // cross section helpers
+  std::vector<double> nucCSY;
+  std::vector<std::vector<double>> nucCSYM;
+  std::vector<std::vector<double>> nucTargRatioCSYM; // for VM production
+  std::vector<std::vector<double>> polCSRatio;
+  // to sample Z for given M
+  std::vector<double> binEdgesM;
+  std::vector<double> binEdgesZ;
+  std::vector<double> binEdgesY;
+  std::vector<UpcSampler1D*> samplersCsZ;
+  std::vector<UpcSampler1D*> samplersCsSZ;
+  std::vector<UpcSampler1D*> samplersCsPsZ;
+  UpcSampler2D* samplerCsYM{nullptr}; // to sample Y and M from nuclear cross section
 
   void writeEvent(long int evt,
                   const std::vector<int>& pdgs,
@@ -301,6 +259,13 @@ class UpcGenerator
                       std::vector<int>& mothers,
                       std::vector<int>& statuses);
 
+  bool isPairProductionVM{false};
+  void twoPartDecayVM(std::vector<int>& pdgs,
+                      std::vector<int>& statuses,
+                      std::vector<int>& mothers,
+                      std::vector<TLorentzVector>& particles,
+                      int id);
+
   bool isSingleProduction{false};
   void singleProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
                         int partPDG,                            // pdg of final-state particle
@@ -326,5 +291,3 @@ class UpcGenerator
   // check kinematic cuts for particles in 'particles' vector
   bool checkKinCuts(std::vector<TLorentzVector>& particles);
 };
-
-#endif // UPCGENERATOR__UPCGENERATOR_H_
