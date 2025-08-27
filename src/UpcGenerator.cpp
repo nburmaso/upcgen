@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -22,10 +22,7 @@
 #include "UpcGenerator.h"
 #include "UpcPhysConstants.h"
 #include "UpcSampler.h"
-
 #include "UpcTwoPhotonDipion.h"
-
-using namespace std;
 
 // out-of-line initialization for static members
 int UpcGenerator::debug = 0;
@@ -48,23 +45,25 @@ UpcGenerator::~UpcGenerator()
   delete decayer;
 #endif
   delete gRandom;
-  delete hNucCSYM;
-
-  for (int i = 0; i < nucProcessCS->nm; i++) {
-    delete hCrossSecsZ[i];
-    delete hCrossSecsZ_S[i];
-    delete hCrossSecsZ_PS[i];
-  }
+  delete samplerCsYM;
+  for (auto* s : samplersCsZ)
+    delete s;
+  for (auto* s : samplersCsSZ)
+    delete s;
+  for (auto* s : samplersCsPsZ)
+    delete s;
 }
 
 void UpcGenerator::init()
 {
+  TH1::AddDirectory(false);
+
   if (nucProcessCS == nullptr) {
     PLOG_FATAL << "UpcCrossSection was not initialized! Exiting...";
     std::_Exit(-1);
   }
 
-  TH1::AddDirectory(false);
+  ignoreCSZ = false;
 
   // sanity checks: lbyl
   if (procID == 22) {
@@ -104,6 +103,7 @@ void UpcGenerator::init()
 
   // checks for ALP production
   if (procID == 51) {
+    ignoreCSZ = true; // hack for ALP: cos(theta) is uniformly distributed
     isSingleProduction = true;
     double mass = nucProcessCS->alpMass;
     double width = nucProcessCS->alpWidth;
@@ -126,6 +126,17 @@ void UpcGenerator::init()
       PLOG_WARNING << "MMIN is lower than 2 lepton masses! Setting MMIN to 2 lepton masses...";
       nucProcessCS->mmin = mPart * 2.;
     }
+  }
+
+  if (procID == 443 || procID == 100443 || procID == 553) {
+    isSingleProduction = true; // one particle
+    isPairProductionVM = true; // two-part decay
+    ignoreCSZ = true;
+    auto* proc = (UpcPhotoNuclearVM*)nucProcessCS->elemProcess;
+    double mPart = proc->mPart;
+    nucProcessCS->mmin = mPart - 1e-6;
+    nucProcessCS->mmax = mPart + 1e-6;
+    nucProcessCS->nm = 1;
   }
 
   nucProcessCS->numThreads = numThreads;
@@ -169,7 +180,7 @@ void UpcGenerator::init()
   computeNuclXsection();
 }
 
-void UpcGenerator::setParameterValue(std::string parameter, std::string parValue)
+void UpcGenerator::setParameterValue(const std::string& parameter, const std::string& parValue)
 {
   if (parameter == "NEVENTS") {
     nEvents = stol(parValue);
@@ -243,7 +254,7 @@ void UpcGenerator::setParameterValue(std::string parameter, std::string parValue
     UpcCrossSection::Z = stoi(parValue);
   }
   if (parameter == "NUCLEUS_A") {
-    nucProcessCS->A = stoi(parValue);
+    UpcCrossSection::A = stoi(parValue);
   }
   if (parameter == "FLUX_POINT") {
     nucProcessCS->isPoint = stoi(parValue);
@@ -285,6 +296,12 @@ void UpcGenerator::setParameterValue(std::string parameter, std::string parValue
   if (parameter == "HIGH_M_CUT") {
     nucProcessCS->hiMCut = stod(parValue);
   }
+  if (parameter == "SHADOWING") {
+    nucProcessCS->shadowingOption = stoi(parValue);
+  }
+  if (parameter == "DECAY_PDG") {
+    nucProcessCS->dghtPDG = stoi(parValue);
+  }
 }
 
 void UpcGenerator::setCollisionSystem(float sqrts, int nucl_z, int nucl_a)
@@ -294,7 +311,8 @@ void UpcGenerator::setCollisionSystem(float sqrts, int nucl_z, int nucl_a)
   UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
 
   UpcCrossSection::Z = nucl_z;
-  nucProcessCS->A = nucl_a;
+  UpcCrossSection::A = nucl_a;
+  UpcCrossSection::mNucl = (nucl_z * phys_consts::mProt + (nucl_a - nucl_z) * phys_consts::mNeut) / nucl_a;
 }
 
 void UpcGenerator::configGeneratorFromFile()
@@ -302,12 +320,12 @@ void UpcGenerator::configGeneratorFromFile()
   // todo: use <any> from c++17 for a neat parsing?
   if (!gSystem->AccessPathName(parFileName.c_str())) {
     PLOG_INFO << "Reading parameters from " << parFileName << " ...";
-    ifstream fInputs(parFileName);
-    string line;
-    string parameter;
-    string parValue;
+    std::ifstream fInputs(parFileName);
+    std::string line;
+    std::string parameter;
+    std::string parValue;
     while (getline(fInputs, line)) {
-      istringstream iss(line);
+      std::istringstream iss(line);
       // skip comment lines
       if (line[0] == '#') {
         continue;
@@ -331,7 +349,7 @@ void UpcGenerator::printParameters()
 {
   PLOG_INFO << "OMP_NTHREADS " << numThreads;
   PLOG_INFO << "NUCLEUS_Z " << UpcCrossSection::Z;
-  PLOG_INFO << "NUCLEUS_A " << nucProcessCS->A;
+  PLOG_INFO << "NUCLEUS_A " << UpcCrossSection::A;
   PLOG_INFO << "WS_R " << UpcCrossSection::R;
   PLOG_INFO << "WS_A " << UpcCrossSection::a;
   PLOG_INFO << "SQRTS " << UpcCrossSection::sqrts;
@@ -363,17 +381,19 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "DO_M_CUT " << nucProcessCS->doMassCut;
   PLOG_INFO << "LOW_M_CUT " << nucProcessCS->lowMCut;
   PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
+  PLOG_INFO << "SHADOWING " << nucProcessCS->shadowingOption;
+  PLOG_INFO << "DECAY_PDG " << nucProcessCS->dghtPDG;
 }
 
-void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz pair-momentum vector of incoming photons
-                                  TVector3& vec,                     // momentum of outgoing particles
-                                  double mPart,                      // outgoing particle mass
-                                  int partPDG,                       // pdg of final-state particles
-                                  bool isCharged,                    // final-state particles are charged or not
-                                  vector<TLorentzVector>& particles, // vector for final-state particles
-                                  vector<int>& pdgs,
-                                  vector<int>& mothers,
-                                  vector<int>& statuses)
+void UpcGenerator::pairProduction(TLorentzVector& pPair,                  // lorentz pair-momentum vector of incoming photons
+                                  TVector3& vec,                          // momentum of outgoing particles
+                                  double mPart,                           // outgoing particle mass
+                                  int partPDG,                            // pdg of final-state particles
+                                  bool isCharged,                         // final-state particles are charged or not
+                                  std::vector<TLorentzVector>& particles, // vector for final-state particles
+                                  std::vector<int>& pdgs,
+                                  std::vector<int>& mothers,
+                                  std::vector<int>& statuses)
 {
   TLorentzVector tlVec1, tlVec2;
   tlVec1.SetVectM(vec, mPart);
@@ -402,6 +422,55 @@ void UpcGenerator::pairProduction(TLorentzVector& pPair,             // lorentz 
   statuses.emplace_back(23);
 }
 
+void UpcGenerator::twoPartDecayVM(std::vector<int>& pdgs, // output vectors with pdg codes, status codes, mother IDs and 4-momenta
+                                  std::vector<int>& statuses,
+                                  std::vector<int>& mothers,
+                                  std::vector<TLorentzVector>& particles,
+                                  int id) // index of particle to be decayed
+{
+  int decayProdPDG = nucProcessCS->elemProcess->dghtPDG;
+  // J. Breitweg et al., Eur. Phys. J. C2, 247 (1998)
+  double theta;
+  double dndtheta;
+  while (true) {
+    theta = M_PI * gRandom->Uniform(0., 1.);
+    double test = gRandom->Uniform(0., 1.);
+    if (decayProdPDG == 11 || decayProdPDG == 13) {
+      dndtheta = std::sin(theta) * (1. + (std::cos(theta) * std::cos(theta)));
+    } else if (decayProdPDG == 2212) {
+      dndtheta = std::sin(theta) * (1. + (0.605 * std::cos(theta) * std::cos(theta)));
+    }
+    if (test < dndtheta)
+      break;
+  }
+  int sign1 = gRandom->Uniform(-1, 1) > 0 ? 1 : -1;
+  int sign2 = -sign1;
+  const int status = 33; // code from pythia 8: outgoing particles from subsequent subprocesses
+  std::vector<TLorentzVector> decays(2);
+  const auto& particle = particles[id-1];
+  double mDecay = nucProcessCS->elemProcess->mDght;
+  double pMag = std::sqrt(particle.Mag2() / 4. - mDecay * mDecay);
+  double phi = gRandom->Uniform(0., 2. * M_PI);
+  TVector3 vec;
+  vec.SetMagThetaPhi(pMag, theta, phi);
+  decays[0].SetVectM(-vec, mDecay);
+  decays[1].SetVectM(vec, mDecay);
+  TVector3 boost = particle.BoostVector();
+  TVector3 zAxis1 = particle.Vect().Unit();
+  decays[0].RotateUz(zAxis1);
+  decays[1].RotateUz(zAxis1);
+  decays[0].Boost(boost);
+  decays[1].Boost(boost);
+  pdgs.emplace_back(sign1 * decayProdPDG);
+  statuses.emplace_back(status);
+  mothers.emplace_back(id);
+  particles.emplace_back(decays[0]);
+  pdgs.emplace_back(sign2 * decayProdPDG);
+  statuses.emplace_back(status);
+  mothers.emplace_back(id);
+  particles.emplace_back(decays[1]);
+}
+
 void UpcGenerator::singleProduction(TLorentzVector& pPair,                  // input lorentz pair-momentum vector
                                     int partPDG,                            // pdg of final-state particle
                                     std::vector<TLorentzVector>& particles, // vector for final-state particles
@@ -410,18 +479,16 @@ void UpcGenerator::singleProduction(TLorentzVector& pPair,                  // i
                                     std::vector<int>& statuses)
 {
   particles.emplace_back(pPair);
-  // TVector3 boost = pPair.BoostVector();
-  // particles[0].Boost(boost);
   pdgs.emplace_back(partPDG);
   mothers.emplace_back(0);
   statuses.emplace_back(23);
 }
 
-void UpcGenerator::processInPythia(vector<int>& pdgs,
-                                   vector<int>& statuses,
-                                   vector<int>& mothers,
-                                   vector<vector<int>>& daughters,
-                                   vector<TLorentzVector>& particles)
+void UpcGenerator::processInPythia(std::vector<int>& pdgs,
+                                   std::vector<int>& statuses,
+                                   std::vector<int>& mothers,
+                                   std::vector<std::vector<int>>& daughters,
+                                   std::vector<TLorentzVector>& particles)
 {
 #if defined(USE_PYTHIA6) || defined(USE_PYTHIA8)
   TClonesArray processedParts("TParticle");
@@ -449,23 +516,23 @@ void UpcGenerator::processInPythia(vector<int>& pdgs,
     pdgs.emplace_back(pdg);
     statuses.emplace_back(status);
     mothers.emplace_back(mother);
-    daughters.emplace_back(vector<int>{fDaughter, lDaughter});
+    daughters.emplace_back(std::vector<int>{fDaughter, lDaughter});
     particles.emplace_back(tlVector);
   }
 #endif
 }
 
 // todo: for now valid only for neutral-charged decay products
-void UpcGenerator::twoPartDecayUniform(vector<int>& pdgs, // output vectors with pdg codes, status codes, mother IDs and 4-momenta
-                                       vector<int>& statuses,
-                                       vector<int>& mothers,
-                                       vector<TLorentzVector>& particles,
+void UpcGenerator::twoPartDecayUniform(std::vector<int>& pdgs, // output vectors with pdg codes, status codes, mother IDs and 4-momenta
+                                       std::vector<int>& statuses,
+                                       std::vector<int>& mothers,
+                                       std::vector<TLorentzVector>& particles,
                                        int id,           // index of particle to be decayed
                                        double decayMass, // mass of decay products
                                        int decayProdPDG) // pdg of decay products
 {
   const int status = 33; // code from pythia 8: outgoing particles from subsequent subprocesses
-  vector<TLorentzVector> decays(2);
+  std::vector<TLorentzVector> decays(2);
   const auto& particle = particles[id-1];
   double mDecay = decayMass;
   double ePhot1 = particle.Mag() / 2.;
@@ -520,10 +587,10 @@ bool UpcGenerator::checkKinCuts(std::vector<TLorentzVector>& particles)
 }
 
 void UpcGenerator::writeEvent(long int evt,
-                              const vector<int>& pdgs,
-                              const vector<int>& statuses,
-                              const vector<int>& mothers,
-                              const vector<TLorentzVector>& particles)
+                              const std::vector<int>& pdgs,
+                              const std::vector<int>& statuses,
+                              const std::vector<int>& mothers,
+                              const std::vector<TLorentzVector>& particles)
 {
   if (useROOTOut) {
     for (int i = 0; i < particles.size(); i++) {
@@ -562,11 +629,9 @@ void UpcGenerator::writeEvent(long int evt,
 
 void UpcGenerator::computeNuclXsection()
 {
-  gErrorIgnoreLevel = 6001; // fixme: temporary workaround
-
-  TH2D* hCrossSectionZM = nullptr;
-  TH2D* hCrossSectionZMPolS = nullptr;
-  TH2D* hCrossSectionZMPolPS = nullptr;
+  bool isVM = false;
+  if (procID == 443 || procID == 100443 || procID == 553)
+    isVM = true;
 
   int nm = nucProcessCS->nm;
   double mmin = nucProcessCS->mmin;
@@ -581,66 +646,81 @@ void UpcGenerator::computeNuclXsection()
   double ymax = nucProcessCS->ymax;
   double dy = (ymax - ymin) / ny;
 
-  if (usePolarizedCS) {
-    hCrossSectionZMPolS = new TH2D("hCrossSectionZMPolS", ";m [gev]; z; cs [nb/gev]",
-                                   nz, zmin, zmax,
-                                   nm, mmin, mmax);
+  // setup for two-photon processes
+  if (!isVM) {
+    std::vector<std::vector<double>> crossSectionZM;
+    std::vector<std::vector<double>> crossSectionZMPolS;
+    std::vector<std::vector<double>> crossSectionZMPolPS;
 
-    nucProcessCS->fillCrossSectionZM(hCrossSectionZMPolS, zmin, zmax, nz, mmin, mmax, nm, 1);
-
-    hCrossSectionZMPolPS = new TH2D("hCrossSectionZMPolPS", ";m [gev]; z; cs [nb/gev]",
-                                    nz, zmin, zmax,
-                                    nm, mmin, mmax);
-
-    nucProcessCS->fillCrossSectionZM(hCrossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
-  } else {
-    hCrossSectionZM = new TH2D("hCrossSectionZM_", ";m [gev]; z; cs [nb/gev]",
-                               nz, zmin, zmax,
-                               nm, mmin, mmax);
-
-    nucProcessCS->fillCrossSectionZM(hCrossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
-  }
-
-  // calculating nuclear cross section in YM space
-  // -----------------------------------------------------------------------
-  hNucCSYM = new TH2D("hNucCSYM", "", ny, ymin, ymax, nm, mmin, mmax);
-  if (usePolarizedCS) {
-    hPolCSRatio.resize(ny, vector<double>(nm));
-  }
-  nucProcessCS->calcNucCrossSectionYM(hNucCSYM, hPolCSRatio, totCS);
-
-  // setting up histograms for sampling
-  // -----------------------------------------------------------------------
-  hCrossSecsZ.resize(nm, nullptr);
-  hCrossSecsZ_S.resize(nm, nullptr);
-  hCrossSecsZ_PS.resize(nm, nullptr);
-  if (!usePolarizedCS) {
-    for (int i = 0; i < nm; i++) {
-      hCrossSecsZ[i] = hCrossSectionZM->ProjectionX(Form("hCrossSecsZ_%d", i + 1), i + 1, i + 1);
+    if (usePolarizedCS) {
+      crossSectionZMPolS.resize(nm, std::vector<double>(nz, 0.));
+      crossSectionZMPolPS.resize(nm, std::vector<double>(nz, 0.));
+      nucProcessCS->fillCrossSectionZM(crossSectionZMPolS, zmin, zmax, nz, mmin, mmax, nm, 1);
+      nucProcessCS->fillCrossSectionZM(crossSectionZMPolPS, zmin, zmax, nz, mmin, mmax, nm, 2);
+    } else {
+      crossSectionZM.resize(nm, std::vector<double>(nz, 0.));
+      nucProcessCS->fillCrossSectionZM(crossSectionZM, zmin, zmax, nz, mmin, mmax, nm, 0);
     }
-  } else {
-    for (int i = 0; i < nm; i++) {
-      hCrossSecsZ_S[i] = hCrossSectionZMPolS->ProjectionX(Form("hCrossSecsZPolS_%d", i + 1), i + 1, i + 1);
-      hCrossSecsZ_PS[i] = hCrossSectionZMPolPS->ProjectionX(Form("hCrossSecsZPolPS_%d", i + 1), i + 1, i + 1);
+
+    // calculating upc cross section in YM space
+    nucCSYM.resize(ny, std::vector<double>(nm, 0.));
+    if (usePolarizedCS) {
+      polCSRatio.resize(ny, std::vector<double>(nm));
     }
-  }
+    nucProcessCS->calcNucCrossSectionYM(nucCSYM, polCSRatio, totCS);
 
-  // hack for ALP: cos(theta) is uniformly distributed
-  ignoreCSZ = false;
-  if (procID == 51) {
-    ignoreCSZ = true;
-  }
+    // setup random samplers
+    binEdgesM.resize(nm + 1, 0.);
+    binEdgesZ.resize(nz + 1, 0.);
+    binEdgesY.resize(ny + 1, 0.);
 
-  delete hCrossSectionZM;
-  delete hCrossSectionZMPolS;
-  delete hCrossSectionZMPolPS;
+    for (int i = 0; i < nm + 1; ++i)
+      binEdgesM[i] = mmin + dm * i;
+
+    for (int i = 0; i < nz + 1; ++i)
+      binEdgesZ[i] = zmin + dz * i;
+
+    for (int i = 0; i < ny + 1; ++i)
+      binEdgesY[i] = ymin + dy * i;
+
+    if (usePolarizedCS) {
+      for (int i = 0; i < nm; ++i) {
+        auto* samplerSZ = new UpcSampler1D(crossSectionZMPolS[i], binEdgesZ, seed);
+        auto* samplerPsZ = new UpcSampler1D(crossSectionZMPolPS[i], binEdgesZ, seed);
+        samplersCsSZ.push_back(samplerSZ);
+        samplersCsPsZ.push_back(samplerPsZ);
+      }
+    } else {
+      for (int i = 0; i < nm; ++i) {
+        auto* samplerZ = new UpcSampler1D(crossSectionZM[i], binEdgesZ, seed);
+        samplersCsZ.push_back(samplerZ);
+      }
+    }
+
+    samplerCsYM = new UpcSampler2D(nucCSYM, binEdgesY, binEdgesM, seed);
+  } else {
+    nucCSYM.resize(ny, std::vector<double>(1, 0.)); // ignoring nm, nz etc.
+    nucTargRatioCSYM.resize(ny, std::vector<double>(1, 0.)); // ignoring nm, nz etc.
+    nucProcessCS->calcNucCrossSectionY(nucCSYM, nucTargRatioCSYM, totCS);
+    binEdgesM.resize(1 + 1, 0.); // force 1 mass bin
+    binEdgesM[0] = mmin;
+    binEdgesM[1] = mmax;
+    binEdgesY.resize(ny + 1, 0.);
+    for (int i = 0; i < ny + 1; ++i)
+      binEdgesY[i] = ymin + dy * i;
+    samplerCsYM = new UpcSampler2D(nucCSYM, binEdgesY, binEdgesM, seed);
+  }
 }
 
-long int UpcGenerator::generateEvent(vector<int>& pdgs,
-                                     vector<int>& statuses,
-                                     vector<int>& mothers,
-                                     vector<TLorentzVector>& particles)
+long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
+                                     std::vector<int>& statuses,
+                                     std::vector<int>& mothers,
+                                     std::vector<TLorentzVector>& particles)
 {
+  bool isVM = false;
+  if (procID == 443 || procID == 100443 || procID == 553)
+    isVM = true;
+
   // clear the particle vectors
   pdgs.clear();
   statuses.clear();
@@ -654,39 +734,44 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
 
   // pick pair m and y from nuclear cross section
   double mPair, yPair;
-  hNucCSYM->GetRandom2(yPair, mPair);
-  int yPairBin = hNucCSYM->GetXaxis()->FindBin(yPair);
-  int mPairBin = hNucCSYM->GetYaxis()->FindBin(mPair);
+  (*samplerCsYM)(yPair, mPair);
+  int yPairBin = samplerCsYM->getBinX(yPair);
+  int mPairBin = samplerCsYM->getBinY(mPair);
 
   // pick z = cos(theta) for corresponding m from elem. cross section
   double cost;
   if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
     if (usePolarizedCS) {
-      double frac = hPolCSRatio[yPairBin][mPairBin];
+      double frac = polCSRatio[yPairBin][mPairBin];
       bool pickScalar = gRandom->Uniform(0, 1) < frac;
       if (pickScalar) {
-        cost = hCrossSecsZ_S[mPairBin - 1]->GetRandom();
+        cost = (*samplersCsSZ[mPairBin])();
       } else {
-        cost = hCrossSecsZ_PS[mPairBin - 1]->GetRandom();
+        cost = (*samplersCsPsZ[mPairBin])();
       }
     } else {
-      cost = hCrossSecsZ[mPairBin - 1]->GetRandom();
+      cost = (*samplersCsZ[mPairBin])();
     }
   } else {
     cost = gRandom->Uniform(-1., 1.);
   }
 
-  double theta = acos(cost);
-  double phi = gRandom->Uniform(0., 2. * M_PI);
-
   TLorentzVector pPair;
-  nucProcessCS->getPairMomentum(mPair, yPair, pPair);
-  double pMag = sqrt(pPair.Mag() * pPair.Mag() / 4 - mPart * mPart);
 
-  TVector3 vec;
-  vec.SetMagThetaPhi(pMag, theta, phi);
+  if (isVM) {
+    double ratio = nucTargRatioCSYM[yPairBin][mPairBin];
+    bool target = gRandom->Uniform(0, 1) < ratio;
+    nucProcessCS->getMomentumVM(mPair, yPair, target, pPair);
+  } else {
+    nucProcessCS->getPairMomentum(mPair, yPair, pPair);
+  }
 
   if (isPairProduction) {
+    double pMag = std::sqrt(pPair.Mag2() / 4 - mPart * mPart);
+    double theta = acos(cost);
+    double phi = gRandom->Uniform(0., 2. * M_PI);
+    TVector3 vec;
+    vec.SetMagThetaPhi(pMag, theta, phi);
     pairProduction(pPair, vec, mPart, partPDG, isCharged, particles, pdgs, mothers, statuses);
   }
 
@@ -706,7 +791,7 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
   // lepton decays for taus
   // todo: at the moment "fsr" and "decays" flags
   //       are only really meaningful for pythia8
-  vector<vector<int>> daughters;
+  std::vector<std::vector<int>> daughters;
   if ((doFSR || doDecays) && isPythiaUsed && (procID >= 11 && procID <= 15)) {
     processInPythia(pdgs, statuses, mothers, daughters, particles);
   }
@@ -722,11 +807,15 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
     twoPartDecayUniform(pdgs, statuses, mothers, particles, 1, 0., 22);
   }
 
+  if (isPairProductionVM) {
+    twoPartDecayVM(pdgs, statuses, mothers, particles, 1);
+  }
+
   // fill genParticles
-  vector<int> ds{-1, -1};
+  std::vector<int> ds{-1, -1};
   genParticles.clear();
   for (int ii = 0; ii < particles.size(); ++ii) {
-    ds = vector<int>{-1, -1};
+    ds = std::vector<int>{-1, -1};
     if (daughters.size() > ii) {
       ds[0] = daughters[ii][0];
       ds[1] = daughters[ii][1];
@@ -736,7 +825,6 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
       pdgs[ii], statuses[ii], mothers[ii], mothers[ii], ds[0], ds[1],
       particles[ii].Px(), particles[ii].Py(),
       particles[ii].Pz(), particles[ii].E(), 0.0, 0.0, 0.0, 0.0);
-    // particle.Print();
     genParticles.push_back(tpart);
   }
 
@@ -745,10 +833,10 @@ long int UpcGenerator::generateEvent(vector<int>& pdgs,
 
 void UpcGenerator::generateEvents()
 {
-  vector<int> pdgs;
-  vector<int> statuses;
-  vector<int> mothers;
-  vector<TLorentzVector> particles;
+  std::vector<int> pdgs;
+  std::vector<int> statuses;
+  std::vector<int> mothers;
+  std::vector<TLorentzVector> particles;
 
   // initialize file output
   if (useROOTOut) {
@@ -806,15 +894,25 @@ void UpcGenerator::generateEvents()
   if (doAnyCuts && nEvents > 0) {
     PLOG_INFO << "Kinematic cuts were used";
     PLOG_INFO << "Number of rejected events = " << rejected;
-    PLOG_INFO << fixed << setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
+    PLOG_INFO << std::fixed << std::setprecision(6) << "Cross section with cuts = " << fidCS << " mb";
   }
 
   if (useROOTOut) {
-    if (debug > 0) {
+    if (debug > 0) { // write out cross sections
+      auto* hNucCSYM = new TH2D("hNucCSYM", "",
+                                binEdgesY.size() - 1, binEdgesY.data(),
+                                binEdgesM.size() - 1, binEdgesM.data());
+      for (int iy = 0; iy < binEdgesY.size() - 1; ++iy)
+        for (int im = 0; im < binEdgesM.size() - 1; ++im)
+          hNucCSYM->SetBinContent(iy + 1, im + 1, nucCSYM[iy][im]);
       auto* hNucCSM = hNucCSYM->ProjectionY();
+      auto* hNucCSY = hNucCSYM->ProjectionX();
       hNucCSM->Write();
+      hNucCSY->Write();
       hNucCSYM->Write();
       delete hNucCSM;
+      delete hNucCSY;
+      delete hNucCSYM;
     }
     mOutFile->Write();
     mOutFile->Close();

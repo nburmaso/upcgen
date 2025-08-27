@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -21,8 +21,7 @@
 
 // Base class for pythia interfaces
 
-#ifndef UPCGENERATOR_INCLUDE_UPCPYTHIABASE_H_
-#define UPCGENERATOR_INCLUDE_UPCPYTHIABASE_H_
+#pragma once
 
 #include "TObject.h"
 class TClonesArray;
@@ -50,5 +49,3 @@ class UpcPythiaBase
   bool mDoFSR{false};
   bool mDoDecays{false};
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCPYTHIABASE_H_

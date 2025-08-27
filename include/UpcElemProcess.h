@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -21,8 +21,7 @@
 
 /// base (abstract) class for elementary processes
 
-#ifndef UPCGENERATOR_INCLUDE_UPCELEMPROCESS_H_
-#define UPCGENERATOR_INCLUDE_UPCELEMPROCESS_H_
+#pragma once
 
 class UpcElemProcess
 {
@@ -30,8 +29,12 @@ class UpcElemProcess
   UpcElemProcess() = default;
   virtual ~UpcElemProcess() {}
 
-  // mass of a particle in final state
+  // mass of the produced particle
   double mPart{};
+
+  // mass of decay particle
+  double mDght{};
+  int dghtPDG{};
 
   // pdg code of a particle
   int partPDG{};
@@ -40,7 +43,9 @@ class UpcElemProcess
   bool isCharged{};
 
   // `standard` unpolarized cross sections
-  virtual double calcCrossSectionM(double m) = 0;
+  virtual double calcCrossSectionY(double y) { return 0.; }
+
+  virtual double calcCrossSectionM(double m) { return 0.; }
 
   virtual double calcCrossSectionZM(double z, double m) = 0;
 
@@ -55,5 +60,3 @@ class UpcElemProcess
 
   virtual double calcCrossSectionZMPolPS(double z, double m) = 0;
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCELEMPROCESS_H_

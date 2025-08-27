@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -19,113 +19,124 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-// simple interface class for sampling from root histograms using stl
-// can work with a 2d distributions in rectangular region
+#pragma once
 
-#ifndef UPCGENERATOR_INCLUDE_UPCSAMPLER_H_
-#define UPCGENERATOR_INCLUDE_UPCSAMPLER_H_
-
+#include <algorithm>
+#include <cassert>
+#include <chrono>
 #include <map>
 #include <random>
+
 #include <vector>
+#include <gsl/gsl_histogram.h>
+#include <gsl/gsl_histogram2d.h>
+#include <gsl/gsl_rng.h>
 
-#include "TH1D.h"
-#include "TH2D.h"
+using namespace std::chrono;
 
-class UpcSampler
+class UpcSampler1D
 {
  public:
-  UpcSampler() = default;
-
-  ~UpcSampler() = default;
-
-  std::mt19937_64 randGen;
-
-  // 1d distribution for y variable (usually independent of x)
-  std::discrete_distribution<int>* distr1D;
-  std::vector<double>* yGrid;
-
-  // vector of 1d distributions along x for each y
-  std::vector<std::discrete_distribution<int>>* distr2D;
-  std::vector<double>* xGrid;
-
-  void setYGrid(std::vector<double>& yGrid)
+  UpcSampler1D(const std::vector<double>& dist,
+               const std::vector<double>& binEdges,
+               uint64_t seed = std::numeric_limits<uint64_t>::max())
   {
-    this->yGrid = &yGrid;
-  }
-
-  void setXGrid(std::vector<double>& xGrid)
-  {
-    this->xGrid = &xGrid;
-  }
-
-  // set seed for internal generator
-  void setSeed(long int seed)
-  {
-    std::random_device rd;
-    randGen = std::mt19937_64(seed == 0 ? rd() : seed);
-  }
-
-  // set 1d distribution from 1d histogram
-  void setDistr1D(const TH1D* hist1D, int ny)
-  {
-    std::vector<double> distr(ny, 0.);
-    for (int i = 1; i <= ny; i++) {
-      distr[i - 1] = hist1D->GetBinContent(i);
+    auto nBinsX = static_cast<int>(dist.size());
+    auto nBinEdgesX = static_cast<int>(binEdges.size());
+    hist = gsl_histogram_alloc(dist.size());
+    gsl_histogram_set_ranges(hist, binEdges.data(), nBinEdgesX);
+    rng = gsl_rng_alloc(gsl_rng_default);
+    if (seed == std::numeric_limits<uint64_t>::max()) {
+      seed = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     }
-    distr1D = new std::discrete_distribution<int>(distr.begin(), distr.end());
-  }
-
-  // set vector of 1d distributions from 2d histogram
-  void setDistr2D(const TH2D* hist2D, int nx, int ny)
-  {
-    distr2D = new std::vector<std::discrete_distribution<int>>(ny);
-    std::vector<double> distr(nx, 0.);
-    for (int j = 1; j <= ny; j++) {
-      for (int i = 1; i <= nx; i++) {
-        distr[i - 1] = 0;
-        distr[i - 1] = hist2D->GetBinContent(i, j);
-      }
-      (*distr2D)[j - 1] = std::discrete_distribution<int>(distr.begin(), distr.end());
+    gsl_rng_set(rng, seed);
+    for (int i = 0; i < nBinsX; ++i) {
+      hist->bin[i] = dist[i];
     }
+    hpdf = gsl_histogram_pdf_alloc(nBinsX);
+    int status = gsl_histogram_pdf_init(hpdf, hist);
+    assert(("Could not initialize 1D sampler", status != GSL_EDOM));
   }
 
-  // sample y value
-  void sample1D(double& y)
+  ~UpcSampler1D()
   {
-    y = (*yGrid)[(*distr1D)(randGen)];
+    gsl_rng_free(rng);
+    gsl_histogram_free(hist);
+    gsl_histogram_pdf_free(hpdf);
   }
 
-  // sample y bin
-  void sample1D(int& iy)
+  double operator()() const
   {
-    iy = (*distr1D)(randGen);
+    return gsl_histogram_pdf_sample(hpdf, gsl_rng_uniform(rng));
   }
 
-  // sample y and x values
-  // first, y is sampled independently,
-  // then x is sampled for the obtained y
-  void sample2D(double& y, double& x)
-  {
-    int iy = (*distr1D)(randGen);
-    y = (*yGrid)[iy];
-    int ix = (*distr2D)[iy](randGen);
-    x = (*xGrid)[ix];
-  }
-
-  // sample y and x bins -- same method as for the values
-  void sample2D(int& iy, int& ix)
-  {
-    iy = (*distr1D)(randGen);
-    ix = (*distr2D)[iy](randGen);
-  }
-
-  // sample x for a given y
-  void sampleXAtY(int iy, double& x)
-  {
-    int ix = (*distr2D)[iy](randGen);
-    x = (*xGrid)[ix];
-  }
+  gsl_rng* rng{nullptr};            // random generator
+  gsl_histogram* hist{nullptr};     // input histogram
+  gsl_histogram_pdf* hpdf{nullptr}; // pdf to be sampled from
 };
 
-#endif // UPCGENERATOR_INCLUDE_UPCSAMPLER_H_
+class UpcSampler2D
+{
+ public:
+  UpcSampler2D(const std::vector<std::vector<double>>& dist,
+               const std::vector<double>& binEdgesX,
+               const std::vector<double>& binEdgesY,
+               uint64_t seed = std::numeric_limits<uint64_t>::max())
+  {
+    nBinsX = static_cast<int>(dist.size());
+    nBinsY = static_cast<int>(dist[0].size());
+    auto nBinEdgesX = static_cast<int>(binEdgesX.size());
+    auto nBinEdgesY = static_cast<int>(binEdgesY.size());
+    edgesX = binEdgesX;
+    edgesY = binEdgesY;
+    hist = gsl_histogram2d_alloc(nBinsX, nBinsY);
+    gsl_histogram2d_set_ranges(hist,
+                               binEdgesX.data(), nBinEdgesX,
+                               binEdgesY.data(), nBinEdgesY);
+    rng = gsl_rng_alloc(gsl_rng_default);
+    if (seed == std::numeric_limits<uint64_t>::max()) {
+      seed = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+    }
+    gsl_rng_set(rng, seed);
+    for (int i = 0; i < nBinsX; ++i) {
+      for (int j = 0; j < nBinsY; ++j) {
+        hist->bin[i * nBinsY + j] = dist[i][j]; // inside hist bins are stored as single 1D array
+      }
+    }
+    hpdf = gsl_histogram2d_pdf_alloc(nBinsX, nBinsY);
+    int status = gsl_histogram2d_pdf_init(hpdf, hist);
+    assert(("Could not initialize 2D sampler", status != GSL_EDOM));
+  }
+
+  ~UpcSampler2D()
+  {
+    gsl_rng_free(rng);
+    gsl_histogram2d_free(hist);
+    gsl_histogram2d_pdf_free(hpdf);
+  }
+
+  void operator()(double& x, double& y) const
+  {
+    gsl_histogram2d_pdf_sample(hpdf, gsl_rng_uniform(rng), gsl_rng_uniform(rng), &x, &y);
+  }
+
+  // from 0 to nBinsX
+  int getBinX(double x)
+  {
+    return int(nBinsX * (x - edgesX.front())) / (edgesX.back() - edgesX.front());
+  }
+
+  // from 0 to nBinsY
+  int getBinY(double y)
+  {
+    return int(nBinsY * (y - edgesY.front())) / (edgesY.back() - edgesY.front());
+  }
+
+  int nBinsX;
+  int nBinsY;
+  std::vector<double> edgesX;
+  std::vector<double> edgesY;
+  gsl_rng* rng;                       // random generator
+  gsl_histogram2d* hist{nullptr};     // input histogram
+  gsl_histogram2d_pdf* hpdf{nullptr}; // pdf to be sampled from
+};

@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -21,8 +21,7 @@
 
 // A simple interface to Pythia6
 
-#ifndef UPCGENERATOR_SRC_UPCPYTHIA6HELPER_H_
-#define UPCGENERATOR_SRC_UPCPYTHIA6HELPER_H_
+#pragma once
 
 #include "UpcPythiaBase.h"
 
@@ -47,5 +46,3 @@ class UpcPythia6Helper : public UpcPythiaBase
 };
 
 #endif
-
-#endif // UPCGENERATOR_SRC_UPCPYTHIA6HELPER_H_

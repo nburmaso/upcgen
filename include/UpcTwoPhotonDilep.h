@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -22,8 +22,7 @@
 /// a class implementing cross sections for dilepton photoproduction
 /// gamma+gamma -> l+l-
 
-#ifndef UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_
-#define UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_
+#pragma once
 
 #include "UpcElemProcess.h"
 
@@ -49,5 +48,3 @@ class UpcTwoPhotonDilep : public UpcElemProcess
 
   double calcCrossSectionZMPolPS(double z, double m) override;
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCTWOPHOTONDILEP_H_

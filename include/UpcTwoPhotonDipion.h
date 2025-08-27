@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -24,8 +24,7 @@
 /// disclaimer: cross section calculated by Mariola Klusek-Gawenda et al
 /// see https://arxiv.org/pdf/1302.4204.pdf for more information
 
-#ifndef UPCGENERATOR_INCLUDE_UPCTWOPHOTONDIPION_H_
-#define UPCGENERATOR_INCLUDE_UPCTWOPHOTONDIPION_H_
+#pragma once
 
 #include "UpcElemProcess.h"
 
@@ -60,5 +59,3 @@ class UpcTwoPhotonDipion : public UpcElemProcess
 
   double calcCrossSectionZMPolPS(double z, double m) override { return 0; };
 };
-
-#endif // UPCGENERATOR_INCLUDE_UPCTWOPHOTONDIPION_H_

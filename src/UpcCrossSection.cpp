@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -19,36 +19,49 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
+#include <gsl/gsl_interp2d.h>
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_sf_bessel.h>
+#include <gsl/gsl_spline2d.h>
+
+#include <omp.h>
+
 #include "UpcCrossSection.h"
 
-#ifdef USE_OPENMP
-#include <omp.h>
-#endif
+gsl_interp_accel* gslInterpAccGAA{nullptr};
+gsl_spline* gslSplineGAA{nullptr};
 
-using namespace std;
+gsl_interp_accel* gslInterpAccBreakP{nullptr};
+gsl_spline* gslSplineBreakP{nullptr};
 
-// out-of-line initialization for static members
-double UpcCrossSection::rho0 = 0;
-double UpcCrossSection::R = 6.68;
-double UpcCrossSection::a = 0.447;
-int UpcCrossSection::Z = 82;
-double UpcCrossSection::sqrts = 5020;
-double UpcCrossSection::g1 = sqrts / (2. * phys_consts::mProt);
-double UpcCrossSection::g2 = sqrts / (2. * phys_consts::mProt);
-int UpcCrossSection::debug = 0;
-double* UpcCrossSection::vCachedFormFac = new double[UpcCrossSection::nQ2];
+gsl_interp_accel* gslInterpAccFormFac{nullptr};
+gsl_spline* gslSplineFormFac{nullptr};
+
+struct GslFuncParsFluxForm { double b; double k; double g1; };
+GslFuncParsFluxForm gslFuncParsFluxForm;
+gsl_function gslFuncFluxForm;
+
+#pragma omp threadprivate(gslFuncFluxForm, gslFuncParsFluxForm)
+
+const double Q2min{1e-9};
+const double Q2max{2.};
+const int nQ2{1000000};
+const double dQ2{(Q2max - Q2min) / nQ2};
 
 UpcCrossSection::UpcCrossSection()
 {
-  constexpr int nbc = 10000000;
-  vCachedBreakup = new double[nbc];
   gtot = TMath::CosH((TMath::ACosH(g1) + TMath::ACosH(g2)) / 2.);
 }
 
 UpcCrossSection::~UpcCrossSection()
 {
-  delete[] vCachedBreakup;
   delete elemProcess;
+  gsl_spline_free(gslSplineGAA);
+  gsl_interp_accel_free(gslInterpAccGAA);
+  gsl_spline_free(gslSplineBreakP);
+  gsl_interp_accel_free(gslInterpAccBreakP);
+  gsl_spline_free(gslSplineFormFac);
+  gsl_interp_accel_free(gslInterpAccFormFac);
 }
 
 void UpcCrossSection::setElemProcess(int procID)
@@ -81,6 +94,18 @@ void UpcCrossSection::setElemProcess(int procID)
       elemProcess = new UpcTwoPhotonDipion(doMassCut, lowMCut, hiMCut);
       break;
     }
+    case 443: { // J/Psi photoproduction
+      elemProcess = new UpcPhotoNuclearVM(443, shadowingOption, dghtPDG);
+      break;
+    }
+    case 100443: { // Psi(2S) photoproduction
+      elemProcess = new UpcPhotoNuclearVM(100443, shadowingOption, dghtPDG);
+      break;
+    }
+    case 553: { // Upsilon(1S) photoproduction
+      elemProcess = new UpcPhotoNuclearVM(553, shadowingOption, dghtPDG);
+      break;
+    }
     default: {
       PLOG_FATAL << "Unknown process ID! Check manual and enter a correct ID! Exiting...";
       std::_Exit(-1);
@@ -93,6 +118,7 @@ void UpcCrossSection::init()
   PLOG_INFO << "Initializing caches ...";
   // update scaling factor
   factor = Z * Z * phys_consts::alpha / M_PI / M_PI / phys_consts::hc / phys_consts::hc;
+  mNucl = (Z * phys_consts::mProt + (A - Z) * phys_consts::mNeut) / A;
 
   // calculate Woods-Saxon rho0 from R and a
   rho0 = calcWSRho();
@@ -103,7 +129,11 @@ void UpcCrossSection::init()
   if (breakupMode > 1) {
     prepareBreakupProb();
   }
-  prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
+  if (elemProcess->partPDG != 443 &&
+      elemProcess->partPDG != 100443 &&
+      elemProcess->partPDG != 553) {
+    prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
+  }
 }
 
 template <typename ArrayType>
@@ -111,33 +141,35 @@ double UpcCrossSection::simpson(int n, ArrayType* v, double h)
 {
   double sum = v[0] + v[n - 1];
   for (int i = 1; i < n - 1; i += 2) {
-    sum += 4 * v[i];
+    sum += 4. * v[i];
   }
   for (int i = 2; i < n - 1; i += 2) {
-    sum += 2 * v[i];
+    sum += 2. * v[i];
   }
-  return sum * h / 3;
+  return sum * h / 3.;
 }
 
 double UpcCrossSection::calcWSRho()
 {
-  double bmax = 20;
-  double db = bmax / (nb - 1);
+  double bmax = 20.;
+  double db = bmax / (nb - 1.);
+  double vRho[nb];
   for (int ib = 0; ib < nb; ib++) {
     double r = ib * db;
-    vRho[ib] = r * r / (1 + exp((r - R) / a));
+    vRho[ib] = r * r / (1. + exp((r - R) / a));
   }
-  double wsRho0 = A / simpson(nb, vRho, db) / 4 / M_PI;
+  double wsRho0 = A / simpson(nb, vRho, db) / 4. / M_PI;
   return wsRho0;
 }
 
+// integrated flux of a point-like source
 double UpcCrossSection::fluxPoint(const double b, const double k)
 {
   // flux divided by k
   double g = g1;
   double x = b * k / g / phys_consts::hc;
-  double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
-  double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
+  double K0 = x > 1e-10 ? gsl_sf_bessel_K0(x) : 0;
+  double K1 = x > 1e-10 ? gsl_sf_bessel_K1(x) : 0;
   double result = factor * k / g / g * (K1 * K1 + K0 * K0 / g / g);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
@@ -145,69 +177,65 @@ double UpcCrossSection::fluxPoint(const double b, const double k)
   return result;
 }
 
-double UpcCrossSection::fluxFormInt(double* x, double* par)
+// integrand for flux of a nucleus with realistic form-factor
+double fluxFormIntegrand(double x, void* par)
 {
-  double k = x[0];
-  double b = par[0];
-  double w = par[1];
-  double g = g1;
-
-  if (debug > 1) {
-    PLOG_DEBUG << "b = " << b << " w = " << w << " g = " << g;
-  }
-
+  double k = x;
+  double b = gslFuncParsFluxForm.b;
+  double w = gslFuncParsFluxForm.k;
+  double g = gslFuncParsFluxForm.g1;
   double t = k * k + w * w / g / g;
-  double ff = getCachedFormFac(t);
-  double result = k * k * ff / t * TMath::BesselJ1(b * k / phys_consts::hc);
-  if (debug > 1) {
-    PLOG_DEBUG << "result = " << result;
-  }
+  double ff = gsl_spline_eval(gslSplineFormFac, t < Q2max ? t : Q2max - dQ2, gslInterpAccFormFac);
+  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / phys_consts::hc);
   return result;
 }
 
-double UpcCrossSection::fluxForm(const double b, const double k, TF1* fFluxFormInt)
+// integrated flux divided by k
+double UpcCrossSection::fluxForm(const double b, const double k)
 {
-  // flux divided by k
-  if (isPoint) {
+  if (isPoint)
     return fluxPoint(b, k);
-  }
 
-  if (b > 2 * R) {
+  if (b > 2. * R)
     return fluxPoint(b, k);
-  }
 
-  fFluxFormInt->SetParameter(0, b);
-  fFluxFormInt->SetParameter(1, k);
-  fFluxFormInt->SetParameter(2, g1);
-  double Q = fFluxFormInt->Integral(0, 10, 1e-5) / A;
-  double result = factor * Q * Q / k;
+  gslFuncParsFluxForm.b = b;
+  gslFuncParsFluxForm.k = k;
+  gslFuncParsFluxForm.g1 = g1;
+  gslFuncFluxForm.function = &fluxFormIntegrand;
+  gsl_integration_workspace* gslIntWsFluxForm = gsl_integration_workspace_alloc(1000);
 
-  if (debug > 1) {
-    PLOG_DEBUG << "result = " << result;
-  }
+  double res, err;
+  gsl_integration_qags(&gslFuncFluxForm, 0., 10., 1e-4, 1e-4, 1000,
+                       gslIntWsFluxForm, &res, &err); // GSL_INTEG_GAUSS61
 
-  return result;
+  gsl_integration_workspace_free(gslIntWsFluxForm);
+
+  double Q = res / A;
+  double flux = factor * Q * Q / k;
+
+  return flux;
 }
 
-double UpcCrossSection::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
+// double differential luminosity
+double UpcCrossSection::calcTwoPhotonLumi(double M, double Y)
 {
-  // double differential luminosity
-  double k1 = M / 2. * exp(Y);
-  double k2 = M / 2. * exp(-Y);
+  double k1 = M / 2. * std::exp(Y);
+  double k2 = M / 2. * std::exp(-Y);
 
-  double b1min = isPoint ? 1 * R : 0.05 * R;
-  double b2min = isPoint ? 1 * R : 0.05 * R;
-  double b1max = TMath::Max(5. * g1 * phys_consts::hc / k1, 5 * R);
-  double b2max = TMath::Max(5. * g2 * phys_consts::hc / k2, 5 * R);
-  double log_delta_b1 = (log(b1max) - log(b1min)) / nb1;
-  double log_delta_b2 = (log(b2max) - log(b2min)) / nb2;
+  double b1min = isPoint ? R : 0.05 * R;
+  double b2min = isPoint ? R : 0.05 * R;
+  double b1max = std::max(5. * g1 * phys_consts::hc / k1, 5. * R);
+  double b2max = std::max(5. * g2 * phys_consts::hc / k2, 5. * R);
+  double log_delta_b1 = (std::log(b1max) - std::log(b1min)) / nb1;
+  double log_delta_b2 = (std::log(b2max) - std::log(b2min)) / nb2;
 
-  vector<double> flux(nb2);
+  std::vector<double> flux(nb2);
   for (int j = 0; j < nb2; j++) {
-    double b2l = b2min * exp(j * log_delta_b2);
-    double b2h = b2min * exp((j + 1) * log_delta_b2);
+    double b2l = b2min * std::exp(j * log_delta_b2);
+    double b2h = b2min * std::exp((j + 1.) * log_delta_b2);
     double b2 = (b2h + b2l) / 2.;
-    flux[j] = fluxForm(b2, k2, fFluxForm);
+    flux[j] = fluxForm(b2, k2);
   }
 
   double sum = 0;
@@ -227,19 +255,23 @@ double UpcCrossSection::calcTwoPhotonLumi(double M, double Y, TF1* fFluxForm, co
         }
         double phi = M_PI * abscissas10[k];
         double b = sqrt(b1 * b1 + b2 * b2 + 2. * b1 * b2 * cos(phi));
-        double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
-        double gaa = b < 20. ? gGAA->Eval(b) : 1;
+        double breakup = 1.;
+        if (breakupMode != 1) {
+          breakup = gsl_spline_eval(gslSplineBreakP, b < 20. ? b : 20., gslInterpAccBreakP);
+        }
+        double gaa = b < 20. ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
         sum_phi += breakup * gaa * weights10[k];
       }
       sum_b2 += flux[j] * sum_phi * b2 * (b2h - b2l);
     }
-    sum += fluxForm(b1, k1, fFluxForm) * sum_b2 * b1 * (b1h - b1l);
+    sum += fluxForm(b1, k1) * sum_b2 * b1 * (b1h - b1l);
   }
   double lumi = 2 * M_PI * M_PI * M * sum;
   return lumi;
 }
 
-void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y, TF1* fFluxForm, const TGraph* gGAA)
+// polarized double differential luminosity
+void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, double Y)
 {
   double k1 = M / 2. * exp(Y);
   double k2 = M / 2. * exp(-Y);
@@ -256,7 +288,7 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
     double b2l = b2min * exp(j * log_delta_b2);
     double b2h = b2min * exp((j + 1) * log_delta_b2);
     double b2 = (b2h + b2l) / 2.;
-    flux[j] = fluxForm(b2, k2, fFluxForm);
+    flux[j] = fluxForm(b2, k2);
   }
 
   // calculating two integrals simultaneously
@@ -266,7 +298,7 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
     double b1l = b1min * exp(i * log_delta_b1);
     double b1h = b1min * exp((i + 1) * log_delta_b1);
     double b1 = (b1h + b1l) / 2.;
-    double ff_b1 = fluxForm(b1, k1, fFluxForm);
+    double ff_b1 = fluxForm(b1, k1);
     double sum_b2_s = 0;
     double sum_b2_p = 0;
     for (int j = 0; j < nb2; ++j) {
@@ -283,8 +315,11 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
         double cphi = TMath::Cos(phi);
         double sphi = TMath::Sin(phi);
         double b = TMath::Sqrt(b1 * b1 + b2 * b2 - 2. * b1 * b2 * cphi);
-        double breakup = breakupMode == 1 ? 1 : getCachedBreakupProb(b);
-        double gaa = b < 20 ? gGAA->Eval(b) : 1;
+        double breakup = 1.;
+        if (breakupMode != 1) {
+          breakup = gsl_spline_eval(gslSplineBreakP, b < 20. ? b : 20., gslInterpAccBreakP);
+        }
+        double gaa = b < 20 ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
         sum_phi_s += breakup * gaa * weights10[k] * cphi * cphi;
         sum_phi_p += breakup * gaa * weights10[k] * sphi * sphi;
       }
@@ -295,23 +330,23 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
     sum_b1_s += sum_b2_s * ff_b1 * b1 * (b1h - b1l);
     sum_b1_p += sum_b2_p * ff_b1 * b1 * (b1h - b1l);
   }
-  ns = 2 * M_PI * M_PI * M * sum_b1_s;
-  np = 2 * M_PI * M_PI * M * sum_b1_p;
+  ns = 2. * M_PI * M_PI * M * sum_b1_s;
+  np = 2. * M_PI * M_PI * M * sum_b1_p;
 }
 
-void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
+void UpcCrossSection::fillCrossSectionZM(std::vector<std::vector<double>>& crossSectionZM,
                                          double zmin, double zmax, int nz,
                                          double mmin, double mmax, int nm,
                                          int flag)
 {
-  double m, z;
+  constexpr double scalingFactor = phys_consts::hc * phys_consts::hc * 1e7; // to [nb]
   double dm = (mmax - mmin) / nm;
   double dz = (zmax - zmin) / nz;
   double cs;
-  for (int im = 1; im <= nm; im++) {
-    m = mmin + dm * (im - 1);
-    for (int iz = 1; iz <= nz; iz++) {
-      z = zmin + dz * (iz - 1);
+  for (int im = 0; im < nm; ++im) {
+    double m = mmin + dm * im;
+    for (int iz = 0; iz < nz; ++iz) {
+      double z = zmin + dz * iz;
       if (flag == 0) { // the usual unpolarized cross section
         cs = elemProcess->calcCrossSectionZM(z, m);
       }
@@ -321,35 +356,39 @@ void UpcCrossSection::fillCrossSectionZM(TH2D* hCrossSectionZM,
       if (flag == 2) { // pseudoscalar part
         cs = elemProcess->calcCrossSectionZMPolPS(z, m);
       }
-      hCrossSectionZM->SetBinContent(iz, im, cs);
+      crossSectionZM[im][iz] = cs * scalingFactor / dm;
     }
   }
-  double scalingFactor = phys_consts::hc * phys_consts::hc * 1e7; // to [nb]
-  hCrossSectionZM->Scale(scalingFactor / dm);
 }
 
 void UpcCrossSection::prepareGAA()
 {
-  double bmax = 20;
+  double bmax = 20.;
   double db = bmax / (nb - 1);
-  double ssm = pow(sqrts, 2) / pow(2 * phys_consts::mProt + 2.1206, 2);
-  double csNN = 0.1 * (34.41 + 0.2720 * pow(log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
+  double ssm = pow(sqrts, 2) / std::pow(2 * phys_consts::mProt + 2.1206, 2);
+  double csNN = 0.1 * (34.41 + 0.2720 * std::pow(std::log(ssm), 2) + 13.07 * pow(ssm, -0.4473) - 7.394 * pow(ssm, -0.5486)); // PDG 2016
   // calculate rho and TA
-  double TAb[nb];
+  double vB[nb];
+  double vTA[nb];
+  double vRho[nb][nb];
   for (int ib = 0; ib < nb; ib++) {
     double b = ib * db;
     for (int iz = 0; iz < nb; iz++) {
       double z = iz * db;
       double r = TMath::Sqrt(b * b + z * z);
-      rho[ib][iz] = rho0 / (1 + exp((r - R) / a));
+      vRho[ib][iz] = rho0 / (1 + exp((r - R) / a));
     }
-    TA[ib] = 2 * simpson(nb, rho[ib], db);
-    TAb[ib] = TA[ib] * b;
-    vb[ib] = b;
+    vTA[ib] = 2. * simpson(nb, vRho[ib], db);
+    vB[ib] = b;
   }
-  auto* gTA = new TGraph(nb, vb, TA);
+
+  gsl_interp_accel* gslInterpAccTA = gsl_interp_accel_alloc();
+  gsl_spline* gslSplineTA = gsl_spline_alloc(gsl_interp_cspline, nb);
+  gsl_spline_init(gslSplineTA, vB, vTA, nb);
 
   // calculate G_AA
+  double vGAA[nb];
+  double vs[nb];
   for (int ib = 0; ib < nb; ib++) {
     double b = ib * db;
     for (int is = 0; is < nb; is++) {
@@ -358,15 +397,20 @@ void UpcCrossSection::prepareGAA()
       for (int k = 0; k < ngi10; k++) {
         if (abscissas10[k] < 0)
           continue;
-        double r = TMath::Sqrt(b * b + s * s + 2 * b * s * TMath::Cos(M_PI * abscissas10[k]));
-        sum_phi += 2 * M_PI * weights10[k] * gTA->Eval(r);
+        double r = TMath::Sqrt(b * b + s * s + 2. * b * s * TMath::Cos(M_PI * abscissas10[k]));
+        sum_phi += 2. * M_PI * weights10[k] * gsl_spline_eval(gslSplineTA, r < bmax ? r : bmax, gslInterpAccTA);
       }
-      vs[is] = 2 * s * gTA->Eval(s) * sum_phi;
+      vs[is] = 2. * s * gsl_spline_eval(gslSplineTA, s < bmax ? s : bmax, gslInterpAccTA) * sum_phi;
     }
     vGAA[ib] = exp(-csNN * simpson(nb, vs, db));
   }
 
-  delete gTA;
+  gsl_spline_free(gslSplineTA);
+  gsl_interp_accel_free(gslInterpAccTA);
+
+  gslInterpAccGAA = gsl_interp_accel_alloc();
+  gslSplineGAA = gsl_spline_alloc(gsl_interp_cspline, nb);
+  gsl_spline_init(gslSplineGAA, vB, vGAA, nb);
 }
 
 void UpcCrossSection::prepareBreakupProb()
@@ -375,69 +419,50 @@ void UpcCrossSection::prepareBreakupProb()
   constexpr double bmax = 1000;
   constexpr int nbc = 1000000;
   constexpr double db = (bmax - bmin) / nbc;
+  double vB[nbc];
+  double vBreak[nbc];
   for (int i = 0; i < nbc; i++) {
     double b = bmin + db * i;
     double prob = calcBreakupProb(b, breakupMode);
-    vCachedBreakup[i] = prob;
+    vB[i] = b;
+    vBreak[i] = prob;
   }
-}
 
-double UpcCrossSection::getCachedBreakupProb(double b)
-{
-  constexpr double bmin = 1e-6;
-  constexpr double bmax = 1000;
-  constexpr int nbc = 1000000;
-  constexpr double db = (bmax - bmin) / nbc;
-  if (breakupMode == 3 && b > bmax) {
-    return 1.;
-  }
-  if ((breakupMode == 2 || breakupMode == 4) && b > bmax) {
-    return 0.;
-  }
-  double frac = (b - bmin) / db;
-  int idx1 = floor(frac);
-  double prob1 = vCachedBreakup[idx1];
-  double prob2 = vCachedBreakup[idx1 + 1];
-  double prob = prob1 + (prob2 - prob1) * (frac - idx1);
-  return prob;
+  gslInterpAccBreakP = gsl_interp_accel_alloc();
+  gslSplineBreakP = gsl_spline_alloc(gsl_interp_cspline, nbc);
+  gsl_spline_init(gslSplineBreakP, vB, vBreak, nbc);
 }
 
 double UpcCrossSection::calcFormFac(double Q2)
 {
-  double Q = sqrt(Q2) / phys_consts::hc;
+  double Q = std::sqrt(Q2) / phys_consts::hc;
   double coshVal = TMath::CosH(M_PI * Q * a);
   double sinhVal = TMath::SinH(M_PI * Q * a);
   double ff = 4 * M_PI * M_PI * rho0 * a * a * a / (Q * a * Q * a * sinhVal * sinhVal) *
               (M_PI * Q * a * coshVal * TMath::Sin(Q * R) - Q * R * TMath::Cos(Q * R) * sinhVal);
-  ff += 8 * M_PI * rho0 * a * a * a * exp(-R / a) / (1 + Q * Q * a * a) / (1 + Q * Q * a * a);
+  ff += 8 * M_PI * rho0 * a * a * a * std::exp(-R / a) / (1 + Q * Q * a * a) / (1 + Q * Q * a * a);
   return ff;
 }
 
 void UpcCrossSection::prepareFormFac()
 {
+  auto* vQ2 = new double[nQ2];
+  auto* vFF = new double[nQ2];
   for (int iQ2 = 0; iQ2 < nQ2; iQ2++) {
     double Q2 = Q2min + iQ2 * dQ2;
     double ff = calcFormFac(Q2);
-    vCachedFormFac[iQ2] = ff;
+    vQ2[iQ2] = Q2;
+    vFF[iQ2] = ff;
   }
-}
 
-double UpcCrossSection::getCachedFormFac(double Q2)
-{
-  if (Q2 > Q2max) {
-    return 0;
-  }
-  double frac = (Q2 - Q2min) / dQ2;
-  int idx1 = floor(frac);
-  double ff1 = vCachedFormFac[idx1];
-  double ff2 = vCachedFormFac[idx1 + 1];
-  double ff = ff1 + (ff2 - ff1) * (frac - idx1);
-  return ff;
+  gslInterpAccFormFac = gsl_interp_accel_alloc();
+  gslSplineFormFac = gsl_spline_alloc(gsl_interp_cspline, nQ2);
+  gsl_spline_init(gslSplineFormFac, vQ2, vFF, nQ2);
 }
 
 void UpcCrossSection::prepareTwoPhotonLumi()
 {
-  // wait here if an other generator is working on this
+  // wait here if another generator is working on this
   TString fnlock{lumiFileDirectory+"/.lumiIsCalculated"};
   if (usePolarizedCS) {
     fnlock += "Pol";
@@ -470,101 +495,91 @@ void UpcCrossSection::prepareTwoPhotonLumi()
     double dm = (mmax - mmin) / nm;
     auto* f2DLumi = new TFile(fname, "recreate");
     // histograms for unpolarized case
-    TH2D* hD2LDMDY = nullptr;
+    TH2D* hTpLumi = nullptr;
     // histograms for polarized case
-    TH2D* hD2LDMDY_s = nullptr;
-    TH2D* hD2LDMDY_p = nullptr;
+    TH2D* hTpLumiS = nullptr;
+    TH2D* hTpLumiPs = nullptr;
     if (usePolarizedCS) {
-      hD2LDMDY_s = new TH2D("hD2LDMDY_s", ";;", nm, mmin, mmax, ny, ymin, ymax);
-      hD2LDMDY_p = new TH2D("hD2LDMDY_p", ";;", nm, mmin, mmax, ny, ymin, ymax);
+      hTpLumiS = new TH2D("hD2LDMDY_s", "", nm, mmin, mmax, ny, ymin, ymax);
+      hTpLumiPs = new TH2D("hD2LDMDY_p", "", nm, mmin, mmax, ny, ymin, ymax);
     } else {
-      hD2LDMDY = new TH2D("hD2LDMDY", ";;", nm, mmin, mmax, ny, ymin, ymax);
+      hTpLumi = new TH2D("hD2LDMDY", "", nm, mmin, mmax, ny, ymin, ymax);
     }
     ROOT::EnableThreadSafety();
     int im, iy;
     int progress = 0;
     int total = ny * nm;
-    // using ether parallel or serial implementation
-#ifdef USE_OPENMP
+    std::vector<std::vector<double>> tpLumi; // total luminosity
+    std::vector<std::vector<double>> tpLumiS; // scalar part
+    std::vector<std::vector<double>> tpLumiPs; // pseudoscalar part
+    omp_set_dynamic(0);
     omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)                                   \
-  shared(hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy) \
-    firstprivate(nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
+#pragma omp parallel default(none) \
+  private(im, iy) \
+  shared(progress, hTpLumi, hTpLumiS, hTpLumiPs) \
+  firstprivate(usePolarizedCS, total, numThreads, \
+    dm, dy, ymin, ymax, mmin, mmax, nm, ny, \
+    abscissas10, weights10, \
+    gslSplineGAA, gslInterpAccGAA, \
+    gslSplineBreakP, gslInterpAccBreakP, \
+    gslSplineFormFac, gslInterpAccFormFac)
     {
-      auto* fFluxFormInt = new TF1(Form("fFluxFormInt_private_%d", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
-      auto* gGAA = new TGraph(nb, vb, vGAA);
-      TH2D* hD2LDMDY_private = nullptr;
-      TH2D* hD2LDMDY_private_s = nullptr;
-      TH2D* hD2LDMDY_private_p = nullptr;
+      std::vector<std::vector<double>> tpLumiPrv;
+      std::vector<std::vector<double>> tpLumiSPrv;
+      std::vector<std::vector<double>> tpLumiPsPrv;
       if (usePolarizedCS) {
-        hD2LDMDY_private_s = new TH2D(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
-        hD2LDMDY_private_p = new TH2D(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+        tpLumiSPrv.resize(nm, std::vector<double>(ny, 0.));
+        tpLumiPsPrv.resize(nm, std::vector<double>(ny, 0.));
       } else {
-        hD2LDMDY_private = new TH2D(Form("hD2LDMDY_private_%d", omp_get_thread_num()), ";;", nm, mmin, mmax, ny, ymin, ymax);
+        tpLumiPrv.resize(nm, std::vector<double>(ny, 0.));
       }
       int threadNum = omp_get_thread_num();
       int lowM = nm * threadNum / numThreads;
       int highM = nm * (threadNum + 1) / numThreads;
-      for (im = lowM; im < highM; im++) {
+      for (im = lowM; im < highM; ++im) {
         double m = mmin + dm * im;
-        for (iy = 0; iy < ny; iy++) {
+        for (iy = 0; iy < ny; ++iy) {
           double y = ymin + dy * iy;
           if (usePolarizedCS) {
-            double lumi_s, lumi_p;
-            calcTwoPhotonLumiPol(lumi_s, lumi_p, m, y, fFluxFormInt, gGAA);
-            hD2LDMDY_private_s->SetBinContent(im, iy, lumi_s * dm * dy);
-            hD2LDMDY_private_p->SetBinContent(im, iy, lumi_p * dm * dy);
+            double lumiS, lumiPs;
+            calcTwoPhotonLumiPol(lumiS, lumiPs, m, y);
+            tpLumiSPrv[im][iy] = lumiS * dm * dy;
+            tpLumiPsPrv[im][iy] = lumiPs * dm * dy;
           } else {
-            double lumi = calcTwoPhotonLumi(m, y, fFluxFormInt, gGAA);
-            hD2LDMDY_private->SetBinContent(im, iy, lumi * dm * dy);
+            double lumi = calcTwoPhotonLumi(m, y);
+            tpLumiPrv[im][iy] = lumi * dm * dy;
           }
           progress++;
         }
         if (threadNum == 0) {
           double progressBar = 100. * progress / total;
-          PLOG_INFO << "Calculating two-photon luminosity: " << fixed << setprecision(2) << progressBar << "%";
+          PLOG_INFO << "Calculating two-photon luminosity: " << std::fixed << std::setprecision(2) << progressBar << "%";
         }
       }
 #pragma omp critical
       {
         if (usePolarizedCS) {
-          hD2LDMDY_s->Add(hD2LDMDY_private_s);
-          hD2LDMDY_p->Add(hD2LDMDY_private_p);
+          for (im = lowM; im < highM; ++im) {
+            for (iy = 0; iy < ny; ++iy) {
+              hTpLumiS->SetBinContent(im + 1, iy + 1, tpLumiSPrv[im][iy]);
+              hTpLumiPs->SetBinContent(im + 1, iy + 1, tpLumiPsPrv[im][iy]);
+            }
+          }
         } else {
-          hD2LDMDY->Add(hD2LDMDY_private);
+          for (im = lowM; im < highM; ++im) {
+            for (iy = 0; iy < ny; ++iy) {
+              hTpLumi->SetBinContent(im + 1, iy + 1, tpLumiPrv[im][iy]);
+            }
+          }
         }
-        delete hD2LDMDY_private;
-        delete hD2LDMDY_private_s;
-        delete hD2LDMDY_private_p;
       }
     }
     omp_set_num_threads(1);
-#else
-    auto* fFluxFormInt = new TF1(Form("fFluxFormInt", omp_get_thread_num()), fluxFormInt, 0, 10, 3);
-    auto* gGAA = new TGraph(nb, vb, vGAA);
-    for (im = 0; im < nm; im++) {
-      double M = mmin + dm * im;
-      for (iy = 0; iy < ny; iy++) {
-        double y = ymin + dy * iy;
-        if (usePolarizedCS) {
-          double lumi_s, lumi_p;
-          calcTwoPhotonLumiPol(lumi_s, lumi_p, m, y, fFluxFormInt, gGAA);
-          hD2LDMDY_s->SetBinContent(im, iy, lumi_s * dm * dy);
-          hD2LDMDY_p->SetBinContent(im, iy, lumi_p * dm * dy);
-        } else {
-          double lumi = calcTwoPhotonLumi(m, y, fFluxFormInt, gGAA);
-          hD2LDMDY->SetBinContent(im, iy, lumi * dm * dy);
-        }
-      }
-      double progressBar = 100. * progress / total;
-      PLOG_INFO << "Calculating two-photon luminosity: " << fixed << setprecision(2) << progressBar << "%";
-    }
-#endif
     if (usePolarizedCS) {
-      hD2LDMDY_s->Write();
-      hD2LDMDY_p->Write();
+      hTpLumiS->Write();
+      hTpLumiPs->Write();
     } else {
-      hD2LDMDY->Write();
+      hTpLumi->Write();
     }
     f2DLumi->Close();
     PLOG_INFO << "Two-photon luminosity was written to " << fname;
@@ -576,116 +591,160 @@ void UpcCrossSection::prepareTwoPhotonLumi()
   }  
 }
 
-void UpcCrossSection::calcNucCrossSectionYM(TH2D* hCrossSectionYM, vector<vector<double>>& hPolCSRatio, double& totCS)
+void UpcCrossSection::calcNucCrossSectionYM(std::vector<std::vector<double>>& crossSectionYM,
+                                            std::vector<std::vector<double>>& polCSRatio,
+                                            double& totCS)
 {
   PLOG_INFO << "Calculating nuclear cross section...";
 
   double dy = (ymax - ymin) / ny;
   double dm = (mmax - mmin) / nm;
 
-  TH2D* hD2LDMDY = nullptr;
-  TH2D* hD2LDMDY_s = nullptr;
-  TH2D* hD2LDMDY_p = nullptr;
+  TH2D* hTpLumi = nullptr;
+  TH2D* hTpLumiS = nullptr;
+  TH2D* hTpLumiPs = nullptr;
 
-  TString fname{lumiFileDirectory+"/twoPhotonLumi"};
+  TString fname{lumiFileDirectory + "/twoPhotonLumi"};
   fname += usePolarizedCS ? "Pol.root" : ".root";
   auto* f2DLumi = new TFile(fname, "r");
 
   if (usePolarizedCS) {
-    hD2LDMDY_s = (TH2D*)f2DLumi->Get("hD2LDMDY_s");
-    hD2LDMDY_p = (TH2D*)f2DLumi->Get("hD2LDMDY_p");
+    hTpLumiS = (TH2D*)f2DLumi->Get("hD2LDMDY_s");
+    hTpLumiPs = (TH2D*)f2DLumi->Get("hD2LDMDY_p");
   } else { // loading pre-cached two-photon luminosity
-    hD2LDMDY = (TH2D*)f2DLumi->Get("hD2LDMDY");
+    hTpLumi = (TH2D*)f2DLumi->Get("hD2LDMDY");
   }
 
   // calculating nuclear cross section
   ROOT::EnableThreadSafety();
-  int im, iy, ib;
   int progress = 0;
   int total = nm * ny;
-  std::vector<std::vector<double>> cs(nm, std::vector<double>(ny, 0));
-  std::vector<std::vector<double>> cs_rat(nm, std::vector<double>(ny, 0));
+  omp_set_dynamic(0);
   omp_set_num_threads(numThreads);
-#pragma omp parallel default(none)                                                   \
-  shared(cs, cs_rat, hD2LDMDY, hD2LDMDY_s, hD2LDMDY_p, progress) private(im, iy, ib) \
-    firstprivate(elemProcess, nb, vb, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10, vGAA)
+#pragma omp parallel default(none) \
+  shared(totCS, crossSectionYM, polCSRatio, hTpLumi, hTpLumiS, hTpLumiPs, progress) \
+    firstprivate(elemProcess, total, numThreads, dm, dy, ymin, ymax, mmin, mmax, nm, ny, abscissas10, weights10)
   {
-    vector<vector<double>> cs_private(nm, vector<double>(ny, 0));
-    vector<vector<double>> rat_private(nm, vector<double>(ny, 0));
-    TH2D* hD2LDMDY_private = nullptr;
-    TH2D* hD2LDMDY_private_s = nullptr;
-    TH2D* hD2LDMDY_private_p = nullptr;
+    std::vector<std::vector<double>> csPrv(ny, std::vector<double>(nm, 0.));
+    std::vector<std::vector<double>> ratioPrv;
+    TH2D* hTpLumiPrv = nullptr;
+    TH2D* hTpLumiSPrv = nullptr;
+    TH2D* hTpLumiPsPrv = nullptr;
     if (usePolarizedCS) {
-      hD2LDMDY_private_s = (TH2D*)hD2LDMDY_s->Clone(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()));
-      hD2LDMDY_private_p = (TH2D*)hD2LDMDY_p->Clone(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()));
+      hTpLumiSPrv = (TH2D*)hTpLumiS->Clone(Form("hD2LDMDY_private_s_%d", omp_get_thread_num()));
+      hTpLumiPsPrv = (TH2D*)hTpLumiPs->Clone(Form("hD2LDMDY_private_p_%d", omp_get_thread_num()));
+      ratioPrv.resize(ny, std::vector<double>(nm, 0.));
     } else {
-      hD2LDMDY_private = (TH2D*)hD2LDMDY->Clone(Form("hD2LDMDY_private_%d", omp_get_thread_num()));
+      hTpLumiPrv = (TH2D*)hTpLumi->Clone(Form("hD2LDMDY_private_%d", omp_get_thread_num()));
     }
     int threadNum = omp_get_thread_num();
-    int lowM = nm * threadNum / numThreads;
-    int highM = nm * (threadNum + 1) / numThreads;
-    for (im = lowM; im < highM; im++) {
+    int imL = nm * threadNum / numThreads;
+    int imH = nm * (threadNum + 1) / numThreads;
+    for (int im = imL; im < imH; ++im) {
       double m = mmin + dm * im;
-      for (iy = 0; iy < ny; iy++) {
+      for (int iy = 0; iy < ny; ++iy) {
         if (!usePolarizedCS) { // unpolarized cross section
-          double lumi = hD2LDMDY_private->GetBinContent(im, iy);
-          cs_private[im][iy] = elemProcess->calcCrossSectionM(m) * lumi;
+          double lumi = hTpLumiPrv->GetBinContent(im + 1, iy + 1);
+          csPrv[iy][im] = elemProcess->calcCrossSectionM(m) * lumi;
         } else { // polarized
           double cs_s = elemProcess->calcCrossSectionMPolS(m);
           double cs_p = elemProcess->calcCrossSectionMPolPS(m);
-          double lumi_s = hD2LDMDY_private_s->GetBinContent(im, iy);
-          double lumi_p = hD2LDMDY_private_p->GetBinContent(im, iy);
+          double lumi_s = hTpLumiSPrv->GetBinContent(im + 1, iy + 1);
+          double lumi_p = hTpLumiPsPrv->GetBinContent(im + 1, iy + 1);
           double nuccs_s = lumi_s * cs_s; // scalar part
           double nuccs_p = lumi_p * cs_p; // psudoscalar part
           double nuccs = nuccs_s + nuccs_p;
-          cs_private[im][iy] = nuccs * 1e7; // fm^2 -> nb
-          rat_private[im][iy] = nuccs_s / nuccs_p;
+          csPrv[iy][im] = nuccs * 1e7; // fm^2 -> nb
+          ratioPrv[iy][im] = nuccs_s / nuccs_p;
         }
         progress++;
       }
       if (threadNum == 0) {
         double progressBar = 100. * progress / total;
-        PLOG_INFO << "Calculating nuclear cross section... " << fixed << setprecision(2) << progressBar << "%";
+        PLOG_INFO << "Calculating nuclear cross section... " << std::fixed << std::setprecision(2) << progressBar << "%";
       }
     }
 #pragma omp critical
     {
-      for (im = lowM; im < highM; im++) {
-        for (iy = 0; iy < ny; iy++) {
-          cs[im][iy] = cs_private[im][iy];
-          cs_rat[im][iy] = rat_private[im][iy];
+      for (int im = imL; im < imH; ++im) {
+        for (int iy = 0; iy < ny; ++iy) {
+          crossSectionYM[iy][im] = csPrv[iy][im];
+          totCS += csPrv[iy][im];
         }
       }
+
+      if (usePolarizedCS) {
+        for (int im = imL; im < imH; ++im)
+          for (int iy = 0; iy < ny; ++iy)
+            polCSRatio[iy][im] = ratioPrv[iy][im];
+      }
     }
-    delete hD2LDMDY_private;
-    delete hD2LDMDY_private_s;
-    delete hD2LDMDY_private_p;
+    delete hTpLumiPrv;
+    delete hTpLumiSPrv;
+    delete hTpLumiPsPrv;
   }
   omp_set_num_threads(1);
 
-  delete hD2LDMDY;
-  delete hD2LDMDY_s;
-  delete hD2LDMDY_p;
+  delete hTpLumi;
+  delete hTpLumiS;
+  delete hTpLumiPs;
   f2DLumi->Close();
   delete f2DLumi;
 
   PLOG_INFO << "Calculating nuclear cross section...Done!";
 
-  // filling histograms
-  double cssum = 0;
-  for (int i = 0; i < nm; i++) {
-    for (int j = 0; j < ny; j++) {
-      double cs_ij = cs[i][j];
-      hCrossSectionYM->SetBinContent(j + 1, i + 1, cs_ij);
-      if (usePolarizedCS) {
-        double rat_ij = cs_rat[i][j];
-        hPolCSRatio[j][i] = rat_ij;
-      }
-    }
-  }
+  totCS *= 1e-6; // [nb] to [mb]
+  PLOG_INFO << "Total nuclear cross section = " << std::fixed << std::setprecision(6) << totCS << " mb";
+}
 
-  totCS = hCrossSectionYM->Integral() * 1e-6;
-  PLOG_INFO << "Total nuclear cross section = " << fixed << setprecision(6) << totCS << " mb";
+double UpcCrossSection::calcPhotonFlux(double M, double Y)
+{
+  double k = M / 2. * exp(Y);
+
+  double bmin = isPoint ? 1 * R : 0.05 * R;
+  double bmax = TMath::Max(5. * g1 * phys_consts::hc / k, 5 * R);
+  double log_delta_b = (log(bmax) - log(bmin)) / nb1;
+
+  double sum = 0;
+  for (int i = 0; i < nb1; i++) {
+    double bl = bmin * exp(i * log_delta_b);
+    double bh = bmin * exp((i + 1) * log_delta_b);
+    double b = (bh + bl) / 2.;
+    double breakup = 1.;
+    if (breakupMode != 1) {
+      breakup = gsl_spline_eval(gslSplineBreakP, b < 20. ? b : 20., gslInterpAccBreakP);
+    }
+    double gaa = b < 20. ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
+    sum += breakup * gaa * fluxForm(b, k) * b * (bh - bl);
+  }
+  double flux = 2. * M_PI * k * sum;
+  return flux;
+}
+
+void UpcCrossSection::calcNucCrossSectionY(
+  std::vector<std::vector<double>>& crossSectionY,
+  std::vector<std::vector<double>>& csYRatio,
+  double& totCS
+)
+{
+  PLOG_INFO << "Calculating nuclear cross section...";
+
+  double dy = (ymax - ymin) / ny;
+
+  for (int iy = 0; iy < ny; iy++) {
+    double y = ymin + dy * iy;
+    double flux1 = calcPhotonFlux(elemProcess->mPart, y);
+    double cs1 = elemProcess->calcCrossSectionY(y);
+    double flux2 = calcPhotonFlux(elemProcess->mPart, -y);
+    double cs2 = elemProcess->calcCrossSectionY(-y);
+    double upcCs1 = flux1 * cs1;
+    double upcCs2 = flux2 * cs2;
+    // printf("%.6f %.6f\n", y, cs);
+    crossSectionY[iy][0] = upcCs1 + upcCs2;
+    totCS += upcCs1 + upcCs2;
+    csYRatio[iy][0] = upcCs1 / upcCs2;
+  }
+  totCS *= dy; // already in [mb] for VM
 }
 
 // Function from Starlight
@@ -973,7 +1032,7 @@ double UpcCrossSection::getPhotonPt(double ePhot)
     for (int bin = 1; bin <= nbins; bin++) {
       double pt = 6. * phys_consts::hc / R / nbins * bin;
       double arg = pt * pt + ereds;
-      double sFFactPt1 = getCachedFormFac(arg);
+      double sFFactPt1 = gsl_spline_eval(gslSplineFormFac, arg, gslInterpAccFormFac);
       double prob = (sFFactPt1 * sFFactPt1) * pt * pt * pt / (pi2x4 * arg * arg);
       ptDistr.SetBinContent(bin, prob);
     }
@@ -1012,4 +1071,34 @@ void UpcCrossSection::getPairMomentum(double mPair, double yPair, TLorentzVector
     double e = mtPair * TMath::CosH(yPair);
     pPair.SetPxPyPzE(px, py, pz, e);
   }
+}
+
+void UpcCrossSection::getMomentumVM(
+  double m, double y,
+  int target,
+  TLorentzVector& p)
+{
+  double sign = target ? 1 : -1;
+  double ePhot = m / 2 * exp(sign * y);
+  double ePom = m / 2 * exp(-sign * y);
+  double ptPhot = getPhotonPt(ePhot);
+  double phi1 = gRandom->Uniform(0, 2 * M_PI);
+  double phi2 = gRandom->Uniform(0, 2 * M_PI);
+  double tmin = (ePom * ePom) / (g1 * g1);
+  double ptPom;
+  while (true) {
+    ptPom = 32. * gRandom->Uniform(0., 1.) * phys_consts::hc * R;
+    double t2 = tmin + ptPom * ptPom;
+    double ff = calcFormFac(t2) / A;
+    double test = gRandom->Uniform(0., 1.);
+    if (test < ff * ff * ptPom)
+      break;
+  }
+  double px = ptPhot * TMath::Cos(phi1) + ptPom * TMath::Cos(phi2);
+  double py = ptPhot * TMath::Sin(phi1) + ptPom * TMath::Sin(phi2);
+  double pt = TMath::Sqrt(px * px + py * py);
+  double mtPair = TMath::Sqrt(m * m + pt * pt);
+  double pz = mtPair * TMath::SinH(y);
+  double e = mtPair * TMath::CosH(y);
+  p.SetPxPyPzE(px, py, pz, e);
 }

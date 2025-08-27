@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////////////////
-// Copyright (C) 2021-2024, Nazar Burmasov, Evgeny Kryshen
+// Copyright (C) 2021-2025, Nazar Burmasov, Evgeny Kryshen
 //
 // E-mail of the corresponding author: nazar.burmasov@cern.ch
 //
@@ -33,13 +33,13 @@ UpcTwoPhotonDilep::UpcTwoPhotonDilep(int partPDG)
   // populating lepton mass map
   // data from PDG
   if (partPDG == 11) { // electron
-    mPart = 0.000510998946;
+    mPart = phys_consts::mEl;
   }
   if (partPDG == 13) { // muon
-    mPart = 0.1056583745;
+    mPart = phys_consts::mMu;
   }
   if (partPDG == 15) { // tau
-    mPart = 1.77686;
+    mPart = phys_consts::mTau;
   }
 }
 
