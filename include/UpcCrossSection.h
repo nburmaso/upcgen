@@ -77,12 +77,12 @@ class UpcCrossSection
   // parameters of the nucleus
   inline static int Z{82};
   inline static int A{208};
-  inline static double mNucl{(Z * phys_consts::mProt + (A - Z) * phys_consts::mNeut) / A};
+  inline static double mNucl{(Z * phc::mProt + (A - Z) * phc::mNeut) / A};
 
   // beam parameters
   inline static double sqrts{5020.};
-  inline static double g1{sqrts / (2. * phys_consts::mProt)};
-  inline static double g2{sqrts / (2. * phys_consts::mProt)};
+  inline static double g1{sqrts / (2. * phc::mProt)};
+  inline static double g2{sqrts / (2. * phc::mProt)};
 
   // Gaussian integration n = 10
   // since cos is symmetric around 0 we only need 5
@@ -132,7 +132,7 @@ class UpcCrossSection
   double hiMCut{9999};
 
   // scaling factor
-  double factor{Z * Z * phys_consts::alpha / M_PI / M_PI / phys_consts::hc / phys_consts::hc};
+  double factor{Z * Z * phc::alpha / M_PI / M_PI / phc::hc / phc::hc};
 
   // helper containers for calculations
   // ----------------------------------------------------------------------
@@ -171,7 +171,10 @@ class UpcCrossSection
   double alpMass{1.}; // 1 GeV
   double alpWidth{0.010}; // 10 MeV
 
+  int64_t seed{0};
+
   void init();
+  void setSeed(int64_t _seed) { seed = _seed; }
 
   // methods for cross section calculation
   // ----------------------------------------------------------------------
@@ -210,6 +213,8 @@ class UpcCrossSection
                              std::vector<std::vector<double>>& polCSRatio,
                              double& totCS);
 
+  double vegasNucCrossSectionYM();
+
   void calcNucCrossSectionY(std::vector<std::vector<double>>& crossSectionY,
                             std::vector<std::vector<double>>& csYRatio,
                             double& totCS);
@@ -219,7 +224,6 @@ class UpcCrossSection
   // functions for calculating pair momentum
   // accounting for non-zero photon pt
   double getPhotonPt(double ePhot);
-  double getPomPt(double ePom);
   void getPairMomentum(double mPair, double yPair, TLorentzVector& pPair);
   void getMomentumVM(double m, double y, int target, TLorentzVector& pPair);
 

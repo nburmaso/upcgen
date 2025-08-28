@@ -145,6 +145,7 @@ void UpcGenerator::init()
   printParameters();
 
   // calculate two-photon luminosity
+  nucProcessCS->setSeed(seed == 0 ? time(nullptr) : seed);
   nucProcessCS->init();
 
   // initialize the MT64 random number generator
@@ -187,8 +188,8 @@ void UpcGenerator::setParameterValue(const std::string& parameter, const std::st
   }
   if (parameter == "SQRTS") {
     UpcCrossSection::sqrts = stod(parValue);
-    UpcCrossSection::g1 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
-    UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
+    UpcCrossSection::g1 = UpcCrossSection::sqrts / (2. * phc::mProt);
+    UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phc::mProt);
   }
   if (parameter == "PROC_ID") {
     procID = stoi(parValue);
@@ -302,17 +303,20 @@ void UpcGenerator::setParameterValue(const std::string& parameter, const std::st
   if (parameter == "DECAY_PDG") {
     nucProcessCS->dghtPDG = stoi(parValue);
   }
+  if (parameter == "EXPERIMENTAL") {
+    isExperimental = stoi(parValue);
+  }
 }
 
 void UpcGenerator::setCollisionSystem(float sqrts, int nucl_z, int nucl_a)
 {
   UpcCrossSection::sqrts = sqrts;
-  UpcCrossSection::g1 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
-  UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phys_consts::mProt);
+  UpcCrossSection::g1 = UpcCrossSection::sqrts / (2. * phc::mProt);
+  UpcCrossSection::g2 = UpcCrossSection::sqrts / (2. * phc::mProt);
 
   UpcCrossSection::Z = nucl_z;
   UpcCrossSection::A = nucl_a;
-  UpcCrossSection::mNucl = (nucl_z * phys_consts::mProt + (nucl_a - nucl_z) * phys_consts::mNeut) / nucl_a;
+  UpcCrossSection::mNucl = (nucl_z * phc::mProt + (nucl_a - nucl_z) * phc::mNeut) / nucl_a;
 }
 
 void UpcGenerator::configGeneratorFromFile()
@@ -383,6 +387,7 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
   PLOG_INFO << "SHADOWING " << nucProcessCS->shadowingOption;
   PLOG_INFO << "DECAY_PDG " << nucProcessCS->dghtPDG;
+  PLOG_INFO << "EXPERIMENTAL " << isExperimental;
 }
 
 void UpcGenerator::pairProduction(TLorentzVector& pPair,                  // lorentz pair-momentum vector of incoming photons
@@ -629,6 +634,12 @@ void UpcGenerator::writeEvent(long int evt,
 
 void UpcGenerator::computeNuclXsection()
 {
+  if (isExperimental) {
+    totCS = nucProcessCS->vegasNucCrossSectionYM();
+    std::exit(0);
+    return;
+  }
+
   bool isVM = false;
   if (procID == 443 || procID == 100443 || procID == 553)
     isVM = true;
@@ -667,6 +678,7 @@ void UpcGenerator::computeNuclXsection()
     if (usePolarizedCS) {
       polCSRatio.resize(ny, std::vector<double>(nm));
     }
+
     nucProcessCS->calcNucCrossSectionYM(nucCSYM, polCSRatio, totCS);
 
     // setup random samplers
@@ -718,8 +730,9 @@ long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
                                      std::vector<TLorentzVector>& particles)
 {
   bool isVM = false;
-  if (procID == 443 || procID == 100443 || procID == 553)
+  if (procID == 443 || procID == 100443 || procID == 553) {
     isVM = true;
+  }
 
   // clear the particle vectors
   pdgs.clear();
@@ -734,26 +747,37 @@ long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
 
   // pick pair m and y from nuclear cross section
   double mPair, yPair;
-  (*samplerCsYM)(yPair, mPair);
-  int yPairBin = samplerCsYM->getBinX(yPair);
-  int mPairBin = samplerCsYM->getBinY(mPair);
-
-  // pick z = cos(theta) for corresponding m from elem. cross section
   double cost;
-  if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
-    if (usePolarizedCS) {
-      double frac = polCSRatio[yPairBin][mPairBin];
-      bool pickScalar = gRandom->Uniform(0, 1) < frac;
-      if (pickScalar) {
-        cost = (*samplersCsSZ[mPairBin])();
+  int yPairBin;
+  int mPairBin;
+
+  if (!isExperimental) {
+    (*samplerCsYM)(yPair, mPair);
+    yPairBin = samplerCsYM->getBinX(yPair);
+    mPairBin = samplerCsYM->getBinY(mPair);
+
+    // pick z = cos(theta) for corresponding m from elem. cross section
+    if (!ignoreCSZ) { // ignoring z distribution for narrow resonances
+      if (usePolarizedCS) {
+        double frac = polCSRatio[yPairBin][mPairBin];
+        bool pickScalar = gRandom->Uniform(0, 1) < frac;
+        if (pickScalar) {
+          cost = (*samplersCsSZ[mPairBin])();
+        } else {
+          cost = (*samplersCsPsZ[mPairBin])();
+        }
       } else {
-        cost = (*samplersCsPsZ[mPairBin])();
+        cost = (*samplersCsZ[mPairBin])();
       }
     } else {
-      cost = (*samplersCsZ[mPairBin])();
+      cost = gRandom->Uniform(-1., 1.);
     }
-  } else {
-    cost = gRandom->Uniform(-1., 1.);
+  } else { // experimental
+//    std::vector<double> state(6, 0.);
+//    nucProcessCS->upcSampleKineFromIntegrand(state);
+//    mPair = state[0];
+//    yPair = state[1];
+//    cost = state[5];
   }
 
   TLorentzVector pPair;

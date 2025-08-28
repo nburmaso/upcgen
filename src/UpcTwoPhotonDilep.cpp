@@ -24,8 +24,6 @@
 
 #include <cmath>
 
-using namespace std;
-
 UpcTwoPhotonDilep::UpcTwoPhotonDilep(int partPDG)
 {
   this->partPDG = partPDG;
@@ -33,13 +31,13 @@ UpcTwoPhotonDilep::UpcTwoPhotonDilep(int partPDG)
   // populating lepton mass map
   // data from PDG
   if (partPDG == 11) { // electron
-    mPart = phys_consts::mEl;
+    mPart = phc::mEl;
   }
   if (partPDG == 13) { // muon
-    mPart = phys_consts::mMu;
+    mPart = phc::mMu;
   }
   if (partPDG == 15) { // tau
-    mPart = phys_consts::mTau;
+    mPart = phc::mTau;
   }
 }
 
@@ -47,15 +45,15 @@ double UpcTwoPhotonDilep::calcCrossSectionM(double m)
 {
   double s = m * m;                 // cms invariant mass squared
   double x = 4 * mPart * mPart / s; // inverse lepton gamma-factor squared = 1/g^2 in cms
-  double b = sqrt(1 - x);           // lepton relativistic velocity in cms
-  double y = atanh(b);              // lepton rapidity in cms
+  double b = std::sqrt(1 - x);           // lepton relativistic velocity in cms
+  double y = std::atanh(b);              // lepton rapidity in cms
   double cs = 0;
   cs += (2 + 2 * x - x * x) * y - b * (1 + x);
   cs += 4 * y * aLep;
   cs += (4 * b / x + y) * aLep * aLep;
   cs += (4 * b / x - 2 * y) * aLep * aLep * aLep;
   cs += ((7. / 12.) * b / x + (1. / 6.) * b / x / x - 0.5 * y) * aLep * aLep * aLep * aLep;
-  cs *= 4 * phys_consts::hc * phys_consts::hc * 1e7 * phys_consts::alpha * phys_consts::alpha * M_PI / s;
+  cs *= 4 * phc::hc2 * 1e7 * phc::alpha2 * M_PI / s;
   return cs;
   // [nb] //
 }
@@ -63,9 +61,9 @@ double UpcTwoPhotonDilep::calcCrossSectionM(double m)
 double UpcTwoPhotonDilep::calcCrossSectionZM(double z, double m)
 {
   double s = m * m;
-  double k = sqrt(s) / 2.;                // photon/lepton energy in cm system in GeV
-  double p = sqrt(k * k - mPart * mPart); // outgoing lepton momentum in GeV
-  double norm = 2 * M_PI * phys_consts::alpha * phys_consts::alpha / s * p / k;
+  double k = std::sqrt(s) / 2.;                // photon/lepton energy in cm system in GeV
+  double p = std::sqrt(k * k - mPart * mPart); // outgoing lepton momentum in GeV
+  double norm = 2 * M_PI * phc::alpha2 / s * p / k;
   double kt = -2 * k * (k - z * p) / mPart / mPart;
   double ku = -2 * k * (k + z * p) / mPart / mPart;
   double ks = kt + ku;
@@ -85,11 +83,10 @@ double UpcTwoPhotonDilep::calcCrossSectionZM(double z, double m)
 double UpcTwoPhotonDilep::calcCrossSectionMPolS(double m)
 {
   double r = 2 * mPart / m;
-  double r2 = r * r;
   if (r > 1) {
     return 0;
   }
-  double cs_s = 4 * M_PI * phys_consts::alpha * phys_consts::alpha * phys_consts::hc * phys_consts::hc / m / m * ((1 + r * r - 3. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 3. / 2. * r * r) * sqrt(1 - r * r));
+  double cs_s = 4 * M_PI * phc::alpha2 * phc::hc2 / m / m * ((1 + r * r - 3. / 4. * r * r * r * r) * 2 * std::log(1 / r + std::sqrt(1 / r / r - 1)) - (1 + 3. / 2. * r * r) * std::sqrt(1 - r * r));
   return cs_s;
   // fm^2 //
 }
@@ -99,24 +96,22 @@ double UpcTwoPhotonDilep::calcCrossSectionZMPolS(double z, double m)
   double mLep2 = mPart * mPart;
   double m2 = m * m;
   double z2 = z * z;
-  double cs_s = 2 * M_PI * phys_consts::alpha * phys_consts::alpha;
+  double cs_s = 2 * M_PI * phc::alpha2 * phc::hc2;
   cs_s *= m2 - 4 * mLep2;
-  cs_s *= sqrt(m2 - 4 * mLep2);
+  cs_s *= std::sqrt(m2 - 4 * mLep2);
   cs_s *= (4 * mLep2 * (3 - 2 * z2 + z2 * z2)) + m2 * (1 - z2 * z2);
   cs_s /= m2 * m * (m2 * (1 - z2) + 4 * mLep2 * z2) * (m2 * (1 - z2) + 4 * mLep2 * z2);
   return cs_s;
-  // GeV^-2 //
+  // fm^2 //
 }
 
 double UpcTwoPhotonDilep::calcCrossSectionMPolPS(double m)
 {
   double r = 2 * mPart / m;
-  double r2 = r * r;
-  double r4 = r2 * r2;
   if (r > 1) {
     return 0;
   }
-  return 4 * M_PI * phys_consts::alpha * phys_consts::alpha * phys_consts::hc * phys_consts::hc / m / m * ((1 + r * r - 1. / 4. * r * r * r * r) * 2 * log(1 / r + sqrt(1 / r / r - 1)) - (1 + 1. / 2. * r * r) * sqrt(1 - r * r));
+  return 4 * M_PI * phc::alpha2 * phc::hc2 / m / m * ((1 + r * r - 1. / 4. * r * r * r * r) * 2 * std::log(1 / r + std::sqrt(1 / r / r - 1)) - (1 + 1. / 2. * r * r) * std::sqrt(1 - r * r));
   // fm^2 //
 }
 
@@ -125,10 +120,10 @@ double UpcTwoPhotonDilep::calcCrossSectionZMPolPS(double z, double m)
   double mLep2 = mPart * mPart;
   double m2 = m * m;
   double z2 = z * z;
-  double cs_s = 2 * M_PI * phys_consts::alpha * phys_consts::alpha;
-  cs_s *= sqrt(m2 - 4 * mLep2);
+  double cs_s = 2 * M_PI * phc::alpha2 * phc::hc2;
+  cs_s *= std::sqrt(m2 - 4 * mLep2);
   cs_s *= m2 * m2 * (1 - z2 * z2) + 8 * m2 * mLep2 * (1 - z2 + z2 * z2) - 16 * mLep2 * mLep2 * (1 - z2) * (1 - z2);
   cs_s /= m2 * m * (m2 * (1 - z2) + 4 * mLep2 * z2) * (m2 * (1 - z2) + 4 * mLep2 * z2);
   return cs_s;
-  // GeV^-2 //
+  // fm^2 //
 }

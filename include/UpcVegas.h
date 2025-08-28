@@ -19,15 +19,17 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //////////////////////////////////////////////////////////////////////////
 
-#include "UpcTwoPhotonALP.h"
-#include "UpcPhysConstants.h"
+#pragma once
 
-#include <cmath>
+#include <boost/python.hpp>
 
-// cross section in narrow resonance approximation
-double UpcTwoPhotonALP::calcCrossSectionM(double m)
+namespace python = boost::python;
+
+class UpcVegas
 {
-  double cs = 4. * M_PI * M_PI * width / (mPart * mPart);
-  cs *= phc::hc * phc::hc* 1e7 * phc::alpha * phc::alpha;
-  return cs;
-}
+ public:
+  UpcVegas() = default;
+  ~UpcVegas() = default;
+
+
+};

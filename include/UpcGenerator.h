@@ -135,6 +135,8 @@ class UpcGenerator
   bool useROOTOut{true};
   bool useHepMCOut{false};
 
+  bool isExperimental{false};
+
   // global variables needed for event generation
   double totCS;
   double fidCS;

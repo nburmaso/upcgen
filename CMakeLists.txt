@@ -28,12 +28,12 @@ project(Upcgen LANGUAGES CXX C)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules")
 
 # debug build
-#set(CMAKE_BUILD_TYPE Debug)
-#set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra")
-#set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # release build
-set(CMAKE_CXX_FLAGS "-O2 -fpic")
+#set(CMAKE_CXX_FLAGS "-O2 -fpic")
 
 option(BUILD_WITH_PYTHIA6 "Build with Pythia6 support" OFF)
 option(BUILD_WITH_PYTHIA8 "Build with Pythia8 support" ON)
@@ -51,7 +51,6 @@ if (ROOT_FOUND)
     message("ROOT includes: " ${ROOT_INCLUDE_DIRS})
     message("ROOT libraries: " ${ROOT_LIBRARIES})
     include_directories(${ROOT_INCLUDE_DIRS})
-    include_directories(${PROJECT_SOURCE_DIR}/include)
 endif ()
 
 find_package(GSL REQUIRED)
@@ -62,8 +61,12 @@ if (GSL_FOUND)
     include_directories(${GSL_INCLUDE_DIRS})
 endif ()
 
+set(PYBIND11_FINDPYTHON ON)
+add_subdirectory(extern/pybind11)
+
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 add_definitions(-DCROSS_SEC_DIR=\"${CMAKE_SOURCE_DIR}/cross_sections\")
 
@@ -93,3 +96,7 @@ set_target_properties(${UpcgenlibShared} PROPERTIES OUTPUT_NAME "Upcgenlib")
 # executable
 add_executable(upcgen main.cpp)
 target_link_libraries(upcgen ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} ${GSL_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)
+
+# executable
+add_executable(test test.cpp)
+target_link_libraries(test ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} ${GSL_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)

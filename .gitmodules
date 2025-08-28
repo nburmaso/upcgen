@@ -1,0 +1,8 @@
+[submodule "submodules/pybind11"]
+	path = submodules/pybind11
+	url = ../../pybind/pybind11
+	branch = stable
+[submodule "submodules/vegas"]
+	path = submodules/vegas
+	url = ../../gplepage/vegas
+	branch = main

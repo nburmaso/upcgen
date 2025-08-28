@@ -78,15 +78,15 @@ UpcPhotoNuclearVM::UpcPhotoNuclearVM(int partPDG, int shadowingOpt, int dghtPDG)
     throw std::invalid_argument("Unsupported particle");
   }
   if (dghtPDG == 11) {
-    mDght = phys_consts::mEl;
+    mDght = phc::mEl;
   } else if (dghtPDG == 13) { // muon
-    mDght = phys_consts::mMu;
+    mDght = phc::mMu;
   } else if (dghtPDG == 2212) {
-    mDght = phys_consts::mProt;
+    mDght = phc::mProt;
   } else {
     throw std::invalid_argument("Unsupported decay mode");
   }
-  double mmin = phys_consts::mProt + mPart;
+  double mmin = phc::mProt + mPart;
   fDsDt0->FixParameter(0, mmin);
   fDsDt0->FixParameter(1, c0);
   fDsDt0->FixParameter(2, pw);
