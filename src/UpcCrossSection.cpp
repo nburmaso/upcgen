@@ -21,9 +21,6 @@
 
 #include <gsl/gsl_interp2d.h>
 #include <gsl/gsl_math.h>
-#include <gsl/gsl_monte.h>
-#include <gsl/gsl_monte_vegas.h>
-#include <gsl/gsl_sf_bessel.h>
 
 #include <omp.h>
 
@@ -41,7 +38,7 @@ gsl_spline* gslSplineFormFac{nullptr};
 struct GslFuncParsFluxForm {
   double b;
   double k;
-  double g1;
+  double g;
 };
 
 GslFuncParsFluxForm gslFuncParsFluxForm;
@@ -132,12 +129,13 @@ void UpcCrossSection::init()
   // prepare caches
   prepareGAA();     // G_AA and Fourier-transformed G_AA
   prepareFormFac(); // nuclear form factor
-  if (breakupMode > 1) {
-    prepareBreakupProb();
-  }
+//  if (breakupMode > 1) {
+//    prepareBreakupProb();
+//  }
   if (elemProcess->partPDG != 443 &&
       elemProcess->partPDG != 100443 &&
-      elemProcess->partPDG != 553) {
+      elemProcess->partPDG != 553 &&
+      !useVegas) {
     prepareTwoPhotonLumi(); // calculate two-photon luminosity and save into a file
   }
 }
@@ -164,7 +162,7 @@ double UpcCrossSection::calcWSRho()
     double r = ib * db;
     vRho[ib] = r * r / (1. + exp((r - R) / a));
   }
-  double wsRho0 = A / simpson(nb, vRho, db) / 4. / M_PI;
+  double wsRho0 = A / simpson(nb, vRho, db) / 4. / phc::pi;
   return wsRho0;
 }
 
@@ -176,7 +174,7 @@ double UpcCrossSection::fluxPoint(const double b, const double k)
   double x = b * k / g / phc::hc;
   double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
   double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
-  double result = factor * k / g / g * (K1 * K1 + K0 * K0 / g / g);
+  double result = (Z * Z * phc::alpha / phc::pi2 / phc::hc2) * k / g / g * (K1 * K1 + K0 * K0 / g / g);
   if (debug > 1) {
     PLOG_DEBUG << "result = " << result;
   }
@@ -189,10 +187,10 @@ double fluxFormIntegrand(double x, void* par)
   double k = x;
   double b = gslFuncParsFluxForm.b;
   double w = gslFuncParsFluxForm.k;
-  double g = gslFuncParsFluxForm.g1;
+  double g = gslFuncParsFluxForm.g;
   double t = k * k + w * w / g / g;
-  double ff = gsl_spline_eval(gslSplineFormFac, t < Q2max ? t : Q2max - dQ2, gslInterpAccFormFac);
-  double result = k * k * ff / t * gsl_sf_bessel_J1(b * k / phc::hc);
+  double ff = UpcCrossSection::calcFormFac(t);
+  double result = k * k * ff / t * TMath::BesselJ1(b * k / phc::hc);
   return result;
 }
 
@@ -207,12 +205,12 @@ double UpcCrossSection::fluxForm(const double b, const double k)
 
   gslFuncParsFluxForm.b = b;
   gslFuncParsFluxForm.k = k;
-  gslFuncParsFluxForm.g1 = g1;
+  gslFuncParsFluxForm.g = g1;
   gslFuncFluxForm.function = &fluxFormIntegrand;
   gsl_integration_workspace* gslIntWsFluxForm = gsl_integration_workspace_alloc(1000);
 
   double res, err;
-  gsl_integration_qags(&gslFuncFluxForm, 0., 1., 1e-4, 1e-4, 1000,
+  gsl_integration_qags(&gslFuncFluxForm, 0., 10., 1e-4, 1e-4, 1000,
                        gslIntWsFluxForm, &res, &err); // GSL_INTEG_GAUSS61
 
   gsl_integration_workspace_free(gslIntWsFluxForm);
@@ -340,93 +338,203 @@ void UpcCrossSection::calcTwoPhotonLumiPol(double& ns, double& np, double M, dou
   np = 2. * M_PI * M_PI * M * sum_b1_p;
 }
 
-// integrand for MC integration
-struct GslFuncParsUpcIntegrand {
-  int mode;
-  UpcCrossSection* cs;
-};
+//std::shared_ptr<UpcVegas> UpcCrossSection::vegasUpcCrossSection(double& cs)
+//{
+//  std::function<double(double, double)> srflux = [this](double b, double k)
+//  {
+//    if (isPoint || b > 2. * R) {
+//      double g = g1;
+//      double x = b * k / g / phc::hc;
+//      double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
+//      double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
+//      double result = k / g * std::sqrt(K1 * K1 + K0 * K0 / g / g);
+//      return result;
+//    }
+//
+//    gslFuncParsFluxForm.b = b;
+//    gslFuncParsFluxForm.k = k;
+//    gslFuncParsFluxForm.g = g1;
+//    gslFuncFluxForm.function = &fluxFormIntegrand;
+//    gsl_integration_workspace* gslIntWsFluxForm = gsl_integration_workspace_alloc(1000);
+//
+//    double res, err;
+//    gsl_integration_qags(&gslFuncFluxForm, 0., 1., 1e-4, 1e-3, 1000,
+//                         gslIntWsFluxForm, &res, &err);
+//
+//    gsl_integration_workspace_free(gslIntWsFluxForm);
+//
+//    return res / A;
+//  };
+//
+//  std::function<double(std::vector<double>&)> f = [&srflux, this](std::vector<double>& x)
+//  {
+//    double m = x[0];
+//    double y = x[1];
+//    double b1 = x[2];
+//    double b2 = x[3];
+//    double phi = x[4];
+//    double kt1 = x[5];
+//    double kt2 = x[6];
+//    double cost = x[7];
+//
+//    double cphi = std::cos(phi);
+//    double cphi2 = cphi * cphi;
+//    double b = std::sqrt(b1 * b1 + b2 * b2 - 2. * b1 * b2 * cphi);
+//    if (b < bmin || b > bmax) return 0.;
+//    double sphi2 = 1. - cphi2;
+//
+//    int mode = breakupMode;
+//
+//    double k1 = m / 2. * std::exp(y);
+//    double k2 = m / 2. * std::exp(-y);
+//
+//    double gaa = b < 20 ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
+//
+//    double breakup = 1.;
+//    if (mode != 1) {
+//      breakup = calcBreakupProb(b, breakupMode);;
+//    }
+//
+//    double t1 = kt1 * kt1 + k1 * k1 / g1 / g1;
+//    double ff1 = calcFormFac(t1) / A;
+//    double fluxInt1 = kt1 * kt1 * ff1 / t1 * TMath::BesselJ1(b1 * kt1 / phc::hc);
+//
+//    double t2 = kt2 * kt2 + k2 * k2 / g2 / g2;
+//    double ff2 = calcFormFac(t2) / A;
+//    double fluxInt2 = kt2 * kt2 * ff2 / t2 * TMath::BesselJ1(b2 * kt2 / phc::hc);
+//
+//    double flux1 = (Z * Z * phc::alpha / phc::pi2 / phc::hc2) * srflux(b1, k1) * fluxInt1 / k1;
+//    double flux2 = (Z * Z * phc::alpha / phc::pi2 / phc::hc2) * srflux(b2, k2) * fluxInt2 / k2;
+//
+//    // double csElem = elemProcess->calcCrossSectionZM(z, m) * phc::hc2 * 10.; // GeV^-2 -> mb
+//    // double csElem = elemProcess->calcCrossSectionM(m) * 1e-6;
+//    // double csElemS = elemProcess->calcCrossSectionMPolS(m) * 10.; // fm^2 -> mb
+//    // double csElemPS = elemProcess->calcCrossSectionMPolPS(m) * 10.; // fm^2 -> mb
+//    // double integ = m * phc::pi * breakup * gaa * flux2 * flux1 * (csElem) * b1 * b2;
+//
+//    double csElemS = elemProcess->calcCrossSectionZMPolS(cost, m) * 10.; // fm^2 -> mb
+//    double csElemPS = elemProcess->calcCrossSectionZMPolPS(cost, m) * 10.; // fm^2 -> mb
+//    double integ = m * phc::pi * breakup * gaa * flux2 * flux1 * (csElemS * cphi2 + csElemPS * sphi2) * b1 * b2;
+//    return integ;
+//  };
+//
+//  auto vg = std::make_shared<UpcVegas>();
+//
+//  vg->xlims = {
+//    {mmin, mmax},      // m
+//    {ymin, ymax},      // y
+//    {0., 10000. * R},  // b1
+//    {0., 10000. * R},  // b2
+//    {0, 2. * phc::pi}, // phi
+//    {0., 1.},          // kt1
+//    {0., 1.},          // kt2
+//    {zmin, zmax},      // z=cos(th)
+//  };
+//
+//  vg->func_cpp = f;
+//  vg->seed = seed;
+//  vg->init();
+//  cs = vg->integrate();
+//  printf("cs=%.12f\n", cs);
+//
+//  return vg;
+//}
 
-GslFuncParsUpcIntegrand gslFuncParsUpcIntegrand;
 
-double upcCsIntegrand(double* x, size_t /* dim */, void* pars)
+std::shared_ptr<UpcVegas> UpcCrossSection::vegasUpcCrossSection(double& cs)
 {
-  double m = x[0];
-  double y = x[1];
-  double b1 = x[2];
-  double b2 = x[3];
-  double phi = x[4];
-  double z = x[5];
+  std::function<double(double, double)> srflux = [this](double b, double k)
+  {
+    if (isPoint || b > 2. * R) {
+      double g = g1;
+      double x = b * k / g / phc::hc;
+      double K0 = x > 1e-10 ? TMath::BesselK0(x) : 0;
+      double K1 = x > 1e-10 ? TMath::BesselK1(x) : 0;
+      double result = k / g * std::sqrt(K1 * K1 + K0 * K0 / g / g);
+      return result;
+    }
 
-  auto* fp = (GslFuncParsUpcIntegrand*)pars;
-  int mode = fp->mode;
-  auto* cs = fp->cs;
+    gslFuncParsFluxForm.b = b;
+    gslFuncParsFluxForm.k = k;
+    gslFuncParsFluxForm.g = g1;
+    gslFuncFluxForm.function = &fluxFormIntegrand;
+    gsl_integration_workspace* gslIntWsFluxForm = gsl_integration_workspace_alloc(1000);
 
-  double k1 = m / 2. * std::exp(y);
-  double k2 = m / 2. * std::exp(-y);
+    double res, err;
+    gsl_integration_qags(&gslFuncFluxForm, 0., 1., 1e-4, 1e-3, 1000,
+                         gslIntWsFluxForm, &res, &err);
 
-  double cphi = std::cos(phi);
-  double sphi = std::sin(phi);
-  double b = std::sqrt(b1 * b1 + b2 * b2 - 2. * b1 * b2 * cphi);
-  double gaa = b < 20 ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
+    gsl_integration_workspace_free(gslIntWsFluxForm);
 
-  double breakup = 1.;
-  if (mode != 1) {
-    breakup = gsl_spline_eval(gslSplineBreakP, b < 20. ? b : 20., gslInterpAccBreakP);
-  }
+    return res / A;
+  };
 
-  double flux1 = cs->fluxForm(b1, k1);
-  double flux2 = cs->fluxForm(b2, k2);
+  std::function<double(std::vector<double>&)> f = [&srflux, this](std::vector<double>& x)
+  {
+    double m = x[0];
+    double y = x[1];
+    double b = x[2];
+    double b1 = x[3];
+    double phi1 = x[4];
+    double kt1 = x[5];
+    double kt2 = x[6];
+    double cost = x[7];
 
-  double csElemS = cs->elemProcess->calcCrossSectionZMPolS(z, m);
-  double csElemP = cs->elemProcess->calcCrossSectionZMPolPS(z, m);
-  double integ = 2 * M_PI * m * breakup * gaa * flux2 * flux1 * b1 * b2 * (cphi * cphi * csElemS + sphi * sphi * csElemP);
-  return integ;
-}
+    double cphi1 = std::cos(phi1);
+    double b2 = std::sqrt(b * b + b1 * b1 - 2 * b1 * b * cphi1);
+    double cphi = (b1 - b * cphi1) / b2;
+    double cphi2 = cphi * cphi;
+    double sphi2 = 1. - cphi2;
 
-double UpcCrossSection::vegasNucCrossSectionYM()
-{
-  auto display_results =
-    [](const std::string& title, double result, double error) {
-      printf("%s ==================\n", title.c_str());
-      printf("result = % .6f\n", result);
-      printf("err    = % .6f\n", error);
-    };
+    int mode = breakupMode;
 
-  double res, err;
+    double k1 = m / 2. * std::exp(y);
+    double k2 = m / 2. * std::exp(-y);
 
-  // m, y, b1, b2, phi, z=cos(th)
-  const int ndim = 6;
-  double xl[ndim] = {mmin, ymin, 0.05 * R, 0.05 * R, -M_PI, zmin};
-  double xu[ndim] = {mmax, ymax, 10. * R, 10. * R, M_PI, zmax};
+    double gaa = 1.; // b < 20 ? gsl_spline_eval(gslSplineGAA, b, gslInterpAccGAA) : 1.;
 
-  gsl_rng* rng = nullptr;
-  rng = gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(rng, seed);
+    double breakup = 1.;
+    if (mode != 1) {
+      breakup = calcBreakupProb(b, breakupMode);
+    }
 
-  GslFuncParsUpcIntegrand pars = {breakupMode, this};
-  gsl_monte_function f = {&upcCsIntegrand, ndim, &pars};
+    double t1 = kt1 * kt1 + k1 * k1 / g1 / g1;
+    double ff1 = calcFormFac(t1) / A;
+    double fluxInt1 = kt1 * kt1 * ff1 / t1 * TMath::BesselJ1(b1 * kt1 / phc::hc);
 
-  size_t calls = 100000;
+    double t2 = kt2 * kt2 + k2 * k2 / g2 / g2;
+    double ff2 = calcFormFac(t2) / A;
+    double fluxInt2 = kt2 * kt2 * ff2 / t2 * TMath::BesselJ1(b2 * kt2 / phc::hc);
 
-  gsl_monte_vegas_state* s = gsl_monte_vegas_alloc(ndim);
-  gsl_monte_vegas_integrate(&f, xl, xu, ndim, calls, rng, s, &res, &err);
+    double flux1 = (Z * Z * phc::alpha / phc::pi2 / phc::hc2) * srflux(b1, k1) * fluxInt1 / k1;
+    double flux2 = (Z * Z * phc::alpha / phc::pi2 / phc::hc2) * srflux(b2, k2) * fluxInt2 / k2;
 
-  display_results("vegas warm-up", res * 10., err * 10.);
+    double csElemS = elemProcess->calcCrossSectionZMPolS(cost, m) * 10.; // fm^2 -> mb
+    double csElemPS = elemProcess->calcCrossSectionZMPolPS(cost, m) * 10.; // fm^2 -> mb
+    double integ = m * phc::pi * breakup * gaa * flux2 * flux1 * (csElemS * cphi2 + csElemPS * sphi2) * b1 * b;
+    return integ;
+  };
 
-  printf("converging...\n");
+  auto vg = std::make_shared<UpcVegas>();
 
-  do {
-    gsl_monte_vegas_integrate(&f, xl, xu, ndim, calls / 5, rng, s, &res, &err);
-    printf("result = %.6f err = %.6f chisq/dof = %.1f\n",
-           res * 10., err * 10., gsl_monte_vegas_chisq(s));
-  } while (std::abs(gsl_monte_vegas_chisq(s) - 1.0) > 0.5);
+  vg->xlims = {
+    {mmin, mmax},          // m
+    {ymin, ymax},          // y
+    {bmin, bmax},          // b
+    {0., 1000000. * R},    // b1
+    {-phc::pi, +phc::pi},  // phi1
+    {0., 1.},              // kt1
+    {0., 1.},              // kt2
+    {zmin, zmax},          // z=cos(th)
+  };
 
-  display_results("vegas final", res * 10., err * 10.);
+  vg->func_cpp = f;
+  vg->seed = seed;
+  vg->init();
+  cs = vg->integrate();
+  printf("cs=%.12f\n", cs);
 
-  gsl_monte_vegas_free(s);
-  gsl_rng_free(rng);
-
-  return res;
+  return vg;
 }
 
 void UpcCrossSection::fillCrossSectionZM(std::vector<std::vector<double>>& crossSectionZM,

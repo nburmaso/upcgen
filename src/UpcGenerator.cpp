@@ -146,6 +146,7 @@ void UpcGenerator::init()
 
   // calculate two-photon luminosity
   nucProcessCS->setSeed(seed == 0 ? time(nullptr) : seed);
+  nucProcessCS->useVegas = useVegas;
   nucProcessCS->init();
 
   // initialize the MT64 random number generator
@@ -303,8 +304,14 @@ void UpcGenerator::setParameterValue(const std::string& parameter, const std::st
   if (parameter == "DECAY_PDG") {
     nucProcessCS->dghtPDG = stoi(parValue);
   }
-  if (parameter == "EXPERIMENTAL") {
-    isExperimental = stoi(parValue);
+  if (parameter == "VEGAS") {
+    useVegas = stoi(parValue);
+  }
+  if (parameter == "BMIN") {
+    nucProcessCS->bmin = stod(parValue);
+  }
+  if (parameter == "BMAX") {
+    nucProcessCS->bmax = stod(parValue);
   }
 }
 
@@ -387,7 +394,7 @@ void UpcGenerator::printParameters()
   PLOG_INFO << "HIGH_M_CUT " << nucProcessCS->hiMCut;
   PLOG_INFO << "SHADOWING " << nucProcessCS->shadowingOption;
   PLOG_INFO << "DECAY_PDG " << nucProcessCS->dghtPDG;
-  PLOG_INFO << "EXPERIMENTAL " << isExperimental;
+  PLOG_INFO << "VEGAS " << useVegas;
 }
 
 void UpcGenerator::pairProduction(TLorentzVector& pPair,                  // lorentz pair-momentum vector of incoming photons
@@ -407,6 +414,9 @@ void UpcGenerator::pairProduction(TLorentzVector& pPair,                  // lor
   particles.emplace_back(tlVec2);
 
   TVector3 boost = pPair.BoostVector();
+  TVector3 zAxis1 = pPair.Vect().Unit();
+  particles[0].RotateUz(zAxis1);
+  particles[1].RotateUz(zAxis1);
   particles[0].Boost(boost);
   particles[1].Boost(boost);
 
@@ -595,7 +605,8 @@ void UpcGenerator::writeEvent(long int evt,
                               const std::vector<int>& pdgs,
                               const std::vector<int>& statuses,
                               const std::vector<int>& mothers,
-                              const std::vector<TLorentzVector>& particles)
+                              const std::vector<TLorentzVector>& particles,
+                              double b = -1.)
 {
   if (useROOTOut) {
     for (int i = 0; i < particles.size(); i++) {
@@ -622,7 +633,7 @@ void UpcGenerator::writeEvent(long int evt,
         lastMotherId = mother;
       }
     }
-    writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), nVertices);
+    writerHepMC->writeEventInfo(evt, static_cast<int>(particles.size()), b, nVertices);
 
     for (int i = 0; i < particles.size(); ++i) {
       writerHepMC->writeParticleInfo(i + 1, mothers[i], pdgs[i],
@@ -634,9 +645,8 @@ void UpcGenerator::writeEvent(long int evt,
 
 void UpcGenerator::computeNuclXsection()
 {
-  if (isExperimental) {
-    totCS = nucProcessCS->vegasNucCrossSectionYM();
-    std::exit(0);
+  if (useVegas) {
+    vg = nucProcessCS->vegasUpcCrossSection(totCS);
     return;
   }
 
@@ -727,7 +737,8 @@ void UpcGenerator::computeNuclXsection()
 long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
                                      std::vector<int>& statuses,
                                      std::vector<int>& mothers,
-                                     std::vector<TLorentzVector>& particles)
+                                     std::vector<TLorentzVector>& particles,
+                                     double& b)
 {
   bool isVM = false;
   if (procID == 443 || procID == 100443 || procID == 553) {
@@ -748,10 +759,12 @@ long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
   // pick pair m and y from nuclear cross section
   double mPair, yPair;
   double cost;
+  double b1, phi1;
+  double kt1, kt2;
   int yPairBin;
   int mPairBin;
 
-  if (!isExperimental) {
+  if (!useVegas) {
     (*samplerCsYM)(yPair, mPair);
     yPairBin = samplerCsYM->getBinX(yPair);
     mPairBin = samplerCsYM->getBinY(mPair);
@@ -772,12 +785,16 @@ long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
     } else {
       cost = gRandom->Uniform(-1., 1.);
     }
-  } else { // experimental
-//    std::vector<double> state(6, 0.);
-//    nucProcessCS->upcSampleKineFromIntegrand(state);
-//    mPair = state[0];
-//    yPair = state[1];
-//    cost = state[5];
+  } else {
+    auto state = vg->generate();
+    mPair = state[0];
+    yPair = state[1];
+    b = state[2];
+    b1 = state[3];
+    phi1 = state[4];
+    kt1 = state[5];
+    kt2 = state[6];
+    cost = state[7];
   }
 
   TLorentzVector pPair;
@@ -787,12 +804,24 @@ long int UpcGenerator::generateEvent(std::vector<int>& pdgs,
     bool target = gRandom->Uniform(0, 1) < ratio;
     nucProcessCS->getMomentumVM(mPair, yPair, target, pPair);
   } else {
-    nucProcessCS->getPairMomentum(mPair, yPair, pPair);
+    double cphi1 = std::cos(phi1);
+    double sphi1 = std::sin(phi1);
+    double b2 = std::sqrt(b * b + b1 * b1 - 2 * b1 * b * cphi1);
+    double sphi2 = -b1 / b2 * sphi1;
+    double cphi2 = (b1 * cphi1 - b) / b2;
+    double px = kt1 * cphi1 + kt2 * cphi2;
+    double py = kt1 * sphi1 + kt2 * sphi2;
+    double pt = std::sqrt(px * px + py * py);
+    double mtPair = std::sqrt(mPair * mPair + pt * pt);
+    double pz = mtPair * TMath::SinH(yPair);
+    double e = mtPair * TMath::CosH(yPair);
+    pPair.SetPxPyPzE(px, py, pz, e);
+    // nucProcessCS->getPairMomentum(mPair, yPair, pPair);
   }
 
   if (isPairProduction) {
-    double pMag = std::sqrt(pPair.Mag2() / 4 - mPart * mPart);
-    double theta = acos(cost);
+    double pMag = std::sqrt(pPair.Mag2() / 4. - mPart * mPart);
+    double theta = std::acos(cost);
     double phi = gRandom->Uniform(0., 2. * M_PI);
     TVector3 vec;
     vec.SetMagThetaPhi(pMag, theta, phi);
@@ -897,8 +926,9 @@ void UpcGenerator::generateEvents()
     }
 
     // generate an event
-    if (generateEvent(pdgs, statuses, mothers, particles) == 1) {
-      writeEvent(evt, pdgs, statuses, mothers, particles);
+    double b = -1.;
+    if (generateEvent(pdgs, statuses, mothers, particles, b) == 1) {
+      writeEvent(evt, pdgs, statuses, mothers, particles, b);
       evt++;
     } else {
       rejected++;

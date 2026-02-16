@@ -54,13 +54,14 @@
 #include "plog/Initializers/RollingFileInitializer.h"
 #include "plog/Log.h"
 
-#include "UpcElemProcess.h"
 #include "UpcPhysConstants.h"
+#include "UpcElemProcess.h"
 #include "UpcTwoPhotonALP.h"
 #include "UpcTwoPhotonDilep.h"
 #include "UpcTwoPhotonDipion.h"
 #include "UpcTwoPhotonLbyL.h"
 #include "UpcPhotoNuclearVM.h"
+#include "UpcVegas.h"
 
 class UpcCrossSection
 {
@@ -75,8 +76,8 @@ class UpcCrossSection
   inline static double a{0.447}; // fm
 
   // parameters of the nucleus
-  inline static int Z{82};
-  inline static int A{208};
+  inline static double Z{82};
+  inline static double A{208};
   inline static double mNucl{(Z * phc::mProt + (A - Z) * phc::mNeut) / A};
 
   // beam parameters
@@ -110,6 +111,8 @@ class UpcCrossSection
                             0.8650633666889845,
                             0.9739065285171717};
 
+  bool useVegas{false};
+
   // photon luminosity calculation parameters
   TString lumiFileDirectory{"."};
   void setLumiFileDirectory(TString directory) { lumiFileDirectory = directory; };
@@ -126,6 +129,8 @@ class UpcCrossSection
   double ymin{-6.};  // min pair rapidity
   double ymax{6.};   // max pair rapidity
   int ny{121};       // n bins in Y
+  double bmin{0.};
+  double bmax{100000.};
 
   bool doMassCut{false};
   double lowMCut{0};
@@ -213,7 +218,7 @@ class UpcCrossSection
                              std::vector<std::vector<double>>& polCSRatio,
                              double& totCS);
 
-  double vegasNucCrossSectionYM();
+  std::shared_ptr<UpcVegas> vegasUpcCrossSection(double& cs);
 
   void calcNucCrossSectionY(std::vector<std::vector<double>>& crossSectionY,
                             std::vector<std::vector<double>>& csYRatio,

@@ -24,10 +24,12 @@
 // physics quantities
 namespace phc
 {
+constexpr double pi{3.14159265358979323846};
+constexpr double pi2{pi * pi};
 constexpr double alpha{1.0 / 137.035999074}; // fine structure constant
 constexpr double alpha2{alpha * alpha};      // fine structure constant
-constexpr double hc{0.1973269718};           // scaling factor
-constexpr double hc2{hc * hc};               // scaling factor
+constexpr double hc{0.1973269718};           // scaling factor, GeV^2 x fm
+constexpr double hc2{hc * hc};               // scaling factor, GeV^2 x fm^2
 constexpr double mProt{0.9382720813};        // proton mass
 constexpr double mNeut{0.939565346};         // neutron mass
 constexpr double mEl{0.000510998946};

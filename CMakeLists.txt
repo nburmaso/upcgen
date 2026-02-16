@@ -22,6 +22,7 @@
 cmake_minimum_required(VERSION 3.9)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(Upcgen LANGUAGES CXX C)
 
@@ -61,8 +62,23 @@ if (GSL_FOUND)
     include_directories(${GSL_INCLUDE_DIRS})
 endif ()
 
-set(PYBIND11_FINDPYTHON ON)
+set(Python_FIND_VIRTUALENV FIRST)
+find_package(Python 3.8  COMPONENTS Interpreter Development.Embed REQUIRED)
+if (Python_FOUND)
+    message("Found Python " ${Python_VERSION} ":")
+    message("Python interpreter: " ${Python_EXECUTABLE})
+    message("Python includes: " ${Python_INCLUDE_DIRS})
+    message("Python libraries: " ${Python_LIBRARIES})
+    include_directories(${Python_INCLUDE_DIRS})
+endif ()
+
 add_subdirectory(extern/pybind11)
+if (pybind11_FOUND)
+    message("Found pybind11 " ${GSL_VERSION} ":")
+    message("pybind11 includes: " ${pybind11_INCLUDE_DIRS})
+    message("pybind11 libraries: " ${pybind11_LIBRARIES})
+    include_directories(${pybind11_INCLUDE_DIRS})
+endif ()
 
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
@@ -83,6 +99,9 @@ if (BUILD_WITH_PYTHIA8)
     include_directories(${PYTHIA8_INCLUDE_DIR})
 endif()
 
+# python venv location
+add_definitions(-DVENV_DIR=\"${CMAKE_SOURCE_DIR}/upc-venv\")
+
 # static and ...
 set(Upcgenlib "Upcgenlib")
 add_library(${Upcgenlib} STATIC ${sources})
@@ -95,8 +114,16 @@ set_target_properties(${UpcgenlibShared} PROPERTIES OUTPUT_NAME "Upcgenlib")
 
 # executable
 add_executable(upcgen main.cpp)
-target_link_libraries(upcgen ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} ${GSL_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)
+target_link_libraries(upcgen
+        ${Upcgenlib}
+        ${optLibs}
+        ${ROOT_LIBRARIES}
+        ${GSL_LIBRARIES}
+        $ENV{ROOTSYS}/lib/libEG.so
+        ${Python_LIBRARIES}
+        pybind11::module)
 
 # executable
 add_executable(test test.cpp)
-target_link_libraries(test ${Upcgenlib} ${optLibs} ${ROOT_LIBRARIES} ${GSL_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)
+target_link_libraries(test ${Python_LIBRARIES} pybind11::module ${ROOT_LIBRARIES} $ENV{ROOTSYS}/lib/libEG.so)
+#target_link_libraries(test ${Python_LIBRARIES} pybind11::module)

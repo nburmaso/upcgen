@@ -121,7 +121,7 @@ class UpcGenerator
   double fidNuclX() { return fidCS; }
 
   // event generation
-  long int generateEvent(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<int>& mothers, std::vector<TLorentzVector>& particles);
+  long int generateEvent(std::vector<int>& pdgs, std::vector<int>& statuses, std::vector<int>& mothers, std::vector<TLorentzVector>& particles, double& b);
   const std::vector<TParticle>& getParticles() const { return genParticles; };
 
   // the main method in an event loop
@@ -135,7 +135,9 @@ class UpcGenerator
   bool useROOTOut{true};
   bool useHepMCOut{false};
 
-  bool isExperimental{false};
+  // vegas integrator parameters
+  bool useVegas{false};
+  std::shared_ptr<UpcVegas> vg{nullptr};
 
   // global variables needed for event generation
   double totCS;
@@ -178,7 +180,8 @@ class UpcGenerator
                   const std::vector<int>& pdgs,
                   const std::vector<int>& statuses,
                   const std::vector<int>& mothers,
-                  const std::vector<TLorentzVector>& particles);
+                  const std::vector<TLorentzVector>& particles,
+                  double b);
 
   // pythia helper & decayer parameters
   int pythiaVersion{-1}; // not using Pythia at all by default
@@ -225,10 +228,12 @@ class UpcGenerator
     }
 
     // writing basic event info with default HepMC units
-    void writeEventInfo(long int eventID, int nParticles, int nVertices = 0)
+    void writeEventInfo(long int eventID, int nParticles, double b = -1, int nVertices = 0)
     {
       outfile << "E " << eventID << " " << nVertices << " " << nParticles << "\n"
               << "U GEV MM"
+              << "\n";
+      outfile << "A 0 GenHeavyIon v0 -1 -1 -1 -1 -1 -1 -1 -1 -1 " << b << " -1 -1 -1 -1 -1 -1 -1 -1 -1 0 0"
               << "\n";
     }
 
